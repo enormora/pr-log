@@ -43,7 +43,9 @@ test('exports pull request collection and label resolution', async () => {
         githubRepo: 'owner/repo',
         baseRef: 'base',
         git: {
-            getMergeCommitLogs: fake.resolves([{ subject: 'Merge pull request #1 from branch', body: 'title' }])
+            getFirstParentCommitLogs: fake.resolves([
+                { hash: 'hash-1', subject: 'Merge pull request #1 from branch', body: 'title' }
+            ])
         },
         pullRequestTitleReader: { getTitle: fake.resolves('fallback title') }
     });

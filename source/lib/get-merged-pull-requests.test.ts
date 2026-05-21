@@ -13,10 +13,11 @@ const latestVersion = '1.2.3';
 const expectedPullRequestLabelCallCount = 2;
 const expectedWaitForMillisecondsCallCount = 2;
 const comparedArgumentCount = 3;
+const secondPullRequestIdentifier = 2;
 
 type Overrides = {
     readonly listTags?: SinonSpy;
-    readonly getMergeCommitLogs?: SinonSpy;
+    readonly getFirstParentCommitLogs?: SinonSpy;
     readonly getPullRequestLabel?: SinonSpy;
     readonly githubClient?: Octokit;
     readonly waitForMilliseconds?: SinonSpy;
@@ -32,7 +33,7 @@ type ControlledLabelLookup = {
 function factory(overrides: Overrides = {}): GetMergedPullRequests {
     const {
         listTags = fake.resolves([latestVersion]),
-        getMergeCommitLogs = fake.resolves([]),
+        getFirstParentCommitLogs = fake.resolves([]),
         getPullRequestLabel = fake.resolves('bug'),
         githubClient = {
             pulls: {
@@ -46,7 +47,7 @@ function factory(overrides: Overrides = {}): GetMergedPullRequests {
     const dependencies = {
         getPullRequestLabel,
         githubClient,
-        gitCommandRunner: { listTags, getMergeCommitLogs },
+        gitCommandRunner: { listTags, getFirstParentCommitLogs },
         waitForMilliseconds,
         labelLookupIntervalMilliseconds
     } as unknown as GetMergedPullRequestsDependencies;
@@ -109,61 +110,63 @@ test('throws when there are only non-semver tags', async () => {
 
 test('ignores non-semver tag', async () => {
     const listTags = fake.resolves(['0.0.1', 'foo', '0.0.2', '0.0.0.0.1']);
-    const getMergeCommitLogs = fake.resolves([]);
-    const getMergedPullRequests = factory({ listTags, getMergeCommitLogs });
+    const getFirstParentCommitLogs = fake.resolves([]);
+    const getMergedPullRequests = factory({ listTags, getFirstParentCommitLogs });
 
     await getMergedPullRequests(anyRepo, defaultValidLabels);
 
-    assert.strictEqual(getMergeCommitLogs.callCount, 1);
-    assert.deepStrictEqual(getMergeCommitLogs.firstCall.args, ['0.0.2']);
+    assert.strictEqual(getFirstParentCommitLogs.callCount, 1);
+    assert.deepStrictEqual(getFirstParentCommitLogs.firstCall.args, ['0.0.2']);
 });
 
 test('always uses the highest version', async () => {
     const listTags = fake.resolves(['1.0.0', '0.0.0', '0.7.5', '2.0.0', '0.2.5', '0.5.0']);
-    const getMergeCommitLogs = fake.resolves([]);
-    const getMergedPullRequests = factory({ listTags, getMergeCommitLogs });
+    const getFirstParentCommitLogs = fake.resolves([]);
+    const getMergedPullRequests = factory({ listTags, getFirstParentCommitLogs });
 
     await getMergedPullRequests(anyRepo, defaultValidLabels);
 
-    assert.strictEqual(getMergeCommitLogs.callCount, 1);
-    assert.deepStrictEqual(getMergeCommitLogs.firstCall.args, ['2.0.0']);
+    assert.strictEqual(getFirstParentCommitLogs.callCount, 1);
+    assert.deepStrictEqual(getFirstParentCommitLogs.firstCall.args, ['2.0.0']);
 });
 
 test('ignores prerelease versions', async () => {
     const listTags = fake.resolves(['1.0.0', '0.0.0', '0.7.5', '2.0.0', '0.2.5', '3.0.0-alpha.1']);
-    const getMergeCommitLogs = fake.resolves([]);
-    const getMergedPullRequests = factory({ listTags, getMergeCommitLogs });
+    const getFirstParentCommitLogs = fake.resolves([]);
+    const getMergedPullRequests = factory({ listTags, getFirstParentCommitLogs });
 
     await getMergedPullRequests(anyRepo, defaultValidLabels);
 
-    assert.strictEqual(getMergeCommitLogs.callCount, 1);
-    assert.deepStrictEqual(getMergeCommitLogs.firstCall.args, ['2.0.0']);
+    assert.strictEqual(getFirstParentCommitLogs.callCount, 1);
+    assert.deepStrictEqual(getFirstParentCommitLogs.firstCall.args, ['2.0.0']);
 });
 
 test('throws when the pull request cannot be extracted from the commit message', async () => {
-    const getMergeCommitLogs = fake.resolves([
+    const getFirstParentCommitLogs = fake.resolves([
         {
+            hash: 'hash-1',
             subject: 'Merge pull request foo from branch',
             body: 'pr-1 message'
         }
     ]);
-    const getMergedPullRequests = factory({ getMergeCommitLogs });
+    const getMergedPullRequests = factory({ getFirstParentCommitLogs });
 
     await assert.rejects(getMergedPullRequests(anyRepo, defaultValidLabels), {
         message: 'Failed to extract pull request id from merge commit log'
     });
 });
 
-test('falls back to the GitHub API when the commit log doesn’t have a body', async () => {
+test('falls back to the GitHub API when the commit log does not have a body', async () => {
     const get = fake.resolves({ data: { title: 'pull request title from github' } });
     const githubClient = { pulls: { get } } as unknown as Octokit;
-    const getMergeCommitLogs = fake.resolves([
+    const getFirstParentCommitLogs = fake.resolves([
         {
+            hash: 'hash-1',
             subject: 'Merge pull request #1 from branch',
             body: undefined
         }
     ]);
-    const getMergedPullRequests = factory({ getMergeCommitLogs, githubClient });
+    const getMergedPullRequests = factory({ getFirstParentCommitLogs, githubClient });
 
     const pullRequests = await getMergedPullRequests(anyRepo, defaultValidLabels);
 
@@ -178,13 +181,14 @@ test('throws when the title is missing in the commit log and the GitHub API requ
             get: stub().rejects(new Error('GitHub API failed'))
         }
     } as unknown as Octokit;
-    const getMergeCommitLogs = fake.resolves([
+    const getFirstParentCommitLogs = fake.resolves([
         {
+            hash: 'hash-1',
             subject: 'Merge pull request #1 from branch',
             body: undefined
         }
     ]);
-    const getMergedPullRequests = factory({ getMergeCommitLogs, githubClient });
+    const getMergedPullRequests = factory({ getFirstParentCommitLogs, githubClient });
 
     await assert.rejects(getMergedPullRequests(anyRepo, defaultValidLabels), {
         message: 'GitHub API failed'
@@ -192,13 +196,14 @@ test('throws when the title is missing in the commit log and the GitHub API requ
 });
 
 test('throws when the title is missing in the commit log and the repo is invalid', async () => {
-    const getMergeCommitLogs = fake.resolves([
+    const getFirstParentCommitLogs = fake.resolves([
         {
+            hash: 'hash-1',
             subject: 'Merge pull request #1 from branch',
             body: undefined
         }
     ]);
-    const getMergedPullRequests = factory({ getMergeCommitLogs });
+    const getMergedPullRequests = factory({ getFirstParentCommitLogs });
 
     await assert.rejects(getMergedPullRequests('invalid-repo', defaultValidLabels), {
         message: 'Could not find a repository'
@@ -209,14 +214,15 @@ test('extracts id, title and label for merged pull requests', async () => {
     const firstExpectedPullRequest = { id: 1, title: 'pr-1 message', label: 'bug' };
     const secondExpectedPullRequest = { id: 2, title: 'pr-2 message', label: 'bug' };
     const getPullRequestLabel = fake.resolves('bug');
-    const getMergeCommitLogs = fake.resolves([
+    const getFirstParentCommitLogs = fake.resolves([
         {
+            hash: 'hash-1',
             subject: 'Merge pull request #1 from branch',
             body: 'pr-1 message'
         },
-        { subject: 'Merge pull request #2 from other', body: 'pr-2 message' }
+        { hash: 'hash-2', subject: 'Merge pull request #2 from other', body: 'pr-2 message' }
     ]);
-    const getMergedPullRequests = factory({ getMergeCommitLogs, getPullRequestLabel });
+    const getMergedPullRequests = factory({ getFirstParentCommitLogs, getPullRequestLabel });
 
     const pullRequests = await getMergedPullRequests(anyRepo, defaultValidLabels);
 
@@ -231,20 +237,20 @@ test('extracts id, title and label for merged pull requests', async () => {
         defaultValidLabels,
         secondExpectedPullRequest.id
     ]);
-
     assert.deepStrictEqual(pullRequests, [firstExpectedPullRequest, secondExpectedPullRequest]);
 });
 
 test('looks up pull request labels sequentially', async () => {
-    const getMergeCommitLogs = fake.resolves([
+    const getFirstParentCommitLogs = fake.resolves([
         {
+            hash: 'hash-1',
             subject: 'Merge pull request #1 from branch',
             body: 'pr-1 message'
         },
-        { subject: 'Merge pull request #2 from other', body: 'pr-2 message' }
+        { hash: 'hash-2', subject: 'Merge pull request #2 from other', body: 'pr-2 message' }
     ]);
     const { getPullRequestLabel, firstLabelLookupStarted, resolveFirstLabelLookup } = createControlledLabelLookup();
-    const getMergedPullRequests = factory({ getMergeCommitLogs, getPullRequestLabel });
+    const getMergedPullRequests = factory({ getFirstParentCommitLogs, getPullRequestLabel });
     const mergedPullRequests = getMergedPullRequests(anyRepo, defaultValidLabels);
 
     await firstLabelLookupStarted;
@@ -268,18 +274,19 @@ test('looks up pull request labels sequentially', async () => {
 });
 
 test('waits between pull request label lookups', async () => {
-    const getMergeCommitLogs = fake.resolves([
+    const getFirstParentCommitLogs = fake.resolves([
         {
+            hash: 'hash-1',
             subject: 'Merge pull request #1 from branch',
             body: 'pr-1 message'
         },
-        { subject: 'Merge pull request #2 from other', body: 'pr-2 message' },
-        { subject: 'Merge pull request #3 from third', body: 'pr-3 message' }
+        { hash: 'hash-2', subject: 'Merge pull request #2 from other', body: 'pr-2 message' },
+        { hash: 'hash-3', subject: 'Merge pull request #3 from third', body: 'pr-3 message' }
     ]);
     const waitForMilliseconds = fake.resolves(undefined);
     const labelLookupIntervalMilliseconds = 123;
     const getMergedPullRequests = factory({
-        getMergeCommitLogs,
+        getFirstParentCommitLogs,
         waitForMilliseconds,
         labelLookupIntervalMilliseconds
     });
@@ -289,4 +296,97 @@ test('waits between pull request label lookups', async () => {
     assert.strictEqual(waitForMilliseconds.callCount, expectedWaitForMillisecondsCallCount);
     assert.deepStrictEqual(waitForMilliseconds.firstCall.args, [labelLookupIntervalMilliseconds]);
     assert.deepStrictEqual(waitForMilliseconds.secondCall.args, [labelLookupIntervalMilliseconds]);
+});
+
+test('ignores first-parent commits that are not merge commits', async () => {
+    const getFirstParentCommitLogs = fake.resolves([
+        { hash: 'hash-2', subject: 'chore: prepare release', body: 'release housekeeping' },
+        { hash: 'hash-1', subject: 'Merge pull request #1 from branch', body: 'pr-1 message' }
+    ]);
+    const getPullRequestLabel = fake.resolves('bug');
+    const getMergedPullRequests = factory({ getFirstParentCommitLogs, getPullRequestLabel });
+
+    const pullRequests = await getMergedPullRequests(anyRepo, defaultValidLabels);
+
+    assert.strictEqual(getPullRequestLabel.callCount, 1);
+    assert.deepStrictEqual(pullRequests, [{ id: 1, title: 'pr-1 message', label: 'bug' }]);
+});
+
+test('ignores merge commits that were reverted later', async () => {
+    const revertedMergeCommitHash = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const getFirstParentCommitLogs = fake.resolves([
+        {
+            hash: 'cccccccccccccccccccccccccccccccccccccccc',
+            subject: 'Revert "Merge pull request #1 from branch"',
+            body: `This reverts commit ${revertedMergeCommitHash}.`
+        },
+        {
+            hash: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+            subject: 'Merge pull request #2 from other',
+            body: 'pr-2 message'
+        },
+        { hash: revertedMergeCommitHash, subject: 'Merge pull request #1 from branch', body: 'pr-1 message' }
+    ]);
+    const getPullRequestLabel = fake.resolves('bug');
+    const getMergedPullRequests = factory({ getFirstParentCommitLogs, getPullRequestLabel });
+
+    const pullRequests = await getMergedPullRequests(anyRepo, defaultValidLabels);
+
+    assert.strictEqual(getPullRequestLabel.callCount, 1);
+    assert.deepStrictEqual(getPullRequestLabel.firstCall.args.slice(0, comparedArgumentCount), [
+        'any/repo',
+        defaultValidLabels,
+        secondPullRequestIdentifier
+    ]);
+    assert.deepStrictEqual(pullRequests, [{ id: secondPullRequestIdentifier, title: 'pr-2 message', label: 'bug' }]);
+});
+
+test('includes a merge commit again when its revert was reverted later', async () => {
+    const revertedMergeCommitHash = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const revertCommitHash = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const getFirstParentCommitLogs = fake.resolves([
+        {
+            hash: 'cccccccccccccccccccccccccccccccccccccccc',
+            subject: 'Revert "Revert \\"Merge pull request #1 from branch\\""',
+            body: `This reverts commit ${revertCommitHash}.`
+        },
+        {
+            hash: revertCommitHash,
+            subject: 'Revert "Merge pull request #1 from branch"',
+            body: `This reverts commit ${revertedMergeCommitHash}.`
+        },
+        { hash: revertedMergeCommitHash, subject: 'Merge pull request #1 from branch', body: 'pr-1 message' }
+    ]);
+    const getPullRequestLabel = fake.resolves('bug');
+    const getMergedPullRequests = factory({ getFirstParentCommitLogs, getPullRequestLabel });
+
+    const pullRequests = await getMergedPullRequests(anyRepo, defaultValidLabels);
+
+    assert.strictEqual(getPullRequestLabel.callCount, 1);
+    assert.deepStrictEqual(pullRequests, [{ id: 1, title: 'pr-1 message', label: 'bug' }]);
+});
+
+test('includes a revert commit when the reverted merge was already released', async () => {
+    const get = fake.resolves({ data: { title: 'pr-1 message' } });
+    const githubClient = { pulls: { get } } as unknown as Octokit;
+    const getFirstParentCommitLogs = fake.resolves([
+        {
+            hash: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+            subject: 'Revert "Merge pull request #1 from branch"',
+            body: 'This reverts commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.'
+        }
+    ]);
+    const getPullRequestLabel = fake.resolves('bug');
+    const getMergedPullRequests = factory({ getFirstParentCommitLogs, getPullRequestLabel, githubClient });
+
+    const pullRequests = await getMergedPullRequests(anyRepo, defaultValidLabels);
+
+    assert.deepStrictEqual(get.firstCall.args, [{ owner: 'any', repo: 'repo', pull_number: 1 }]);
+    assert.strictEqual(getPullRequestLabel.callCount, 1);
+    assert.deepStrictEqual(getPullRequestLabel.firstCall.args.slice(0, comparedArgumentCount), [
+        'any/repo',
+        defaultValidLabels,
+        1
+    ]);
+    assert.deepStrictEqual(pullRequests, [{ id: 1, title: 'Revert "pr-1 message"', label: 'bug' }]);
 });

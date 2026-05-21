@@ -12,8 +12,8 @@ import {
 import {
     collectMergedPullRequests as collectMergedPullRequestsValue,
     type CollectMergedPullRequestsInput as CollectMergedPullRequestsInputValue,
+    type FirstParentCommitLogEntry as FirstParentCommitLogEntryValue,
     type GitRangeReader as GitRangeReaderValue,
-    type MergeCommitLogEntry as MergeCommitLogEntryValue,
     type PullRequest as PullRequestValue,
     type PullRequestTitleReader as PullRequestTitleReaderValue
 } from './lib/collect-merged-pull-requests.ts';
@@ -92,10 +92,10 @@ export async function resolvePullRequestLabels(
 export type ChangelogBaseRef = ChangelogBaseRefValue;
 export type CollectMergedPullRequestsInput = CollectMergedPullRequestsInputValue;
 export type FetchPullRequestChangedFilesInput = FetchPullRequestChangedFilesInputValue;
+export type FirstParentCommitLogEntry = FirstParentCommitLogEntryValue;
 export type GitRangeReader = GitRangeReaderValue;
 export type GitRefReader = GitRefReaderValue;
 export type LatestSemverTagBaseRefInput = LatestSemverTagBaseRefInputValue;
-export type MergeCommitLogEntry = MergeCommitLogEntryValue;
 export type MissingChangelogBaseRefError = MissingChangelogBaseRefErrorValue;
 export type MissingChangelogBaseRefReason = MissingChangelogBaseRefReasonValue;
 export type PackageChangelogBaseRefInput = PackageChangelogBaseRefInputValue;

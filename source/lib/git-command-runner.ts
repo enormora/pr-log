@@ -12,6 +12,15 @@ type MergeCommitLogEntry = {
     readonly body: string | undefined;
 };
 
+type FirstParentCommitLogEntry = {
+    readonly hash: string;
+    readonly subject: string;
+    readonly body: string | undefined;
+};
+
+type FirstParentCommitLogFields = readonly [hash: string, subject: string, body: string | undefined];
+type FirstParentCommitLogParts = readonly [hash: string, subject: string, ...remainingFields: readonly string[]];
+
 export type GitCommandRunner = {
     getShortStatus(): Promise<string>;
     getCurrentBranchName(): Promise<string>;
@@ -21,6 +30,7 @@ export type GitCommandRunner = {
     listTags(): Promise<readonly string[]>;
     hasRef(ref: string): Promise<boolean>;
     getMergeCommitLogs(from: string): Promise<readonly MergeCommitLogEntry[]>;
+    getFirstParentCommitLogs(from: string): Promise<readonly FirstParentCommitLogEntry[]>;
 };
 
 export type GitCommandRunnerDependencies = {
@@ -41,11 +51,22 @@ function splitLines(value: string, lineSeparator = '\n'): readonly string[] {
 
 const lineSeparator = '##$$@@$$##';
 const fieldSeparator = '__||__';
+const minimumCommitLogFieldCount = 2;
+const bodyFieldIndex = 2;
 
-function createParsableGitLogFormat(): string {
+function createParsableMergeGitLogFormat(): string {
     const subjectPlaceholder = '%s';
     const bodyPlaceholder = '%b';
     const fields = [subjectPlaceholder, bodyPlaceholder];
+
+    return `${fields.join(fieldSeparator)}${lineSeparator}`;
+}
+
+function createParsableFirstParentGitLogFormat(): string {
+    const hashPlaceholder = '%H';
+    const subjectPlaceholder = '%s';
+    const bodyPlaceholder = '%b';
+    const fields = [hashPlaceholder, subjectPlaceholder, bodyPlaceholder];
 
     return `${fields.join(fieldSeparator)}${lineSeparator}`;
 }
@@ -59,47 +80,124 @@ async function hasExistingRef(execute: typeof execaCommand, ref: string): Promis
     }
 }
 
+function hasFirstParentCommitLogFields(parts: readonly string[]): parts is FirstParentCommitLogParts {
+    return parts.length >= minimumCommitLogFieldCount;
+}
+
+function parseFirstParentCommitLogFields(log: string): FirstParentCommitLogFields {
+    const parts = splitByString(log, fieldSeparator);
+
+    if (!hasFirstParentCommitLogFields(parts)) {
+        throw new TypeError('Failed to determine git commit log entry');
+    }
+
+    const [hash, subject] = parts;
+    const body = parts[bodyFieldIndex];
+
+    return [hash, subject, body];
+}
+
+async function readShortStatus(execute: typeof execaCommand): Promise<string> {
+    const result = await execute('git status --short');
+    return result.stdout.trim();
+}
+
+async function readCurrentBranchName(execute: typeof execaCommand): Promise<string> {
+    const result = await execute('git rev-parse --abbrev-ref HEAD');
+    return result.stdout.trim();
+}
+
+async function fetchRemoteByAlias(execute: typeof execaCommand, remoteAlias: string): Promise<void> {
+    await execute(`git fetch ${remoteAlias}`);
+}
+
+async function readSymmetricBranchDifferences(
+    execute: typeof execaCommand,
+    branchA: string,
+    branchB: string
+): Promise<readonly string[]> {
+    const result = await execute(`git rev-list --left-right ${branchA}...${branchB}`);
+    return splitLines(result.stdout);
+}
+
+async function readRemoteAliases(execute: typeof execaCommand): Promise<readonly RemoteAlias[]> {
+    const result = await execute('git remote -v');
+
+    return splitLines(result.stdout).map((line: string) => {
+        const remoteLineTokens = splitByPattern(line, /\s/);
+        const [alias, url] = remoteLineTokens;
+
+        if (url === undefined) {
+            throw new TypeError('Failed to determine git remote alias');
+        }
+
+        return { alias, url };
+    });
+}
+
+async function readTags(execute: typeof execaCommand): Promise<readonly string[]> {
+    const result = await execute('git tag --list');
+    return splitLines(result.stdout);
+}
+
+async function readMergeCommitLogs(
+    execute: typeof execaCommand,
+    from: string
+): Promise<readonly MergeCommitLogEntry[]> {
+    const result = await execute(oneLine`git log --first-parent --no-color
+        --pretty=format:${createParsableMergeGitLogFormat()} --merges ${from}..HEAD`);
+
+    const logs = splitLines(result.stdout, lineSeparator);
+    return logs.map((log) => {
+        const parts = splitByString(log, fieldSeparator);
+        const [subject, body] = parts;
+
+        return { subject, body: body === '' ? undefined : body };
+    });
+}
+
+async function readFirstParentCommitLogs(
+    execute: typeof execaCommand,
+    from: string
+): Promise<readonly FirstParentCommitLogEntry[]> {
+    const result = await execute(
+        oneLine`git log --first-parent --no-color
+            --pretty=format:${createParsableFirstParentGitLogFormat()} ${from}..HEAD`
+    );
+
+    const logs = splitLines(result.stdout, lineSeparator);
+    return logs.map((log) => {
+        const [hash, subject, body] = parseFirstParentCommitLogFields(log);
+        return { hash, subject, body: body === '' ? undefined : body };
+    });
+}
+
 export function createGitCommandRunner(dependencies: GitCommandRunnerDependencies): GitCommandRunner {
     const { execute } = dependencies;
 
     return {
         async getShortStatus() {
-            const result = await execute('git status --short');
-            return result.stdout.trim();
+            return readShortStatus(execute);
         },
 
         async getCurrentBranchName() {
-            const result = await execute('git rev-parse --abbrev-ref HEAD');
-            return result.stdout.trim();
+            return readCurrentBranchName(execute);
         },
 
         async fetchRemote(remoteAlias) {
-            await execute(`git fetch ${remoteAlias}`);
+            return fetchRemoteByAlias(execute, remoteAlias);
         },
 
         async getSymmetricDifferencesBetweenBranches(branchA, branchB) {
-            const result = await execute(`git rev-list --left-right ${branchA}...${branchB}`);
-            return splitLines(result.stdout);
+            return readSymmetricBranchDifferences(execute, branchA, branchB);
         },
 
         async getRemoteAliases() {
-            const result = await execute('git remote -v');
-
-            return splitLines(result.stdout).map((line: string) => {
-                const remoteLineTokens = splitByPattern(line, /\s/);
-                const [alias, url] = remoteLineTokens;
-
-                if (url === undefined) {
-                    throw new TypeError('Failed to determine git remote alias');
-                }
-
-                return { alias, url };
-            });
+            return readRemoteAliases(execute);
         },
 
         async listTags() {
-            const result = await execute('git tag --list');
-            return splitLines(result.stdout);
+            return readTags(execute);
         },
 
         async hasRef(ref) {
@@ -107,16 +205,11 @@ export function createGitCommandRunner(dependencies: GitCommandRunnerDependencie
         },
 
         async getMergeCommitLogs(from) {
-            const result = await execute(oneLine`git log --first-parent --no-color
-                    --pretty=format:${createParsableGitLogFormat()} --merges ${from}..HEAD`);
+            return readMergeCommitLogs(execute, from);
+        },
 
-            const logs = splitLines(result.stdout, lineSeparator);
-            return logs.map((log) => {
-                const parts = splitByString(log, fieldSeparator);
-                const [subject, body] = parts;
-
-                return { subject, body: body === '' ? undefined : body };
-            });
+        async getFirstParentCommitLogs(from) {
+            return readFirstParentCommitLogs(execute, from);
         }
     };
 }
