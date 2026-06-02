@@ -177,6 +177,34 @@ Given the following setup:
 - Fix some spelling mistakes in documentation. (#22)
 ```
 
+## Library API
+
+The reusable changelog behavior is published as `@pr-log/core`.
+The CLI package `pr-log` composes the same API.
+
+```ts
+import {
+    collectMergedPullRequests,
+    resolveLatestSemverTagBaseRef,
+    resolvePullRequestLabels,
+    renderChangelogMarkdown
+} from '@pr-log/core';
+```
+
+`@pr-log/core` owns Git/GitHub range resolution, pull request collection, label resolution, changed-file lookup, and changelog rendering.
+Package impact and release planning stay outside pr-log.
+
+## Publishing
+
+This repo uses packtory to publish `pr-log` and `@pr-log/core` from one build without npm workspaces.
+Versions are manual and independent.
+
+```sh
+just pack-all
+just publish-dry-run
+just publish
+```
+
 ### Options
 
 #### --sloppy

@@ -1,17 +1,19 @@
 import type { Octokit } from '@octokit/rest';
-import { isUndefined } from '@sindresorhus/is';
 import type { GetPullRequestLabel } from './get-pull-request-label.ts';
 import type { GitCommandRunner } from './git-command-runner.ts';
-import { determineLatestVersionTag } from './latest-version-tag.ts';
+import { resolveLatestSemverTagBaseRef } from './changelog-base-ref.ts';
+import {
+    collectMergedPullRequests,
+    type PullRequest as PullRequestValue,
+    type PullRequestTitleReader
+} from './collect-merged-pull-requests.ts';
+import {
+    resolvePullRequestLabels,
+    type PullRequestWithLabel as PullRequestWithLabelValue
+} from './resolve-pull-request-labels.ts';
 
-export type PullRequest = {
-    readonly id: number;
-    readonly title: string;
-};
-
-export type PullRequestWithLabel = PullRequest & {
-    readonly label: string;
-};
+export type PullRequest = PullRequestValue;
+export type PullRequestWithLabel = PullRequestWithLabelValue;
 
 export type GetMergedPullRequestsDependencies = {
     readonly gitCommandRunner: GitCommandRunner;
@@ -40,17 +42,6 @@ function determineRepoDetails(githubRepo: string): Readonly<[owner: string, repo
     return [owner, repo];
 }
 
-function extractPullRequestId(subject: string): number {
-    const matches = /^Merge pull request #(?<id>\d+) from .*$/u.exec(subject);
-    const pullRequestIdentifier = matches?.groups?.id;
-
-    if (isUndefined(pullRequestIdentifier)) {
-        throw new TypeError('Failed to extract pull request id from merge commit log');
-    }
-
-    return Number.parseInt(pullRequestIdentifier, 10);
-}
-
 async function fetchPullRequestTitle(
     githubClient: Readonly<Octokit>,
     githubRepo: string,
@@ -66,17 +57,6 @@ async function fetchPullRequestTitle(
     return (pullRequest as PullRequestData).title;
 }
 
-async function createPullRequest(
-    githubClient: Readonly<Octokit>,
-    githubRepo: string,
-    mergeCommitLog: { readonly subject: string; readonly body: string | undefined }
-): Promise<PullRequest> {
-    const pullRequestId = extractPullRequestId(mergeCommitLog.subject);
-    const title = mergeCommitLog.body ?? (await fetchPullRequestTitle(githubClient, githubRepo, pullRequestId));
-
-    return { id: pullRequestId, title };
-}
-
 export function getMergedPullRequestsFactory(dependencies: GetMergedPullRequestsDependencies): GetMergedPullRequests {
     const {
         gitCommandRunner,
@@ -88,47 +68,39 @@ export function getMergedPullRequestsFactory(dependencies: GetMergedPullRequests
 
     async function getLatestVersionTag(): Promise<string> {
         const tags = await gitCommandRunner.listTags();
-        return determineLatestVersionTag(tags);
+        return resolveLatestSemverTagBaseRef({ tags }).ref;
     }
 
     async function getPullRequests(fromTag: string, githubRepo: string): Promise<readonly PullRequest[]> {
-        const mergeCommits = await gitCommandRunner.getMergeCommitLogs(fromTag);
-
-        return Promise.all(
-            mergeCommits.map(async (log) => {
-                return createPullRequest(githubClient, githubRepo, log);
-            })
-        );
-    }
-
-    async function extendWithLabel(
-        githubRepo: string,
-        validLabels: ReadonlyMap<string, string>,
-        pullRequests: readonly PullRequest[]
-    ): Promise<readonly PullRequestWithLabel[]> {
-        const pullRequestsWithLabels: PullRequestWithLabel[] = [];
-
-        for (const [pullRequestIndex, pullRequest] of pullRequests.entries()) {
-            if (pullRequestIndex > 0 && labelLookupIntervalMilliseconds > 0) {
-                await waitForMilliseconds(labelLookupIntervalMilliseconds);
+        const pullRequestTitleReader: PullRequestTitleReader = {
+            async getTitle(repo, pullRequestId) {
+                return fetchPullRequestTitle(githubClient, repo, pullRequestId);
             }
+        };
 
-            const label = await getPullRequestLabel(githubRepo, validLabels, pullRequest.id, dependencies);
-
-            pullRequestsWithLabels.push({
-                id: pullRequest.id,
-                title: pullRequest.title,
-                label
-            });
-        }
-
-        return pullRequestsWithLabels;
+        return collectMergedPullRequests({
+            githubRepo,
+            baseRef: fromTag,
+            git: gitCommandRunner,
+            pullRequestTitleReader
+        });
     }
 
     return async function getMergedPullRequests(githubRepo: string, validLabels: ReadonlyMap<string, string>) {
         const latestVersionTag = await getLatestVersionTag();
         const pullRequests = await getPullRequests(latestVersionTag, githubRepo);
-        const pullRequestsWithLabels = await extendWithLabel(githubRepo, validLabels, pullRequests);
+        const pullRequestsWithLabels = await resolvePullRequestLabels({
+            githubRepo,
+            validLabels,
+            pullRequests,
+            waitForMilliseconds,
+            labelLookupIntervalMilliseconds,
+            pullRequestLabelReader: {
+                async getLabel(repo, labels, pullRequestId) {
+                    return getPullRequestLabel(repo, labels, pullRequestId, dependencies);
+                }
+            }
+        });
 
         return pullRequestsWithLabels;
     };
