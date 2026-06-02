@@ -192,7 +192,10 @@ import {
 ```
 
 `@pr-log/core` owns Git/GitHub range resolution, pull request collection, label resolution, changed-file lookup, and changelog rendering.
-Package impact and release planning stay outside pr-log.
+Package impact and release planning stay outside pr-log; consumers can pass release-plan package data into the package-aware base-ref resolver.
+
+Package-aware release tags use `<packageName>@<version>` by default, for example `@scope/package@1.2.3`.
+Consumers can pass a package tag format with `{packageName}` and `{version}` placeholders.
 
 ## Publishing
 

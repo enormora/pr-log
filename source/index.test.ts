@@ -4,18 +4,38 @@ import {
     collectMergedPullRequests,
     createGitHubPullRequestChangedFilesReader,
     fetchPullRequestChangedFiles,
+    formatPackageVersionTag,
     renderChangelogMarkdown,
+    resolveChangelogBaseRef,
     resolveLatestSemverTagBaseRef,
     resolvePullRequestLabels,
-    type PullRequest
+    type PullRequest,
+    type ReleasePlanPackage
 } from './index.ts';
 import { defaultValidLabels } from './lib/valid-labels.ts';
 
 const pullRequestId = 1;
 const pullRequests: readonly PullRequest[] = [{ id: pullRequestId, title: 'title' }];
 
-test('exports base ref resolvers', () => {
+test('exports base ref resolvers', async () => {
     assert.deepStrictEqual(resolveLatestSemverTagBaseRef({ tags: ['1.0.0'] }), { ref: '1.0.0' });
+    assert.strictEqual(
+        formatPackageVersionTag({ packageName: 'pkg', version: '1.0.0', packageTagFormat: undefined }),
+        'pkg@1.0.0'
+    );
+
+    const baseRef = await resolveChangelogBaseRef(
+        {
+            packageName: 'pkg',
+            previousVersion: undefined,
+            previousGitHead: undefined,
+            packageTagFormat: undefined,
+            explicitBaseRef: 'base'
+        },
+        { hasRef: fake.resolves(true) }
+    );
+
+    assert.deepStrictEqual(baseRef, { ref: 'base' });
 });
 
 test('exports pull request collection and label resolution', async () => {
@@ -71,4 +91,19 @@ test('exports changelog rendering', () => {
     });
 
     assert.ok(changelog.includes('## 1.0.0'));
+});
+
+test('exports the release plan package type', () => {
+    const releasePlanPackage: ReleasePlanPackage = {
+        name: 'pkg',
+        previousVersion: undefined,
+        nextVersion: '1.0.0',
+        changed: true,
+        previousGitHead: undefined,
+        currentGitHead: 'abc123',
+        sourceFiles: ['source/index.ts'],
+        changedArtifactFiles: ['target/index.js']
+    };
+
+    assert.strictEqual(releasePlanPackage.name, 'pkg');
 });
