@@ -3,11 +3,13 @@ import { fake } from 'sinon';
 import {
     collectMergedPullRequests,
     createGitHubPullRequestChangedFilesReader,
-    createGitHubPullRequestLabelReader,
     defaultValidLabels as exportedDefaultValidLabels,
     fetchPullRequestChangedFiles,
+    filterPullRequestsByTargetFiles,
     formatPackageVersionTag,
+    renderGroupedTargetChangelogMarkdown,
     renderChangelogMarkdown,
+    renderTargetChangelogMarkdown,
     resolveChangelogBaseRef,
     resolveLatestSemverTagBaseRef,
     resolvePullRequestLabels,
@@ -66,21 +68,6 @@ test('exports pull request collection and label resolution', async () => {
     );
 });
 
-test('exports pull request label collection', async () => {
-    const listLabelsOnIssue = fake.resolves({ data: [{ name: 'bug' }] });
-    const pullRequestLabelReader = createGitHubPullRequestLabelReader({
-        githubClient: {
-            issues: { listLabelsOnIssue }
-        } as never,
-        waitForMilliseconds: fake.resolves(undefined),
-        getCurrentDate: fake.returns(new Date(0)),
-        maximumRateLimitRetryCount: 0
-    });
-
-    assert.deepStrictEqual(await pullRequestLabelReader.getLabels('owner/repo', pullRequestId), ['bug']);
-    assert.strictEqual(exportedDefaultValidLabels.get('bug'), 'Bug Fixes');
-});
-
 test('exports changed file collection', async () => {
     const changedFilesReader = createGitHubPullRequestChangedFilesReader({
         paginate: fake.resolves([{ filename: 'source/index.ts' }]),
@@ -110,6 +97,47 @@ test('exports changelog rendering', () => {
     });
 
     assert.ok(changelog.includes('## 1.0.0'));
+
+    const targetChangelog = renderTargetChangelogMarkdown({
+        packageInfo: {},
+        currentDate: new Date(0),
+        validLabels: defaultValidLabels,
+        mergedPullRequests: [{ id: pullRequestId, title: 'title', label: 'bug' }],
+        githubRepo: 'owner/repo',
+        unreleased: true,
+        versionNumber: undefined
+    });
+
+    assert.ok(targetChangelog.includes('### Bug Fixes'));
+
+    const groupedChangelog = renderGroupedTargetChangelogMarkdown({
+        packageInfo: {},
+        currentDate: new Date(0),
+        validLabels: defaultValidLabels,
+        targets: [{ targetName: 'pkg-a', mergedPullRequests: [{ id: pullRequestId, title: 'title', label: 'bug' }] }],
+        githubRepo: 'owner/repo',
+        unreleased: false,
+        versionNumber: '1.0.0'
+    });
+
+    assert.ok(groupedChangelog.includes('### pkg-a'));
+    assert.ok(groupedChangelog.includes('#### Bug Fixes'));
+});
+
+test('exports target file filtering and default labels', () => {
+    const changedFilesByPullRequest = new Map([[pullRequestId, ['source/index.ts']]]);
+
+    assert.deepStrictEqual(
+        filterPullRequestsByTargetFiles({
+            targetName: 'pkg',
+            targetSourceFiles: ['source/index.ts'],
+            pullRequests,
+            changedFilesByPullRequest,
+            ignoredAttributionPaths: []
+        }),
+        pullRequests
+    );
+    assert.strictEqual(exportedDefaultValidLabels.get('bug'), 'Bug Fixes');
 });
 
 test('exports the release plan package type', () => {

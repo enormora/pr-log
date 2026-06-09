@@ -24,6 +24,10 @@ import {
     type GitHubPullRequestLabelReaderDependencies as GitHubPullRequestLabelReaderDependenciesValue
 } from './lib/get-pull-request-label.ts';
 import {
+    filterPullRequestsByTargetFiles as filterPullRequestsByTargetFilesValue,
+    type FilterPullRequestsByTargetFilesInput as FilterPullRequestsByTargetFilesInputValue
+} from './lib/filter-pull-requests-by-target-files.ts';
+import {
     fetchPullRequestChangedFiles as fetchPullRequestChangedFilesValue,
     type FetchPullRequestChangedFilesInput as FetchPullRequestChangedFilesInputValue,
     type PullRequestChangedFilesReader as PullRequestChangedFilesReaderValue
@@ -35,7 +39,10 @@ import {
     type ResolvePullRequestLabelsInput as ResolvePullRequestLabelsInputValue
 } from './lib/resolve-pull-request-labels.ts';
 import {
+    renderGroupedTargetChangelogMarkdown as renderGroupedTargetChangelogMarkdownValue,
     renderChangelogMarkdown as renderChangelogMarkdownValue,
+    renderTargetChangelogMarkdown as renderTargetChangelogMarkdownValue,
+    type RenderGroupedTargetChangelogMarkdownInput as RenderGroupedTargetChangelogMarkdownInputValue,
     type RenderChangelogMarkdownInput as RenderChangelogMarkdownInputValue
 } from './lib/render-changelog-markdown.ts';
 import { defaultValidLabels as defaultValidLabelsValue } from './lib/valid-labels.ts';
@@ -68,6 +75,13 @@ export async function fetchPullRequestChangedFiles(
     return changedFiles;
 }
 
+export function filterPullRequestsByTargetFiles(
+    input: FilterPullRequestsByTargetFilesInputValue
+): readonly PullRequestValue[] {
+    const pullRequests = filterPullRequestsByTargetFilesValue(input);
+    return pullRequests;
+}
+
 export function formatPackageVersionTag(options: {
     readonly packageName: string;
     readonly version: string;
@@ -79,6 +93,16 @@ export function formatPackageVersionTag(options: {
 
 export function renderChangelogMarkdown(input: RenderChangelogMarkdownInputValue): string {
     const changelog = renderChangelogMarkdownValue(input);
+    return changelog;
+}
+
+export function renderGroupedTargetChangelogMarkdown(input: RenderGroupedTargetChangelogMarkdownInputValue): string {
+    const changelog = renderGroupedTargetChangelogMarkdownValue(input);
+    return changelog;
+}
+
+export function renderTargetChangelogMarkdown(input: RenderChangelogMarkdownInputValue): string {
+    const changelog = renderTargetChangelogMarkdownValue(input);
     return changelog;
 }
 
@@ -115,6 +139,7 @@ export type ChangelogBaseRef = ChangelogBaseRefValue;
 export type CollectMergedPullRequestsInput = CollectMergedPullRequestsInputValue;
 export const defaultValidLabels: ReadonlyMap<string, string> = new Map(defaultValidLabelsValue);
 export type FetchPullRequestChangedFilesInput = FetchPullRequestChangedFilesInputValue;
+export type FilterPullRequestsByTargetFilesInput = FilterPullRequestsByTargetFilesInputValue;
 export type GitRangeReader = GitRangeReaderValue;
 export type GitRefReader = GitRefReaderValue;
 export type GitHubPullRequestLabelReaderDependencies = GitHubPullRequestLabelReaderDependenciesValue;
@@ -139,4 +164,5 @@ export type ReleasePlanPackage = {
     readonly changedArtifactFiles: readonly string[];
 };
 export type RenderChangelogMarkdownInput = RenderChangelogMarkdownInputValue;
+export type RenderGroupedTargetChangelogMarkdownInput = RenderGroupedTargetChangelogMarkdownInputValue;
 export type ResolvePullRequestLabelsInput = ResolvePullRequestLabelsInputValue;
