@@ -9,13 +9,16 @@ import {
     filterPullRequestsByTargetFiles,
     formatPackageVersionTag,
     getPullRequestLabels,
+    renderGroupedTargetChangelogMarkdown,
     renderChangelogMarkdown,
+    renderTargetChangelogMarkdown,
     resolveChangelogBaseRef,
     resolveLatestSemverTagBaseRef,
     resolvePullRequestLabels,
     type GitHubPullRequestLabelReaderDependencies,
     type PullRequest,
-    type ReleasePlanPackage
+    type ReleasePlanPackage,
+    type TargetChangelogSection
 } from './index.ts';
 import { defaultValidLabels } from './lib/valid-labels.ts';
 
@@ -130,6 +133,37 @@ test('exports changelog rendering', () => {
     });
 
     assert.ok(changelog.includes('## 1.0.0'));
+
+    const targetChangelog = renderTargetChangelogMarkdown({
+        packageInfo: {},
+        currentDate: new Date(0),
+        validLabels: defaultValidLabels,
+        targetName: 'pkg-a',
+        mergedPullRequests: [{ id: pullRequestId, title: 'title', label: 'bug' }],
+        githubRepo: 'owner/repo',
+        unreleased: true,
+        versionNumber: undefined
+    });
+
+    assert.ok(targetChangelog.includes('### Bug Fixes'));
+
+    const groupedChangelog = renderGroupedTargetChangelogMarkdown({
+        packageInfo: {},
+        currentDate: new Date(0),
+        validLabels: defaultValidLabels,
+        targets: [
+            {
+                targetName: 'pkg-a',
+                unreleased: false,
+                versionNumber: '1.0.0',
+                mergedPullRequests: [{ id: pullRequestId, title: 'title', label: 'bug' }]
+            }
+        ],
+        githubRepo: 'owner/repo'
+    });
+
+    assert.ok(groupedChangelog.includes('## pkg-a 1.0.0'));
+    assert.ok(groupedChangelog.includes('### Bug Fixes'));
 });
 
 test('exports the release plan package type', () => {
@@ -149,4 +183,15 @@ test('exports the release plan package type', () => {
 
 test('exports default valid labels', () => {
     assert.strictEqual(exportedDefaultValidLabels.get('bug'), 'Bug Fixes');
+});
+
+test('exports the target changelog section type', () => {
+    const targetChangelogSection: TargetChangelogSection = {
+        targetName: 'pkg',
+        unreleased: false,
+        versionNumber: '1.0.0',
+        mergedPullRequests: [{ id: pullRequestId, title: 'title', label: 'bug' }]
+    };
+
+    assert.strictEqual(targetChangelogSection.versionNumber, '1.0.0');
 });
