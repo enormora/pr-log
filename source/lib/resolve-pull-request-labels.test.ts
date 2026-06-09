@@ -21,7 +21,9 @@ test('resolves labels for pull requests sequentially', async () => {
         ],
         pullRequestLabelReader: { getLabels },
         waitForMilliseconds,
-        labelLookupIntervalMilliseconds
+        labelLookupIntervalMilliseconds,
+        targetName: undefined,
+        targetScopedLabelPattern: undefined
     });
 
     assert.strictEqual(waitForMilliseconds.callCount, 1);
@@ -32,6 +34,21 @@ test('resolves labels for pull requests sequentially', async () => {
     ]);
 });
 
+test('applies target scoped labels over pull request level labels', async () => {
+    const pullRequests = await resolvePullRequestLabels({
+        githubRepo: 'owner/repo',
+        validLabels: defaultValidLabels,
+        pullRequests: [{ id: 1, title: 'Fix bug' }],
+        pullRequestLabelReader: { getLabels: fake.resolves(['bug', 'pkg-a:breaking']) },
+        waitForMilliseconds: fake.resolves(undefined),
+        labelLookupIntervalMilliseconds: 0,
+        targetName: 'pkg-a',
+        targetScopedLabelPattern: undefined
+    });
+
+    assert.deepStrictEqual(pullRequests, [{ id: 1, title: 'Fix bug', label: 'breaking' }]);
+});
+
 test('ignores raw labels that are not valid labels', async () => {
     const pullRequests = await resolvePullRequestLabels({
         githubRepo: 'owner/repo',
@@ -39,7 +56,9 @@ test('ignores raw labels that are not valid labels', async () => {
         pullRequests: [{ id: 1, title: 'Fix bug' }],
         pullRequestLabelReader: { getLabels: fake.resolves(['bug', 'not-for-changelog']) },
         waitForMilliseconds: fake.resolves(undefined),
-        labelLookupIntervalMilliseconds: 0
+        labelLookupIntervalMilliseconds: 0,
+        targetName: undefined,
+        targetScopedLabelPattern: undefined
     });
 
     assert.deepStrictEqual(pullRequests, [{ id: 1, title: 'Fix bug', label: 'bug' }]);
@@ -53,7 +72,9 @@ test('rejects missing pull request level labels', async () => {
             pullRequests: [{ id: 1, title: 'Fix bug' }],
             pullRequestLabelReader: { getLabels: fake.resolves(['not-for-changelog']) },
             waitForMilliseconds: fake.resolves(undefined),
-            labelLookupIntervalMilliseconds: 0
+            labelLookupIntervalMilliseconds: 0,
+            targetName: undefined,
+            targetScopedLabelPattern: undefined
         }),
         {
             message:
@@ -70,11 +91,75 @@ test('rejects multiple pull request level labels', async () => {
             pullRequests: [{ id: 1, title: 'Fix bug' }],
             pullRequestLabelReader: { getLabels: fake.resolves(['bug', 'documentation']) },
             waitForMilliseconds: fake.resolves(undefined),
-            labelLookupIntervalMilliseconds: 0
+            labelLookupIntervalMilliseconds: 0,
+            targetName: undefined,
+            targetScopedLabelPattern: undefined
         }),
         {
             message:
                 'Pull Request #1 has multiple labels of breaking, bug, feature, enhancement, documentation, upgrade, refactor, build'
         }
     );
+});
+
+test('ignores scoped labels for other targets', async () => {
+    const pullRequests = await resolvePullRequestLabels({
+        githubRepo: 'owner/repo',
+        validLabels: defaultValidLabels,
+        pullRequests: [{ id: 1, title: 'Fix bug' }],
+        pullRequestLabelReader: { getLabels: fake.resolves(['bug', 'pkg-a:breaking']) },
+        waitForMilliseconds: fake.resolves(undefined),
+        labelLookupIntervalMilliseconds: 0,
+        targetName: 'pkg-b',
+        targetScopedLabelPattern: undefined
+    });
+
+    assert.deepStrictEqual(pullRequests, [{ id: 1, title: 'Fix bug', label: 'bug' }]);
+});
+
+test('rejects conflicting target scoped labels', async () => {
+    await assert.rejects(
+        resolvePullRequestLabels({
+            githubRepo: 'owner/repo',
+            validLabels: defaultValidLabels,
+            pullRequests: [{ id: 1, title: 'Fix bug' }],
+            pullRequestLabelReader: { getLabels: fake.resolves(['bug', 'pkg-a:breaking', 'pkg-a:feature']) },
+            waitForMilliseconds: fake.resolves(undefined),
+            labelLookupIntervalMilliseconds: 0,
+            targetName: 'pkg-a',
+            targetScopedLabelPattern: undefined
+        }),
+        { message: 'Pull Request #1 has multiple scoped labels for "pkg-a"' }
+    );
+});
+
+test('rejects unknown target scoped labels', async () => {
+    await assert.rejects(
+        resolvePullRequestLabels({
+            githubRepo: 'owner/repo',
+            validLabels: defaultValidLabels,
+            pullRequests: [{ id: 1, title: 'Fix bug' }],
+            pullRequestLabelReader: { getLabels: fake.resolves(['bug', 'pkg-a:not-real']) },
+            waitForMilliseconds: fake.resolves(undefined),
+            labelLookupIntervalMilliseconds: 0,
+            targetName: 'pkg-a',
+            targetScopedLabelPattern: undefined
+        }),
+        { message: 'Pull Request #1 has unknown label "pkg-a:not-real"' }
+    );
+});
+
+test('supports scoped package names in target labels', async () => {
+    const pullRequests = await resolvePullRequestLabels({
+        githubRepo: 'owner/repo',
+        validLabels: defaultValidLabels,
+        pullRequests: [{ id: 1, title: 'Fix bug' }],
+        pullRequestLabelReader: { getLabels: fake.resolves(['bug', '@scope/pkg:documentation']) },
+        waitForMilliseconds: fake.resolves(undefined),
+        labelLookupIntervalMilliseconds: 0,
+        targetName: '@scope/pkg',
+        targetScopedLabelPattern: undefined
+    });
+
+    assert.deepStrictEqual(pullRequests, [{ id: 1, title: 'Fix bug', label: 'documentation' }]);
 });
