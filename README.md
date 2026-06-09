@@ -185,17 +185,35 @@ The CLI package `pr-log` composes the same API.
 ```ts
 import {
     collectMergedPullRequests,
+    createGitHubPullRequestChangedFilesReader,
+    createGitHubPullRequestLabelReader,
+    fetchPullRequestChangedFiles,
+    filterPullRequestsByTargetFiles,
     resolveLatestSemverTagBaseRef,
     resolvePullRequestLabels,
-    renderChangelogMarkdown
+    renderGroupedTargetChangelogMarkdown
 } from '@pr-log/core';
 ```
 
 `@pr-log/core` owns Git/GitHub range resolution, pull request collection, label resolution, changed-file lookup, and changelog rendering.
-Package impact and release planning stay outside pr-log; consumers can pass release-plan package data into the package-aware base-ref resolver.
+Target impact and release planning stay outside pr-log. Consumers pass target source files into pr-log when they need target-specific changelogs.
+
+A target-aware integration usually follows this flow:
+
+1. Compute release targets and their source files.
+2. Resolve a base ref for each target.
+3. Collect merged pull requests for each Git range.
+4. Fetch changed files for those pull requests.
+5. Filter pull requests by target source files.
+6. Resolve labels for each target.
+7. Render target-only or grouped Markdown.
+
+Target-scoped labels can override the pull request level label for one target. The default pattern is `{targetName}:{label}`.
+For example, `pkg-a:breaking` overrides a `bug` pull request label when rendering `pkg-a`, while other targets still use `bug`.
 
 Package-aware release tags use `<packageName>@<version>` by default, for example `@scope/package@1.2.3`.
 Consumers can pass a package tag format with `{packageName}` and `{version}` placeholders.
+pr-log does not compute target impact, map build artifacts to source files, publish packages, commit files, create tags, or create releases.
 
 ## Publishing
 
