@@ -24,17 +24,18 @@ lint-fix: eslint-fix prettier-fix
 
 prepare-packtory-source: compile
     rm -rf target/packtory/source
+    mkdir -p target/packtory
     cp -R target/build/source target/packtory/source
     perl -pi -e 's/from ([\x22\x27])(\.[^\x22\x27]+)\.ts\1/from $1$2.js$1/g' $(find target/packtory/source -name '*.d.ts')
 
 pack PACKAGE VERSION OUTPUT: prepare-packtory-source
     mkdir -p target/packages
-    packtory pack {{PACKAGE}} --format tar --out {{OUTPUT}} --version {{VERSION}}
+    packtory pack {{PACKAGE}} --format tar --out {{OUTPUT}} --version {{VERSION}} --vendor-dependencies
 
 pack-all: prepare-packtory-source
     mkdir -p target/packages
-    packtory pack pr-log --format tar --out target/packages/pr-log-6.1.1.tgz --version 6.1.1
-    packtory pack @pr-log/core --format tar --out target/packages/@pr-log-core-0.1.0.tgz --version 0.1.0
+    packtory pack pr-log --format tar --out target/packages/pr-log-6.1.1.tgz --version 6.1.1 --vendor-dependencies
+    packtory pack @pr-log/core --format tar --out target/packages/@pr-log-core-0.1.0.tgz --version 0.1.0 --vendor-dependencies
 
 publish: prepare-packtory-source
     packtory publish --no-dry-run

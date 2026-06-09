@@ -4,6 +4,8 @@ import path from 'node:path';
 
 const projectFolder = process.cwd();
 const sourcesFolder = path.join(projectFolder, 'target/packtory/source');
+const licensePath = path.join(projectFolder, 'LICENSE');
+const readmePath = path.join(projectFolder, 'README.md');
 
 async function readPackageInfo() {
     const packageJsonContent = await fs.readFile(path.join(projectFolder, 'package.json'), { encoding: 'utf8' });
@@ -25,8 +27,8 @@ function commonPackageSettings(packageInfo) {
         sourcesFolder,
         mainPackageJson: { type: 'module', dependencies: packageInfo.dependencies },
         additionalFiles: [
-            { sourceFilePath: path.join(projectFolder, 'LICENSE'), targetFilePath: 'LICENSE' },
-            { sourceFilePath: path.join(projectFolder, 'README.md'), targetFilePath: 'README.md' }
+            { sourceFilePath: licensePath, targetFilePath: 'LICENSE' },
+            { sourceFilePath: readmePath, targetFilePath: 'README.md' }
         ],
         deadCodeElimination: { enabled: false },
         publishSettings: {
@@ -45,9 +47,6 @@ function corePackage(sharedAttributes) {
                 js: 'packages/core/core.entry-point.js',
                 declarationFile: 'packages/core/core.entry-point.d.ts'
             }
-        },
-        packageInterface: {
-            modules: [{ root: 'main', export: '.' }]
         },
         additionalPackageJsonAttributes: {
             ...sharedAttributes,
@@ -73,7 +72,8 @@ function cliPackage(packageInfo, sharedAttributes) {
             ...sharedAttributes,
             description: packageInfo.description,
             keywords: packageInfo.keywords
-        }
+        },
+        bundleDependencies: ['@pr-log/core']
     };
 }
 
@@ -84,6 +84,12 @@ export async function buildConfig() {
 
     return {
         commonPackageSettings: commonPackageSettings(packageInfo),
+        checks: {
+            areTheTypesWrong: { enabled: true, profile: 'esm-only' },
+            noDuplicatedFiles: { enabled: true, allowList: [licensePath, readmePath] },
+            requiredFiles: { enabled: true, files: ['LICENSE', 'README.md'] },
+            uniqueTargetPaths: { enabled: true }
+        },
         packages: [corePackage(sharedAttributes), cliPackage(packageInfo, sharedAttributes)]
     };
 }

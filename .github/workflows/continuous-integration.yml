@@ -29,6 +29,9 @@ jobs:
               run: npx just compile
             - name: Run tests
               run: npx just test
+            - name: Check packages
+              if: matrix.node-version == 24
+              run: npx just publish-dry-run
             - name: Coveralls
               uses: coverallsapp/github-action@v2
               with:
