@@ -2,7 +2,11 @@ import assert from 'node:assert';
 import { fake, stub, type SinonSpy } from 'sinon';
 import { oneLine } from 'common-tags';
 import type { Octokit } from '@octokit/rest';
-import { getPullRequestLabel } from './get-pull-request-label.ts';
+import {
+    createGitHubPullRequestLabelReader,
+    getPullRequestLabel,
+    getPullRequestLabels
+} from './get-pull-request-label.ts';
 import { defaultValidLabels } from './valid-labels.ts';
 
 type Overrides = {
@@ -142,6 +146,31 @@ test('fulfills with the correct label name', async () => {
         }),
         expectedLabelName
     );
+});
+
+test('fulfills with all label names', async () => {
+    const listLabelsOnIssue = fake.resolves({ data: [{ name: 'bug' }, { name: 'docs' }] });
+    const { githubClient, waitForMilliseconds, getCurrentDate, maximumRateLimitRetryCount } = createDependencies({
+        listLabelsOnIssue
+    });
+
+    assert.deepStrictEqual(
+        await getPullRequestLabels(anyRepo, anyPullRequestId, {
+            githubClient,
+            waitForMilliseconds,
+            getCurrentDate,
+            maximumRateLimitRetryCount
+        }),
+        ['bug', 'docs']
+    );
+});
+
+test('creates a GitHub pull request label reader', async () => {
+    const listLabelsOnIssue = fake.resolves({ data: [{ name: 'bug' }] });
+    const dependencies = createDependencies({ listLabelsOnIssue });
+    const pullRequestLabelReader = createGitHubPullRequestLabelReader(dependencies);
+
+    assert.deepStrictEqual(await pullRequestLabelReader.getLabels(anyRepo, anyPullRequestId), ['bug']);
 });
 
 test('uses custom labels when provided', async () => {

@@ -19,6 +19,11 @@ import {
 } from './lib/collect-merged-pull-requests.ts';
 import * as githubChangedFiles from './lib/github-pull-request-changed-files.ts';
 import {
+    createGitHubPullRequestLabelReader as createGitHubPullRequestLabelReaderValue,
+    getPullRequestLabels as getPullRequestLabelsValue,
+    type GitHubPullRequestLabelReaderDependencies as GitHubPullRequestLabelReaderDependenciesValue
+} from './lib/get-pull-request-label.ts';
+import {
     fetchPullRequestChangedFiles as fetchPullRequestChangedFilesValue,
     type FetchPullRequestChangedFilesInput as FetchPullRequestChangedFilesInputValue,
     type PullRequestChangedFilesReader as PullRequestChangedFilesReaderValue
@@ -47,6 +52,13 @@ export function createGitHubPullRequestChangedFilesReader(
 ): PullRequestChangedFilesReaderValue {
     const changedFilesReader = githubChangedFiles.createGitHubPullRequestChangedFilesReader(githubClient);
     return changedFilesReader;
+}
+
+export function createGitHubPullRequestLabelReader(
+    dependencies: GitHubPullRequestLabelReaderDependenciesValue
+): PullRequestLabelReaderValue {
+    const pullRequestLabelReader = createGitHubPullRequestLabelReaderValue(dependencies);
+    return pullRequestLabelReader;
 }
 
 export async function fetchPullRequestChangedFiles(
@@ -90,6 +102,15 @@ export async function resolvePullRequestLabels(
     return pullRequests;
 }
 
+export async function getPullRequestLabels(
+    githubRepo: string,
+    pullRequestId: number,
+    dependencies: GitHubPullRequestLabelReaderDependenciesValue
+): Promise<readonly string[]> {
+    const labels = await getPullRequestLabelsValue(githubRepo, pullRequestId, dependencies);
+    return labels;
+}
+
 export type ChangelogBaseRef = ChangelogBaseRefValue;
 export type CollectMergedPullRequestsInput = CollectMergedPullRequestsInputValue;
 export const defaultValidLabels: ReadonlyMap<string, string> = new Map(defaultValidLabelsValue);
@@ -97,6 +118,7 @@ export type FetchPullRequestChangedFilesInput = FetchPullRequestChangedFilesInpu
 export type FirstParentCommitLogEntry = FirstParentCommitLogEntryValue;
 export type GitRangeReader = GitRangeReaderValue;
 export type GitRefReader = GitRefReaderValue;
+export type GitHubPullRequestLabelReaderDependencies = GitHubPullRequestLabelReaderDependenciesValue;
 export type LatestSemverTagBaseRefInput = LatestSemverTagBaseRefInputValue;
 export type MissingChangelogBaseRefError = MissingChangelogBaseRefErrorValue;
 export type MissingChangelogBaseRefReason = MissingChangelogBaseRefReasonValue;

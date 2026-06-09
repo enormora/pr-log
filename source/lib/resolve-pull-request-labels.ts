@@ -5,7 +5,7 @@ export type PullRequestWithLabel = PullRequest & {
 };
 
 export type PullRequestLabelReader = {
-    getLabel(githubRepo: string, validLabels: ReadonlyMap<string, string>, pullRequestId: number): Promise<string>;
+    getLabels(githubRepo: string, pullRequestId: number): Promise<readonly string[]>;
 };
 
 export type ResolvePullRequestLabelsInput = {
@@ -17,6 +17,33 @@ export type ResolvePullRequestLabelsInput = {
     readonly labelLookupIntervalMilliseconds: number;
 };
 
+function formatLabelList(validLabels: ReadonlyMap<string, string>): string {
+    return Array.from(validLabels.keys()).join(', ');
+}
+
+function resolvePullRequestLevelLabel(
+    validLabels: ReadonlyMap<string, string>,
+    pullRequestId: number,
+    labels: readonly string[]
+): string {
+    const validLabelNames = new Set(validLabels.keys());
+    const matchingLabels = labels.filter((label) => {
+        return validLabelNames.has(label);
+    });
+    const [label] = matchingLabels;
+    const listOfLabels = formatLabelList(validLabels);
+
+    if (matchingLabels.length > 1) {
+        throw new Error(`Pull Request #${pullRequestId} has multiple labels of ${listOfLabels}`);
+    }
+
+    if (label === undefined) {
+        throw new TypeError(`Pull Request #${pullRequestId} has no label of ${listOfLabels}`);
+    }
+
+    return label;
+}
+
 export async function resolvePullRequestLabels(
     input: ResolvePullRequestLabelsInput
 ): Promise<readonly PullRequestWithLabel[]> {
@@ -27,7 +54,8 @@ export async function resolvePullRequestLabels(
             await input.waitForMilliseconds(input.labelLookupIntervalMilliseconds);
         }
 
-        const label = await input.pullRequestLabelReader.getLabel(input.githubRepo, input.validLabels, pullRequest.id);
+        const labels = await input.pullRequestLabelReader.getLabels(input.githubRepo, pullRequest.id);
+        const label = resolvePullRequestLevelLabel(input.validLabels, pullRequest.id, labels);
 
         pullRequestsWithLabels.push({
             id: pullRequest.id,

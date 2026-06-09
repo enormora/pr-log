@@ -1,5 +1,5 @@
 import type { Octokit } from '@octokit/rest';
-import type { GetPullRequestLabel } from './get-pull-request-label.ts';
+import type { GetPullRequestLabels } from './get-pull-request-label.ts';
 import type { GitCommandRunner } from './git-command-runner.ts';
 import { resolveLatestSemverTagBaseRef } from './changelog-base-ref.ts';
 import {
@@ -17,7 +17,7 @@ export type PullRequestWithLabel = PullRequestWithLabelValue;
 
 export type GetMergedPullRequestsDependencies = {
     readonly gitCommandRunner: GitCommandRunner;
-    readonly getPullRequestLabel: GetPullRequestLabel;
+    readonly getPullRequestLabels: GetPullRequestLabels;
     readonly githubClient: Octokit;
     readonly waitForMilliseconds: (durationMilliseconds: number) => Promise<void>;
     readonly labelLookupIntervalMilliseconds: number;
@@ -60,7 +60,7 @@ async function fetchPullRequestTitle(
 export function getMergedPullRequestsFactory(dependencies: GetMergedPullRequestsDependencies): GetMergedPullRequests {
     const {
         gitCommandRunner,
-        getPullRequestLabel,
+        getPullRequestLabels,
         githubClient,
         waitForMilliseconds,
         labelLookupIntervalMilliseconds
@@ -96,8 +96,8 @@ export function getMergedPullRequestsFactory(dependencies: GetMergedPullRequests
             waitForMilliseconds,
             labelLookupIntervalMilliseconds,
             pullRequestLabelReader: {
-                async getLabel(repo, labels, pullRequestId) {
-                    return getPullRequestLabel(repo, labels, pullRequestId, dependencies);
+                async getLabels(repo, pullRequestId) {
+                    return getPullRequestLabels(repo, pullRequestId, dependencies);
                 }
             }
         });
