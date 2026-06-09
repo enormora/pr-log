@@ -8,7 +8,7 @@ import {
     type MissingChangelogBaseRefError as MissingChangelogBaseRefErrorValue,
     type MissingChangelogBaseRefReason as MissingChangelogBaseRefReasonValue,
     type PackageChangelogBaseRefInput as PackageChangelogBaseRefInputValue
-} from './lib/changelog-base-ref.ts';
+} from '../../lib/changelog-base-ref.ts';
 import {
     collectMergedPullRequests as collectMergedPullRequestsValue,
     type CollectMergedPullRequestsInput as CollectMergedPullRequestsInputValue,
@@ -16,28 +16,28 @@ import {
     type GitRangeReader as GitRangeReaderValue,
     type PullRequest as PullRequestValue,
     type PullRequestTitleReader as PullRequestTitleReaderValue
-} from './lib/collect-merged-pull-requests.ts';
-import * as githubChangedFiles from './lib/github-pull-request-changed-files.ts';
+} from '../../lib/collect-merged-pull-requests.ts';
+import * as githubChangedFiles from '../../lib/github-pull-request-changed-files.ts';
 import {
     createGitHubPullRequestLabelReader as createGitHubPullRequestLabelReaderValue,
     getPullRequestLabels as getPullRequestLabelsValue,
     type GitHubPullRequestLabelReaderDependencies as GitHubPullRequestLabelReaderDependenciesValue
-} from './lib/get-pull-request-label.ts';
+} from '../../lib/get-pull-request-label.ts';
 import {
     filterPullRequestsByTargetFiles as filterPullRequestsByTargetFilesValue,
     type FilterPullRequestsByTargetFilesInput as FilterPullRequestsByTargetFilesInputValue
-} from './lib/filter-pull-requests-by-target-files.ts';
+} from '../../lib/filter-pull-requests-by-target-files.ts';
 import {
     fetchPullRequestChangedFiles as fetchPullRequestChangedFilesValue,
     type FetchPullRequestChangedFilesInput as FetchPullRequestChangedFilesInputValue,
     type PullRequestChangedFilesReader as PullRequestChangedFilesReaderValue
-} from './lib/pull-request-changed-files.ts';
+} from '../../lib/pull-request-changed-files.ts';
 import {
     resolvePullRequestLabels as resolvePullRequestLabelsValue,
     type PullRequestLabelReader as PullRequestLabelReaderValue,
     type PullRequestWithLabel as PullRequestWithLabelValue,
     type ResolvePullRequestLabelsInput as ResolvePullRequestLabelsInputValue
-} from './lib/resolve-pull-request-labels.ts';
+} from '../../lib/resolve-pull-request-labels.ts';
 import {
     renderGroupedTargetChangelogMarkdown as renderGroupedTargetChangelogMarkdownValue,
     renderChangelogMarkdown as renderChangelogMarkdownValue,
@@ -46,8 +46,8 @@ import {
     type RenderChangelogMarkdownInput as RenderChangelogMarkdownInputValue,
     type RenderTargetChangelogMarkdownInput as RenderTargetChangelogMarkdownInputValue,
     type TargetChangelogSection as TargetChangelogSectionValue
-} from './lib/render-changelog-markdown.ts';
-import { defaultValidLabels as defaultValidLabelsValue } from './lib/valid-labels.ts';
+} from '../../lib/render-changelog-markdown.ts';
+import { defaultValidLabels as defaultValidLabelsValue } from '../../lib/valid-labels.ts';
 
 export async function collectMergedPullRequests(
     input: CollectMergedPullRequestsInputValue

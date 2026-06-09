@@ -42,8 +42,8 @@ function corePackage(sharedAttributes) {
         versioning: { automatic: false, version: '0.1.0' },
         roots: {
             main: {
-                js: 'index.js',
-                declarationFile: 'index.d.ts'
+                js: 'packages/core/core.entry-point.js',
+                declarationFile: 'packages/core/core.entry-point.d.ts'
             }
         },
         packageInterface: {
@@ -63,7 +63,7 @@ function cliPackage(packageInfo, sharedAttributes) {
         versioning: { automatic: false, version: packageInfo.version },
         roots: {
             cli: {
-                js: 'bin/pr-log.js'
+                js: 'packages/command-line-interface/bin.entry-point.js'
             }
         },
         packageInterface: {

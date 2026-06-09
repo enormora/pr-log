@@ -3,7 +3,7 @@
     "version": "6.1.1",
     "type": "module",
     "description": "Changelog generator based on GitHub Pull Requests",
-    "bin": "target/build/source/bin/pr-log.js",
+    "bin": "target/build/source/packages/command-line-interface/bin.entry-point.js",
     "files": [
         "target/build/source/",
         "!target/build/source/**/*.test.js",
