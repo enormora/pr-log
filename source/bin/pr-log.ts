@@ -13,11 +13,11 @@ import { createCliRunOptions } from '../lib/cli-run-options.ts';
 import { createCliRunner, type CliRunnerDependencies } from '../lib/cli.ts';
 import { ensureCleanLocalGitStateFactory } from '../lib/ensure-clean-local-git-state.ts';
 import { getMergedPullRequestsFactory } from '../lib/get-merged-pull-requests.ts';
-import { createChangelogFactory } from '../lib/create-changelog.ts';
 import { findRemoteAliasFactory } from '../lib/find-remote-alias.ts';
 import { getPullRequestLabels } from '../lib/get-pull-request-label.ts';
 import { createGitCommandRunner } from '../lib/git-command-runner.ts';
 import { determineLatestVersionTag } from '../lib/latest-version-tag.ts';
+import { renderChangelogMarkdown } from '../index.ts';
 
 loglevel.enableAll();
 
@@ -92,7 +92,8 @@ program
                     ),
                     getLatestVersionTag,
                     getMergedPullRequests,
-                    createChangelog: createChangelogFactory({ getCurrentDate, packageInfo })
+                    getCurrentDate,
+                    renderChangelogMarkdown
                 };
                 const cliRunner = createCliRunner(dependencies);
                 await cliRunner.run(runOptions);

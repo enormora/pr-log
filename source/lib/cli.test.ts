@@ -24,7 +24,8 @@ function createCli(dependencies: Partial<CliRunnerDependencies> = {}): CliRunner
         ensureCleanLocalGitState = stub().resolves(),
         getLatestVersionTag = stub().resolves('1.2.2'),
         getMergedPullRequests = stub().resolves([]),
-        createChangelog = stub().returns(''),
+        renderChangelogMarkdown = stub().returns(''),
+        getCurrentDate = stub().returns(new Date(0)),
         prependFile = stub().resolves() as unknown as typeof _prependFile,
         packageInfo = { repository: { url: 'https://github.com/foo/bar.git' } },
         logger = { log: stub() } as unknown as Logger
@@ -34,7 +35,8 @@ function createCli(dependencies: Partial<CliRunnerDependencies> = {}): CliRunner
         ensureCleanLocalGitState,
         getLatestVersionTag,
         getMergedPullRequests,
-        createChangelog,
+        renderChangelogMarkdown,
+        getCurrentDate,
         prependFile,
         packageInfo,
         logger
@@ -134,12 +136,12 @@ for (const throwsTestCase of throwsTestCases) {
 
 test('does not throw if the repository is dirty', async () => {
     const ensureCleanLocalGitState = stub().rejects(new Error('Local copy is not clean'));
-    const createChangelog = stub().returns('sloppy changelog');
+    const renderChangelogMarkdown = stub().returns('sloppy changelog');
     const prependFile = stub().resolves();
     const cli = createCli({
         prependFile: prependFile as unknown as typeof _prependFile,
         ensureCleanLocalGitState,
-        createChangelog
+        renderChangelogMarkdown
     });
     const options = cliRunOptionsFactory.build({
         sloppy: true
@@ -165,22 +167,24 @@ test('uses custom labels if they are provided in package.json', async () => {
         ['foo', 'Foo'],
         ['bar', 'Bar']
     ]);
-    const createChangelog = stub().returns('generated changelog');
+    const renderChangelogMarkdown = stub().returns('generated changelog');
     const getMergedPullRequests = stub().resolves();
-    const cli = createCli({ packageInfo, createChangelog, getMergedPullRequests });
+    const cli = createCli({ packageInfo, renderChangelogMarkdown, getMergedPullRequests });
 
     await cli.run(cliRunOptionsFactory.build());
 
     assert.strictEqual(getMergedPullRequests.callCount, 1);
     assert.deepStrictEqual(getMergedPullRequests.firstCall.args, ['foo/bar', expectedLabels]);
 
-    assert.strictEqual(createChangelog.callCount, 1);
-    assert.deepStrictEqual(createChangelog.firstCall.args[0], {
+    assert.strictEqual(renderChangelogMarkdown.callCount, 1);
+    assert.deepStrictEqual(renderChangelogMarkdown.firstCall.args[0], {
+        packageInfo,
+        currentDate: new Date(0),
         validLabels: expectedLabels,
         mergedPullRequests: undefined,
         githubRepo: 'foo/bar',
         unreleased: false,
-        versionNumber: Maybe.just('1.2.3')
+        versionNumber: '1.2.3'
     });
 });
 
@@ -213,12 +217,12 @@ test('calls getMergedPullRequests with the correct repo', async () => {
 });
 
 test('reports the generated changelog to stdout and not to a file when stdout is set to true', async () => {
-    const createChangelog = stub().returns('generated changelog');
+    const renderChangelogMarkdown = stub().returns('generated changelog');
     const prependFile = stub().resolves();
     const log = stub();
 
     const cli = createCli({
-        createChangelog,
+        renderChangelogMarkdown,
         prependFile: prependFile as unknown as typeof _prependFile,
         logger: { log } as unknown as Logger
     });
@@ -229,13 +233,15 @@ test('reports the generated changelog to stdout and not to a file when stdout is
         })
     );
 
-    assert.strictEqual(createChangelog.callCount, 1);
-    assert.deepStrictEqual(createChangelog.firstCall.args[0], {
+    assert.strictEqual(renderChangelogMarkdown.callCount, 1);
+    assert.deepStrictEqual(renderChangelogMarkdown.firstCall.args[0], {
+        packageInfo: { repository: { url: 'https://github.com/foo/bar.git' } },
+        currentDate: new Date(0),
         validLabels: defaultValidLabels,
         mergedPullRequests: [],
         githubRepo: 'foo/bar',
         unreleased: false,
-        versionNumber: Maybe.just('1.2.3')
+        versionNumber: '1.2.3'
     });
 
     assert.strictEqual(prependFile.callCount, 0);
@@ -245,11 +251,11 @@ test('reports the generated changelog to stdout and not to a file when stdout is
 });
 
 test('reports the generated changelog to a file when stdout is set to false', async () => {
-    const createChangelog = stub().returns('generated changelog');
+    const renderChangelogMarkdown = stub().returns('generated changelog');
     const prependFile = stub().resolves();
 
     const cli = createCli({
-        createChangelog,
+        renderChangelogMarkdown,
         prependFile: prependFile as unknown as typeof _prependFile
     });
     const options = cliRunOptionsFactory.build({
@@ -258,13 +264,15 @@ test('reports the generated changelog to a file when stdout is set to false', as
 
     await cli.run(options);
 
-    assert.strictEqual(createChangelog.callCount, 1);
-    assert.deepStrictEqual(createChangelog.firstCall.args[0], {
+    assert.strictEqual(renderChangelogMarkdown.callCount, 1);
+    assert.deepStrictEqual(renderChangelogMarkdown.firstCall.args[0], {
+        packageInfo: { repository: { url: 'https://github.com/foo/bar.git' } },
+        currentDate: new Date(0),
         validLabels: defaultValidLabels,
         mergedPullRequests: [],
         githubRepo: 'foo/bar',
         unreleased: false,
-        versionNumber: Maybe.just('1.2.3')
+        versionNumber: '1.2.3'
     });
 
     assert.strictEqual(prependFile.callCount, 1);
@@ -272,11 +280,11 @@ test('reports the generated changelog to a file when stdout is set to false', as
 });
 
 test('reports the generated unreleased changelog to a file when stdout is set to false', async () => {
-    const createChangelog = stub().returns('generated changelog');
+    const renderChangelogMarkdown = stub().returns('generated changelog');
     const prependFile = stub().resolves();
 
     const cli = createCli({
-        createChangelog,
+        renderChangelogMarkdown,
         prependFile: prependFile as unknown as typeof _prependFile
     });
     const options: CliRunOptions = {
@@ -290,13 +298,15 @@ test('reports the generated unreleased changelog to a file when stdout is set to
 
     await cli.run(options);
 
-    assert.strictEqual(createChangelog.callCount, 1);
-    assert.deepStrictEqual(createChangelog.firstCall.args[0], {
+    assert.strictEqual(renderChangelogMarkdown.callCount, 1);
+    assert.deepStrictEqual(renderChangelogMarkdown.firstCall.args[0], {
+        packageInfo: { repository: { url: 'https://github.com/foo/bar.git' } },
+        currentDate: new Date(0),
         validLabels: defaultValidLabels,
         mergedPullRequests: [],
         githubRepo: 'foo/bar',
         unreleased: true,
-        versionNumber: Maybe.nothing()
+        versionNumber: undefined
     });
 
     assert.strictEqual(prependFile.callCount, 1);
@@ -304,12 +314,12 @@ test('reports the generated unreleased changelog to a file when stdout is set to
 });
 
 test('derives the version number automatically from merged pull request labels', async () => {
-    const createChangelog = stub().returns('generated changelog');
+    const renderChangelogMarkdown = stub().returns('generated changelog');
     const prependFile = stub().resolves();
     const getLatestVersionTag = stub().resolves('1.2.3');
     const getMergedPullRequests = stub().resolves([{ id: 1, title: 'Add thing', label: 'feature' }]);
     const cli = createCli({
-        createChangelog,
+        renderChangelogMarkdown,
         prependFile: prependFile as unknown as typeof _prependFile,
         getLatestVersionTag,
         getMergedPullRequests
@@ -326,17 +336,19 @@ test('derives the version number automatically from merged pull request labels',
     await cli.run(options);
 
     assert.strictEqual(getLatestVersionTag.callCount, 1);
-    assert.deepStrictEqual(createChangelog.firstCall.args[0], {
+    assert.deepStrictEqual(renderChangelogMarkdown.firstCall.args[0], {
+        packageInfo: { repository: { url: 'https://github.com/foo/bar.git' } },
+        currentDate: new Date(0),
         validLabels: defaultValidLabels,
         mergedPullRequests: [{ id: 1, title: 'Add thing', label: 'feature' }],
         githubRepo: 'foo/bar',
         unreleased: false,
-        versionNumber: Maybe.just('1.3.0')
+        versionNumber: '1.3.0'
     });
 });
 
 test('uses configured version bump labels for auto-versioning', async () => {
-    const createChangelog = stub().returns('generated changelog');
+    const renderChangelogMarkdown = stub().returns('generated changelog');
     const prependFile = stub().resolves();
     const getLatestVersionTag = stub().resolves('1.2.3');
     const getMergedPullRequests = stub().resolves([{ id: 1, title: 'Docs', label: 'documentation' }]);
@@ -349,7 +361,7 @@ test('uses configured version bump labels for auto-versioning', async () => {
         }
     };
     const cli = createCli({
-        createChangelog,
+        renderChangelogMarkdown,
         prependFile: prependFile as unknown as typeof _prependFile,
         getLatestVersionTag,
         getMergedPullRequests,
@@ -366,20 +378,24 @@ test('uses configured version bump labels for auto-versioning', async () => {
 
     await cli.run(options);
 
-    assert.deepStrictEqual(createChangelog.firstCall.args[0], {
+    assert.deepStrictEqual(renderChangelogMarkdown.firstCall.args[0], {
+        packageInfo,
+        currentDate: new Date(0),
         validLabels: defaultValidLabels,
         mergedPullRequests: [{ id: 1, title: 'Docs', label: 'documentation' }],
         githubRepo: 'foo/bar',
         unreleased: false,
-        versionNumber: Maybe.just('1.2.4')
+        versionNumber: '1.2.4'
     });
 });
 
 test('strips trailing empty lines from the generated changelog', async () => {
-    const createChangelog = stub().returns('generated\nchangelog\nwith\n\na\nlot\n\nof\nempty\nlines\n\n\n\n\n');
+    const renderChangelogMarkdown = stub().returns(
+        'generated\nchangelog\nwith\n\na\nlot\n\nof\nempty\nlines\n\n\n\n\n'
+    );
     const prependFile = stub().resolves();
 
-    const cli = createCli({ createChangelog, prependFile: prependFile as unknown as typeof _prependFile });
+    const cli = createCli({ renderChangelogMarkdown, prependFile: prependFile as unknown as typeof _prependFile });
     const options = cliRunOptionsFactory.build();
 
     await cli.run(options);
