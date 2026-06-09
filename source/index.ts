@@ -33,6 +33,7 @@ import {
     renderChangelogMarkdown as renderChangelogMarkdownValue,
     type RenderChangelogMarkdownInput as RenderChangelogMarkdownInputValue
 } from './lib/render-changelog-markdown.ts';
+import { defaultValidLabels as defaultValidLabelsValue } from './lib/valid-labels.ts';
 
 export async function collectMergedPullRequests(
     input: CollectMergedPullRequestsInputValue
@@ -91,6 +92,7 @@ export async function resolvePullRequestLabels(
 
 export type ChangelogBaseRef = ChangelogBaseRefValue;
 export type CollectMergedPullRequestsInput = CollectMergedPullRequestsInputValue;
+export const defaultValidLabels: ReadonlyMap<string, string> = new Map(defaultValidLabelsValue);
 export type FetchPullRequestChangedFilesInput = FetchPullRequestChangedFilesInputValue;
 export type FirstParentCommitLogEntry = FirstParentCommitLogEntryValue;
 export type GitRangeReader = GitRangeReaderValue;

@@ -3,6 +3,7 @@ import { fake } from 'sinon';
 import {
     collectMergedPullRequests,
     createGitHubPullRequestChangedFilesReader,
+    defaultValidLabels as exportedDefaultValidLabels,
     fetchPullRequestChangedFiles,
     formatPackageVersionTag,
     renderChangelogMarkdown,
@@ -108,4 +109,8 @@ test('exports the release plan package type', () => {
     };
 
     assert.strictEqual(releasePlanPackage.name, 'pkg');
+});
+
+test('exports default valid labels', () => {
+    assert.strictEqual(exportedDefaultValidLabels.get('bug'), 'Bug Fixes');
 });
