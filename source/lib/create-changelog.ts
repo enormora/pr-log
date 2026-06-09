@@ -37,6 +37,8 @@ export type CreateChangelog = (options: ChangelogOptions) => string;
 
 type PackageInfo = Record<string, unknown>;
 
+const defaultDateFormat = 'MMMM d, yyyy';
+
 function getConfigValueFromPackageInfo(packageInfo: PackageInfo, fieldName: string, fallback: string): string {
     const prLogConfig = packageInfo['pr-log'];
 
@@ -48,6 +50,11 @@ function getConfigValueFromPackageInfo(packageInfo: PackageInfo, fieldName: stri
     }
 
     return fallback;
+}
+
+export function formatChangelogDate(packageInfo: PackageInfo, date: Readonly<Date>): string {
+    const dateFormat = getConfigValueFromPackageInfo(packageInfo, 'dateFormat', defaultDateFormat);
+    return formatDate(date, dateFormat, { locale: enLocale });
 }
 
 type CollapseRule = {
@@ -348,11 +355,8 @@ type ChangelogOptionsReleased = {
 
 export type ChangelogOptions = ChangelogOptionsReleased | ChangelogOptionsUnreleased;
 
-const defaultDateFormat = 'MMMM d, yyyy';
-
 export function createChangelogFactory(dependencies: Dependencies): CreateChangelog {
     const { getCurrentDate, packageInfo } = dependencies;
-    const dateFormat = getConfigValueFromPackageInfo(packageInfo, 'dateFormat', defaultDateFormat);
     const collapseRules = getCollapseRules(packageInfo);
 
     function createChangelogTitle(options: ChangelogOptions): string {
@@ -362,7 +366,7 @@ export function createChangelogFactory(dependencies: Dependencies): CreateChange
             return '';
         }
 
-        const date = formatDate(getCurrentDate(), dateFormat, { locale: enLocale });
+        const date = formatChangelogDate(packageInfo, getCurrentDate());
         const title = `## ${options.versionNumber.value} (${date})`;
 
         return `${title}\n\n`;

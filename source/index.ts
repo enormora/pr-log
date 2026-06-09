@@ -39,8 +39,13 @@ import {
     type ResolvePullRequestLabelsInput as ResolvePullRequestLabelsInputValue
 } from './lib/resolve-pull-request-labels.ts';
 import {
+    renderGroupedTargetChangelogMarkdown as renderGroupedTargetChangelogMarkdownValue,
     renderChangelogMarkdown as renderChangelogMarkdownValue,
-    type RenderChangelogMarkdownInput as RenderChangelogMarkdownInputValue
+    renderTargetChangelogMarkdown as renderTargetChangelogMarkdownValue,
+    type RenderGroupedTargetChangelogMarkdownInput as RenderGroupedTargetChangelogMarkdownInputValue,
+    type RenderChangelogMarkdownInput as RenderChangelogMarkdownInputValue,
+    type RenderTargetChangelogMarkdownInput as RenderTargetChangelogMarkdownInputValue,
+    type TargetChangelogSection as TargetChangelogSectionValue
 } from './lib/render-changelog-markdown.ts';
 import { defaultValidLabels as defaultValidLabelsValue } from './lib/valid-labels.ts';
 
@@ -90,6 +95,16 @@ export function formatPackageVersionTag(options: {
 
 export function renderChangelogMarkdown(input: RenderChangelogMarkdownInputValue): string {
     const changelog = renderChangelogMarkdownValue(input);
+    return changelog;
+}
+
+export function renderGroupedTargetChangelogMarkdown(input: RenderGroupedTargetChangelogMarkdownInputValue): string {
+    const changelog = renderGroupedTargetChangelogMarkdownValue(input);
+    return changelog;
+}
+
+export function renderTargetChangelogMarkdown(input: RenderTargetChangelogMarkdownInputValue): string {
+    const changelog = renderTargetChangelogMarkdownValue(input);
     return changelog;
 }
 
@@ -151,4 +166,7 @@ export type ReleasePlanPackage = {
     readonly changedArtifactFiles: readonly string[];
 };
 export type RenderChangelogMarkdownInput = RenderChangelogMarkdownInputValue;
+export type RenderGroupedTargetChangelogMarkdownInput = RenderGroupedTargetChangelogMarkdownInputValue;
+export type RenderTargetChangelogMarkdownInput = RenderTargetChangelogMarkdownInputValue;
 export type ResolvePullRequestLabelsInput = ResolvePullRequestLabelsInputValue;
+export type TargetChangelogSection = TargetChangelogSectionValue;
