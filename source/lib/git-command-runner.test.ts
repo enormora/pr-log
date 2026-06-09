@@ -134,6 +134,34 @@ test('listTags() returns the command output splitted as individual lines', async
     assert.deepStrictEqual(result, ['a', 'b', 'c']);
 });
 
+test('hasRef() executes "git rev-parse" with the given ref', async () => {
+    const execute = fake.resolves({ stdout: '' });
+    const runner = gitCommandRunnerFactory({ execute });
+
+    await runner.hasRef('foo');
+
+    assert.strictEqual(execute.callCount, 1);
+    assert.deepStrictEqual(execute.firstCall.args, ['git rev-parse --verify --quiet foo^{commit}']);
+});
+
+test('hasRef() returns true when git finds the ref', async () => {
+    const execute = fake.resolves({ stdout: '' });
+    const runner = gitCommandRunnerFactory({ execute });
+
+    const result = await runner.hasRef('foo');
+
+    assert.strictEqual(result, true);
+});
+
+test('hasRef() returns false when git cannot find the ref', async () => {
+    const execute = fake.rejects(new Error('missing ref'));
+    const runner = gitCommandRunnerFactory({ execute });
+
+    const result = await runner.hasRef('foo');
+
+    assert.strictEqual(result, false);
+});
+
 test('getMergeCommitLogs() executes "git log" with the correct options', async () => {
     const execute = fake.resolves({ stdout: '' });
     const runner = gitCommandRunnerFactory({ execute });

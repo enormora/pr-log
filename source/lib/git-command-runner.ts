@@ -19,6 +19,7 @@ export type GitCommandRunner = {
     getSymmetricDifferencesBetweenBranches(branchA: string, branchB: string): Promise<readonly string[]>;
     getRemoteAliases(): Promise<readonly RemoteAlias[]>;
     listTags(): Promise<readonly string[]>;
+    hasRef(ref: string): Promise<boolean>;
     getMergeCommitLogs(from: string): Promise<readonly MergeCommitLogEntry[]>;
 };
 
@@ -47,6 +48,15 @@ function createParsableGitLogFormat(): string {
     const fields = [subjectPlaceholder, bodyPlaceholder];
 
     return `${fields.join(fieldSeparator)}${lineSeparator}`;
+}
+
+async function hasExistingRef(execute: typeof execaCommand, ref: string): Promise<boolean> {
+    try {
+        await execute(`git rev-parse --verify --quiet ${ref}^{commit}`);
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 export function createGitCommandRunner(dependencies: GitCommandRunnerDependencies): GitCommandRunner {
@@ -90,6 +100,10 @@ export function createGitCommandRunner(dependencies: GitCommandRunnerDependencie
         async listTags() {
             const result = await execute('git tag --list');
             return splitLines(result.stdout);
+        },
+
+        async hasRef(ref) {
+            return hasExistingRef(execute, ref);
         },
 
         async getMergeCommitLogs(from) {

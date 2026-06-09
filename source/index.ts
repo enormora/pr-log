@@ -1,7 +1,13 @@
 import {
+    formatPackageVersionTag as formatPackageVersionTagValue,
+    resolveChangelogBaseRef as resolveChangelogBaseRefValue,
     resolveLatestSemverTagBaseRef as resolveLatestSemverTagBaseRefValue,
     type ChangelogBaseRef as ChangelogBaseRefValue,
-    type LatestSemverTagBaseRefInput as LatestSemverTagBaseRefInputValue
+    type GitRefReader as GitRefReaderValue,
+    type LatestSemverTagBaseRefInput as LatestSemverTagBaseRefInputValue,
+    type MissingChangelogBaseRefError as MissingChangelogBaseRefErrorValue,
+    type MissingChangelogBaseRefReason as MissingChangelogBaseRefReasonValue,
+    type PackageChangelogBaseRefInput as PackageChangelogBaseRefInputValue
 } from './lib/changelog-base-ref.ts';
 import {
     collectMergedPullRequests as collectMergedPullRequestsValue,
@@ -49,9 +55,26 @@ export async function fetchPullRequestChangedFiles(
     return changedFiles;
 }
 
+export function formatPackageVersionTag(options: {
+    readonly packageName: string;
+    readonly version: string;
+    readonly packageTagFormat: string | undefined;
+}): string {
+    const packageVersionTag = formatPackageVersionTagValue(options);
+    return packageVersionTag;
+}
+
 export function renderChangelogMarkdown(input: RenderChangelogMarkdownInputValue): string {
     const changelog = renderChangelogMarkdownValue(input);
     return changelog;
+}
+
+export async function resolveChangelogBaseRef(
+    input: PackageChangelogBaseRefInputValue,
+    gitRefReader: GitRefReaderValue
+): Promise<ChangelogBaseRefValue> {
+    const baseRef = await resolveChangelogBaseRefValue(input, gitRefReader);
+    return baseRef;
 }
 
 export function resolveLatestSemverTagBaseRef(input: LatestSemverTagBaseRefInputValue): ChangelogBaseRefValue {
@@ -70,12 +93,26 @@ export type ChangelogBaseRef = ChangelogBaseRefValue;
 export type CollectMergedPullRequestsInput = CollectMergedPullRequestsInputValue;
 export type FetchPullRequestChangedFilesInput = FetchPullRequestChangedFilesInputValue;
 export type GitRangeReader = GitRangeReaderValue;
+export type GitRefReader = GitRefReaderValue;
 export type LatestSemverTagBaseRefInput = LatestSemverTagBaseRefInputValue;
 export type MergeCommitLogEntry = MergeCommitLogEntryValue;
+export type MissingChangelogBaseRefError = MissingChangelogBaseRefErrorValue;
+export type MissingChangelogBaseRefReason = MissingChangelogBaseRefReasonValue;
+export type PackageChangelogBaseRefInput = PackageChangelogBaseRefInputValue;
 export type PullRequest = PullRequestValue;
 export type PullRequestChangedFilesReader = PullRequestChangedFilesReaderValue;
 export type PullRequestLabelReader = PullRequestLabelReaderValue;
 export type PullRequestTitleReader = PullRequestTitleReaderValue;
 export type PullRequestWithLabel = PullRequestWithLabelValue;
+export type ReleasePlanPackage = {
+    readonly name: string;
+    readonly previousVersion: string | undefined;
+    readonly nextVersion: string;
+    readonly changed: boolean;
+    readonly previousGitHead: string | undefined;
+    readonly currentGitHead: string | undefined;
+    readonly sourceFiles: readonly string[];
+    readonly changedArtifactFiles: readonly string[];
+};
 export type RenderChangelogMarkdownInput = RenderChangelogMarkdownInputValue;
 export type ResolvePullRequestLabelsInput = ResolvePullRequestLabelsInputValue;
