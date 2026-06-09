@@ -6,6 +6,7 @@ import {
     createGitHubPullRequestLabelReader,
     defaultValidLabels as exportedDefaultValidLabels,
     fetchPullRequestChangedFiles,
+    filterPullRequestsByTargetFiles,
     formatPackageVersionTag,
     getPullRequestLabels,
     renderChangelogMarkdown,
@@ -100,6 +101,21 @@ test('exports changed file collection', async () => {
     });
 
     assert.deepStrictEqual(Array.from(changedFilesByPullRequest.entries()), [[pullRequestId, ['source/index.ts']]]);
+});
+
+test('exports target file filtering', () => {
+    const changedFilesByPullRequest = new Map([[pullRequestId, ['source/index.ts']]]);
+
+    assert.deepStrictEqual(
+        filterPullRequestsByTargetFiles({
+            targetName: 'pkg',
+            targetSourceFiles: ['source/index.ts'],
+            pullRequests,
+            changedFilesByPullRequest,
+            ignoredAttributionPaths: []
+        }),
+        pullRequests
+    );
 });
 
 test('exports changelog rendering', () => {
