@@ -24,6 +24,10 @@ import {
     type GitHubPullRequestLabelReaderDependencies as GitHubPullRequestLabelReaderDependenciesValue
 } from './lib/get-pull-request-label.ts';
 import {
+    filterPullRequestsByTargetFiles as filterPullRequestsByTargetFilesValue,
+    type FilterPullRequestsByTargetFilesInput as FilterPullRequestsByTargetFilesInputValue
+} from './lib/filter-pull-requests-by-target-files.ts';
+import {
     fetchPullRequestChangedFiles as fetchPullRequestChangedFilesValue,
     type FetchPullRequestChangedFilesInput as FetchPullRequestChangedFilesInputValue,
     type PullRequestChangedFilesReader as PullRequestChangedFilesReaderValue
@@ -66,6 +70,13 @@ export async function fetchPullRequestChangedFiles(
 ): Promise<ReadonlyMap<number, readonly string[]>> {
     const changedFiles = await fetchPullRequestChangedFilesValue(input);
     return changedFiles;
+}
+
+export function filterPullRequestsByTargetFiles(
+    input: FilterPullRequestsByTargetFilesInputValue
+): readonly PullRequestValue[] {
+    const pullRequests = filterPullRequestsByTargetFilesValue(input);
+    return pullRequests;
 }
 
 export function formatPackageVersionTag(options: {
@@ -116,6 +127,7 @@ export type CollectMergedPullRequestsInput = CollectMergedPullRequestsInputValue
 export const defaultValidLabels: ReadonlyMap<string, string> = new Map(defaultValidLabelsValue);
 export type FetchPullRequestChangedFilesInput = FetchPullRequestChangedFilesInputValue;
 export type FirstParentCommitLogEntry = FirstParentCommitLogEntryValue;
+export type FilterPullRequestsByTargetFilesInput = FilterPullRequestsByTargetFilesInputValue;
 export type GitRangeReader = GitRangeReaderValue;
 export type GitRefReader = GitRefReaderValue;
 export type GitHubPullRequestLabelReaderDependencies = GitHubPullRequestLabelReaderDependenciesValue;
