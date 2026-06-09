@@ -1,0 +1,74 @@
+import assert from 'node:assert';
+import { fake } from 'sinon';
+import {
+    collectMergedPullRequests,
+    createGitHubPullRequestChangedFilesReader,
+    fetchPullRequestChangedFiles,
+    renderChangelogMarkdown,
+    resolveLatestSemverTagBaseRef,
+    resolvePullRequestLabels,
+    type PullRequest
+} from './index.ts';
+import { defaultValidLabels } from './lib/valid-labels.ts';
+
+const pullRequestId = 1;
+const pullRequests: readonly PullRequest[] = [{ id: pullRequestId, title: 'title' }];
+
+test('exports base ref resolvers', () => {
+    assert.deepStrictEqual(resolveLatestSemverTagBaseRef({ tags: ['1.0.0'] }), { ref: '1.0.0' });
+});
+
+test('exports pull request collection and label resolution', async () => {
+    const collectedPullRequests = await collectMergedPullRequests({
+        githubRepo: 'owner/repo',
+        baseRef: 'base',
+        git: {
+            getMergeCommitLogs: fake.resolves([{ subject: 'Merge pull request #1 from branch', body: 'title' }])
+        },
+        pullRequestTitleReader: { getTitle: fake.resolves('fallback title') }
+    });
+
+    assert.deepStrictEqual(collectedPullRequests, pullRequests);
+    assert.deepStrictEqual(
+        await resolvePullRequestLabels({
+            githubRepo: 'owner/repo',
+            validLabels: defaultValidLabels,
+            pullRequests,
+            pullRequestLabelReader: { getLabel: fake.resolves('bug') },
+            waitForMilliseconds: fake.resolves(undefined),
+            labelLookupIntervalMilliseconds: 0
+        }),
+        [{ id: pullRequestId, title: 'title', label: 'bug' }]
+    );
+});
+
+test('exports changed file collection', async () => {
+    const changedFilesReader = createGitHubPullRequestChangedFilesReader({
+        paginate: fake.resolves([{ filename: 'source/index.ts' }]),
+        pulls: { listFiles: fake() }
+    } as never);
+
+    assert.deepStrictEqual(await changedFilesReader.getChangedFiles('owner/repo', pullRequestId), ['source/index.ts']);
+
+    const changedFilesByPullRequest = await fetchPullRequestChangedFiles({
+        githubRepo: 'owner/repo',
+        pullRequests,
+        pullRequestChangedFilesReader: { getChangedFiles: fake.resolves(['source/index.ts']) }
+    });
+
+    assert.deepStrictEqual(Array.from(changedFilesByPullRequest.entries()), [[pullRequestId, ['source/index.ts']]]);
+});
+
+test('exports changelog rendering', () => {
+    const changelog = renderChangelogMarkdown({
+        packageInfo: {},
+        currentDate: new Date(0),
+        validLabels: defaultValidLabels,
+        mergedPullRequests: [{ id: pullRequestId, title: 'title', label: 'bug' }],
+        githubRepo: 'owner/repo',
+        unreleased: false,
+        versionNumber: '1.0.0'
+    });
+
+    assert.ok(changelog.includes('## 1.0.0'));
+});

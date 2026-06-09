@@ -1,0 +1,81 @@
+import {
+    resolveLatestSemverTagBaseRef as resolveLatestSemverTagBaseRefValue,
+    type ChangelogBaseRef as ChangelogBaseRefValue,
+    type LatestSemverTagBaseRefInput as LatestSemverTagBaseRefInputValue
+} from './lib/changelog-base-ref.ts';
+import {
+    collectMergedPullRequests as collectMergedPullRequestsValue,
+    type CollectMergedPullRequestsInput as CollectMergedPullRequestsInputValue,
+    type GitRangeReader as GitRangeReaderValue,
+    type MergeCommitLogEntry as MergeCommitLogEntryValue,
+    type PullRequest as PullRequestValue,
+    type PullRequestTitleReader as PullRequestTitleReaderValue
+} from './lib/collect-merged-pull-requests.ts';
+import * as githubChangedFiles from './lib/github-pull-request-changed-files.ts';
+import {
+    fetchPullRequestChangedFiles as fetchPullRequestChangedFilesValue,
+    type FetchPullRequestChangedFilesInput as FetchPullRequestChangedFilesInputValue,
+    type PullRequestChangedFilesReader as PullRequestChangedFilesReaderValue
+} from './lib/pull-request-changed-files.ts';
+import {
+    resolvePullRequestLabels as resolvePullRequestLabelsValue,
+    type PullRequestLabelReader as PullRequestLabelReaderValue,
+    type PullRequestWithLabel as PullRequestWithLabelValue,
+    type ResolvePullRequestLabelsInput as ResolvePullRequestLabelsInputValue
+} from './lib/resolve-pull-request-labels.ts';
+import {
+    renderChangelogMarkdown as renderChangelogMarkdownValue,
+    type RenderChangelogMarkdownInput as RenderChangelogMarkdownInputValue
+} from './lib/render-changelog-markdown.ts';
+
+export async function collectMergedPullRequests(
+    input: CollectMergedPullRequestsInputValue
+): Promise<readonly PullRequestValue[]> {
+    const pullRequests = await collectMergedPullRequestsValue(input);
+    return pullRequests;
+}
+
+export function createGitHubPullRequestChangedFilesReader(
+    githubClient: Parameters<typeof githubChangedFiles.createGitHubPullRequestChangedFilesReader>[0]
+): PullRequestChangedFilesReaderValue {
+    const changedFilesReader = githubChangedFiles.createGitHubPullRequestChangedFilesReader(githubClient);
+    return changedFilesReader;
+}
+
+export async function fetchPullRequestChangedFiles(
+    input: FetchPullRequestChangedFilesInputValue
+): Promise<ReadonlyMap<number, readonly string[]>> {
+    const changedFiles = await fetchPullRequestChangedFilesValue(input);
+    return changedFiles;
+}
+
+export function renderChangelogMarkdown(input: RenderChangelogMarkdownInputValue): string {
+    const changelog = renderChangelogMarkdownValue(input);
+    return changelog;
+}
+
+export function resolveLatestSemverTagBaseRef(input: LatestSemverTagBaseRefInputValue): ChangelogBaseRefValue {
+    const baseRef = resolveLatestSemverTagBaseRefValue(input);
+    return baseRef;
+}
+
+export async function resolvePullRequestLabels(
+    input: ResolvePullRequestLabelsInputValue
+): Promise<readonly PullRequestWithLabelValue[]> {
+    const pullRequests = await resolvePullRequestLabelsValue(input);
+    return pullRequests;
+}
+
+export type ChangelogBaseRef = ChangelogBaseRefValue;
+export type CollectMergedPullRequestsInput = CollectMergedPullRequestsInputValue;
+export type FetchPullRequestChangedFilesInput = FetchPullRequestChangedFilesInputValue;
+export type GitRangeReader = GitRangeReaderValue;
+export type LatestSemverTagBaseRefInput = LatestSemverTagBaseRefInputValue;
+export type MergeCommitLogEntry = MergeCommitLogEntryValue;
+export type PullRequest = PullRequestValue;
+export type PullRequestChangedFilesReader = PullRequestChangedFilesReaderValue;
+export type PullRequestLabelReader = PullRequestLabelReaderValue;
+export type PullRequestTitleReader = PullRequestTitleReaderValue;
+export type PullRequestWithLabel = PullRequestWithLabelValue;
+export type RenderChangelogMarkdownInput = RenderChangelogMarkdownInputValue;
+export type ResolvePullRequestLabelsInput = ResolvePullRequestLabelsInputValue;

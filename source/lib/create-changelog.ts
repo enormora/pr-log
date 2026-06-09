@@ -2,7 +2,7 @@ import { format as formatDate } from 'date-fns';
 import { isPlainObject, isArray, isString } from '@sindresorhus/is';
 import { enUS as enLocale } from 'date-fns/locale/en-US';
 import type { Just, Nothing } from 'true-myth/maybe';
-import type { PullRequestWithLabel } from './get-merged-pull-requests.ts';
+import type { PullRequestWithLabel } from './resolve-pull-request-labels.ts';
 
 function formatLinkToPullRequest(pullRequestId: number, repo: string): string {
     return `[#${pullRequestId}](https://github.com/${repo}/pull/${pullRequestId})`;
