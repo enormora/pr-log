@@ -2,8 +2,9 @@ import type { Octokit } from '@octokit/rest';
 import { isError, isFiniteNumber, isString } from '@sindresorhus/is';
 import Maybe from 'true-myth/maybe';
 import { splitByString } from './split.ts';
+import type { PullRequestLabelReader } from './resolve-pull-request-labels.ts';
 
-type Dependencies = {
+export type GitHubPullRequestLabelReaderDependencies = {
     readonly githubClient: Octokit;
     readonly waitForMilliseconds: (durationMilliseconds: number) => Promise<void>;
     readonly getCurrentDate: () => Readonly<Date>;
@@ -11,6 +12,7 @@ type Dependencies = {
 };
 
 export type GetPullRequestLabel = typeof getPullRequestLabel;
+export type GetPullRequestLabels = typeof getPullRequestLabels;
 type Headers = Readonly<Record<string, number | string | undefined>>;
 type GitHubClientError = {
     readonly message: string;
@@ -129,12 +131,12 @@ function getGitHubClientError(error: unknown): GitHubClientError | undefined {
 type FetchLabelsWithRateLimitRetryOptions = {
     readonly githubRepo: string;
     readonly pullRequestId: number;
-    readonly dependencies: Dependencies;
+    readonly dependencies: GitHubPullRequestLabelReaderDependencies;
 };
 
 async function waitForRateLimitResetIfRetryable(
     error: unknown,
-    dependencies: Dependencies,
+    dependencies: GitHubPullRequestLabelReaderDependencies,
     retryCount: number
 ): Promise<boolean> {
     const { waitForMilliseconds, getCurrentDate, maximumRateLimitRetryCount } = dependencies;
@@ -175,7 +177,7 @@ export async function getPullRequestLabel(
     githubRepo: string,
     validLabels: ReadonlyMap<string, string>,
     pullRequestId: number,
-    dependencies: Dependencies
+    dependencies: GitHubPullRequestLabelReaderDependencies
 ): Promise<string> {
     const validLabelNames = Array.from(validLabels.keys());
 
@@ -201,4 +203,33 @@ export async function getPullRequestLabel(
     }
 
     return firstLabel.name;
+}
+
+export async function getPullRequestLabels(
+    githubRepo: string,
+    pullRequestId: number,
+    dependencies: GitHubPullRequestLabelReaderDependencies
+): Promise<readonly string[]> {
+    const labels = await fetchLabelsWithRateLimitRetry(
+        {
+            githubRepo,
+            pullRequestId,
+            dependencies
+        },
+        0
+    );
+
+    return labels.map((label) => {
+        return label.name;
+    });
+}
+
+export function createGitHubPullRequestLabelReader(
+    dependencies: GitHubPullRequestLabelReaderDependencies
+): PullRequestLabelReader {
+    return {
+        async getLabels(githubRepo, pullRequestId) {
+            return getPullRequestLabels(githubRepo, pullRequestId, dependencies);
+        }
+    };
 }

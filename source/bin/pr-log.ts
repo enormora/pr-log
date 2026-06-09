@@ -15,7 +15,7 @@ import { ensureCleanLocalGitStateFactory } from '../lib/ensure-clean-local-git-s
 import { getMergedPullRequestsFactory } from '../lib/get-merged-pull-requests.ts';
 import { createChangelogFactory } from '../lib/create-changelog.ts';
 import { findRemoteAliasFactory } from '../lib/find-remote-alias.ts';
-import { getPullRequestLabel } from '../lib/get-pull-request-label.ts';
+import { getPullRequestLabels } from '../lib/get-pull-request-label.ts';
 import { createGitCommandRunner } from '../lib/git-command-runner.ts';
 import { determineLatestVersionTag } from '../lib/latest-version-tag.ts';
 
@@ -46,7 +46,7 @@ const findRemoteAlias = findRemoteAliasFactory({ gitCommandRunner });
 const getMergedPullRequests = getMergedPullRequestsFactory({
     githubClient,
     gitCommandRunner,
-    getPullRequestLabel,
+    getPullRequestLabels,
     waitForMilliseconds: async (durationMilliseconds) => {
         await waitForTimeout(durationMilliseconds);
     },

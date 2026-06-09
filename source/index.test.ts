@@ -3,6 +3,8 @@ import { fake } from 'sinon';
 import {
     collectMergedPullRequests,
     createGitHubPullRequestChangedFilesReader,
+    createGitHubPullRequestLabelReader,
+    defaultValidLabels as exportedDefaultValidLabels,
     fetchPullRequestChangedFiles,
     formatPackageVersionTag,
     renderChangelogMarkdown,
@@ -54,12 +56,29 @@ test('exports pull request collection and label resolution', async () => {
             githubRepo: 'owner/repo',
             validLabels: defaultValidLabels,
             pullRequests,
-            pullRequestLabelReader: { getLabel: fake.resolves('bug') },
+            pullRequestLabelReader: { getLabels: fake.resolves(['bug']) },
             waitForMilliseconds: fake.resolves(undefined),
-            labelLookupIntervalMilliseconds: 0
+            labelLookupIntervalMilliseconds: 0,
+            targetName: undefined,
+            targetScopedLabelPattern: undefined
         }),
         [{ id: pullRequestId, title: 'title', label: 'bug' }]
     );
+});
+
+test('exports pull request label collection', async () => {
+    const listLabelsOnIssue = fake.resolves({ data: [{ name: 'bug' }] });
+    const pullRequestLabelReader = createGitHubPullRequestLabelReader({
+        githubClient: {
+            issues: { listLabelsOnIssue }
+        } as never,
+        waitForMilliseconds: fake.resolves(undefined),
+        getCurrentDate: fake.returns(new Date(0)),
+        maximumRateLimitRetryCount: 0
+    });
+
+    assert.deepStrictEqual(await pullRequestLabelReader.getLabels('owner/repo', pullRequestId), ['bug']);
+    assert.strictEqual(exportedDefaultValidLabels.get('bug'), 'Bug Fixes');
 });
 
 test('exports changed file collection', async () => {

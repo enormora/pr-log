@@ -5,7 +5,7 @@ export type PullRequestWithLabel = PullRequest & {
 };
 
 export type PullRequestLabelReader = {
-    getLabel(githubRepo: string, validLabels: ReadonlyMap<string, string>, pullRequestId: number): Promise<string>;
+    getLabels(githubRepo: string, pullRequestId: number): Promise<readonly string[]>;
 };
 
 export type ResolvePullRequestLabelsInput = {
@@ -15,7 +15,105 @@ export type ResolvePullRequestLabelsInput = {
     readonly pullRequestLabelReader: PullRequestLabelReader;
     readonly waitForMilliseconds: (durationMilliseconds: number) => Promise<void>;
     readonly labelLookupIntervalMilliseconds: number;
+    readonly targetName: string | undefined;
+    readonly targetScopedLabelPattern: string | undefined;
 };
+
+const defaultTargetScopedLabelPattern = '{targetName}:{label}';
+
+function formatLabelList(validLabels: ReadonlyMap<string, string>): string {
+    return Array.from(validLabels.keys()).join(', ');
+}
+
+function resolvePullRequestLevelLabel(
+    validLabels: ReadonlyMap<string, string>,
+    pullRequestId: number,
+    labels: readonly string[]
+): string {
+    const validLabelNames = new Set(validLabels.keys());
+    const matchingLabels = labels.filter((label) => {
+        return validLabelNames.has(label);
+    });
+    const [label] = matchingLabels;
+    const listOfLabels = formatLabelList(validLabels);
+
+    if (matchingLabels.length > 1) {
+        throw new Error(`Pull Request #${pullRequestId} has multiple labels of ${listOfLabels}`);
+    }
+
+    if (label === undefined) {
+        throw new TypeError(`Pull Request #${pullRequestId} has no label of ${listOfLabels}`);
+    }
+
+    return label;
+}
+
+function escapeRegExp(value: string): string {
+    return value.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
+}
+
+function createTargetScopedLabelRegExp(targetName: string, pattern: string): Readonly<RegExp> {
+    const escapedPattern = escapeRegExp(pattern);
+    const source = escapedPattern
+        .replaceAll(escapeRegExp('{targetName}'), escapeRegExp(targetName))
+        .replaceAll(escapeRegExp('{label}'), '(?<label>.+)');
+
+    return new RegExp(`^${source}$`, 'u');
+}
+
+function resolveTargetScopedLabel(options: {
+    readonly validLabels: ReadonlyMap<string, string>;
+    readonly pullRequestId: number;
+    readonly labels: readonly string[];
+    readonly targetName: string;
+    readonly targetScopedLabelPattern: string;
+}): string | undefined {
+    const { validLabels, pullRequestId, labels, targetName, targetScopedLabelPattern } = options;
+    const targetScopedLabelRegExp = createTargetScopedLabelRegExp(targetName, targetScopedLabelPattern);
+    const targetScopedLabels = labels.flatMap((label) => {
+        const match = targetScopedLabelRegExp.exec(label);
+        const targetLabel = match?.groups?.label;
+
+        if (targetLabel === undefined) {
+            return [];
+        }
+
+        if (!validLabels.has(targetLabel)) {
+            throw new TypeError(`Pull Request #${pullRequestId} has unknown label "${label}"`);
+        }
+
+        return [targetLabel];
+    });
+    const [targetScopedLabel] = targetScopedLabels;
+
+    if (targetScopedLabels.length > 1) {
+        throw new Error(`Pull Request #${pullRequestId} has multiple scoped labels for "${targetName}"`);
+    }
+
+    return targetScopedLabel;
+}
+
+function resolveLabel(
+    input: ResolvePullRequestLabelsInput,
+    pullRequest: PullRequest,
+    labels: readonly string[]
+): string {
+    const pullRequestLevelLabel = resolvePullRequestLevelLabel(input.validLabels, pullRequest.id, labels);
+
+    if (input.targetName === undefined) {
+        return pullRequestLevelLabel;
+    }
+
+    return (
+        resolveTargetScopedLabel({
+            validLabels: input.validLabels,
+            pullRequestId: pullRequest.id,
+            labels,
+            targetName: input.targetName,
+            targetScopedLabelPattern: input.targetScopedLabelPattern ?? defaultTargetScopedLabelPattern
+        }) ?? pullRequestLevelLabel
+    );
+}
 
 export async function resolvePullRequestLabels(
     input: ResolvePullRequestLabelsInput
@@ -27,7 +125,8 @@ export async function resolvePullRequestLabels(
             await input.waitForMilliseconds(input.labelLookupIntervalMilliseconds);
         }
 
-        const label = await input.pullRequestLabelReader.getLabel(input.githubRepo, input.validLabels, pullRequest.id);
+        const labels = await input.pullRequestLabelReader.getLabels(input.githubRepo, pullRequest.id);
+        const label = resolveLabel(input, pullRequest, labels);
 
         pullRequestsWithLabels.push({
             id: pullRequest.id,
