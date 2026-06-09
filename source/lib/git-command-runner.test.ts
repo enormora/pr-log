@@ -227,3 +227,84 @@ test('getMergeCommitLogs() falls back to undefined when the body is an empty str
 
     assert.deepStrictEqual(result, [{ subject: 'foo', body: undefined }]);
 });
+
+test('getFirstParentCommitLogs() executes "git log" with the correct options', async () => {
+    const execute = fake.resolves({ stdout: '' });
+    const runner = gitCommandRunnerFactory({ execute });
+
+    await runner.getFirstParentCommitLogs('foo');
+
+    assert.strictEqual(execute.callCount, 1);
+    assert.deepStrictEqual(execute.firstCall.args, [
+        'git log --first-parent --no-color --pretty=format:%H__||__%s__||__%b##$$@@$$## foo..HEAD'
+    ]);
+});
+
+test('getFirstParentCommitLogs() returns the parsed command output', async () => {
+    const execute = fake.resolves({
+        stdout: 'hash-1__||__foo__||__bar##$$@@$$##\nhash-2__||__baz__||__qux##$$@@$$##\n\n'
+    });
+    const runner = gitCommandRunnerFactory({ execute });
+
+    const result = await runner.getFirstParentCommitLogs('');
+
+    assert.deepStrictEqual(result, [
+        { hash: 'hash-1', subject: 'foo', body: 'bar' },
+        { hash: 'hash-2', subject: 'baz', body: 'qux' }
+    ]);
+});
+
+test('getFirstParentCommitLogs() parses multi-line message bodies correctly', async () => {
+    const execute = fake.resolves({
+        stdout: 'hash-1__||__foo__||__bar\nbaz\nqux##$$@@$$##\nhash-2__||__baz__||__qux##$$@@$$##\n\n'
+    });
+    const runner = gitCommandRunnerFactory({ execute });
+
+    const result = await runner.getFirstParentCommitLogs('');
+
+    assert.deepStrictEqual(result, [
+        { hash: 'hash-1', subject: 'foo', body: 'bar\nbaz\nqux' },
+        { hash: 'hash-2', subject: 'baz', body: 'qux' }
+    ]);
+});
+
+test('getFirstParentCommitLogs() parses multi-line bodies correctly when it doesn’t end with a line break', async () => {
+    const execute = fake.resolves({
+        stdout: 'hash-1__||__foo__||__bar\nbaz\nqux##$$@@$$##\nhash-2__||__baz__||__qux##$$@@$$##'
+    });
+    const runner = gitCommandRunnerFactory({ execute });
+
+    const result = await runner.getFirstParentCommitLogs('');
+
+    assert.deepStrictEqual(result, [
+        { hash: 'hash-1', subject: 'foo', body: 'bar\nbaz\nqux' },
+        { hash: 'hash-2', subject: 'baz', body: 'qux' }
+    ]);
+});
+
+test('getFirstParentCommitLogs() falls back to undefined when the body couldn’t be extracted', async () => {
+    const execute = fake.resolves({ stdout: 'hash-1__||__foo##$$@@$$##\n\n\n' });
+    const runner = gitCommandRunnerFactory({ execute });
+
+    const result = await runner.getFirstParentCommitLogs('');
+
+    assert.deepStrictEqual(result, [{ hash: 'hash-1', subject: 'foo', body: undefined }]);
+});
+
+test('getFirstParentCommitLogs() falls back to undefined when the body is an empty string', async () => {
+    const execute = fake.resolves({ stdout: 'hash-1__||__foo__||__##$$@@$$##\n\n\n' });
+    const runner = gitCommandRunnerFactory({ execute });
+
+    const result = await runner.getFirstParentCommitLogs('');
+
+    assert.deepStrictEqual(result, [{ hash: 'hash-1', subject: 'foo', body: undefined }]);
+});
+
+test('getFirstParentCommitLogs() throws when the commit subject cannot be determined', async () => {
+    const execute = fake.resolves({ stdout: 'hash-1##$$@@$$##\n\n\n' });
+    const runner = gitCommandRunnerFactory({ execute });
+
+    await assert.rejects(runner.getFirstParentCommitLogs(''), {
+        message: 'Failed to determine git commit log entry'
+    });
+});
