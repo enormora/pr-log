@@ -3,13 +3,16 @@ import { fake } from 'sinon';
 import {
     collectMergedPullRequests,
     createGitHubPullRequestChangedFilesReader,
+    createGitHubPullRequestLabelReader,
     defaultValidLabels as exportedDefaultValidLabels,
     fetchPullRequestChangedFiles,
     formatPackageVersionTag,
+    getPullRequestLabels,
     renderChangelogMarkdown,
     resolveChangelogBaseRef,
     resolveLatestSemverTagBaseRef,
     resolvePullRequestLabels,
+    type GitHubPullRequestLabelReaderDependencies,
     type PullRequest,
     type ReleasePlanPackage
 } from './index.ts';
@@ -57,12 +60,27 @@ test('exports pull request collection and label resolution', async () => {
             githubRepo: 'owner/repo',
             validLabels: defaultValidLabels,
             pullRequests,
-            pullRequestLabelReader: { getLabel: fake.resolves('bug') },
+            pullRequestLabelReader: { getLabels: fake.resolves(['bug']) },
             waitForMilliseconds: fake.resolves(undefined),
             labelLookupIntervalMilliseconds: 0
         }),
         [{ id: pullRequestId, title: 'title', label: 'bug' }]
     );
+});
+
+test('exports pull request label collection', async () => {
+    const listLabelsOnIssue = fake.resolves({ data: [{ name: 'bug' }] });
+    const githubClientValue: unknown = { issues: { listLabelsOnIssue } };
+    const dependencies: GitHubPullRequestLabelReaderDependencies = {
+        githubClient: githubClientValue as GitHubPullRequestLabelReaderDependencies['githubClient'],
+        waitForMilliseconds: fake.resolves(undefined),
+        getCurrentDate: fake.returns(new Date(0)),
+        maximumRateLimitRetryCount: 0
+    };
+    const pullRequestLabelReader = createGitHubPullRequestLabelReader(dependencies);
+
+    assert.deepStrictEqual(await pullRequestLabelReader.getLabels('owner/repo', pullRequestId), ['bug']);
+    assert.deepStrictEqual(await getPullRequestLabels('owner/repo', pullRequestId, dependencies), ['bug']);
 });
 
 test('exports changed file collection', async () => {
