@@ -183,30 +183,36 @@ The reusable changelog behavior is published as `@pr-log/core`.
 The CLI package `pr-log` composes the same API.
 
 ```ts
-import {
-    collectMergedPullRequests,
-    resolveLatestSemverTagBaseRef,
-    resolvePullRequestLabels,
-    renderChangelogMarkdown
-} from '@pr-log/core';
+import { createPrLogEngine } from '@pr-log/core';
+
+const prLogEngine = createPrLogEngine({
+    githubToken: process.env.GH_TOKEN,
+    workingDirectory: process.cwd(),
+    labelLookupIntervalMilliseconds: 250,
+    maximumRateLimitRetryCount: 3
+});
 ```
 
 `@pr-log/core` owns Git/GitHub range resolution, pull request collection, label resolution, changed-file lookup, and changelog rendering.
-Package impact and release planning stay outside pr-log; consumers can pass release-plan package data into the package-aware base-ref resolver.
+Target impact and release planning stay outside pr-log. Consumers pass target source files into pr-log when they need target-specific changelogs.
+
+A target-aware integration usually follows this flow:
+
+1. Compute release targets and their source files.
+2. Resolve a base ref for each target.
+3. Collect merged pull requests for each Git range.
+4. Fetch changed files for those pull requests.
+5. Filter pull requests by target source files.
+6. Resolve labels for each target.
+7. Render one Markdown string per target, or one grouped Markdown string for all targets.
+
+Target-scoped labels can override the pull request level label for one target. The default pattern is `{targetName}:{label}`.
+For example, `pkg-a:breaking` overrides a `bug` pull request label when rendering `pkg-a`, while other targets still use `bug`.
 
 Package-aware release tags use `<packageName>@<version>` by default, for example `@scope/package@1.2.3`.
 Consumers can pass a package tag format with `{packageName}` and `{version}` placeholders.
-
-## Publishing
-
-This repo uses packtory to publish `pr-log` and `@pr-log/core` from one build without npm workspaces.
-Versions are manual and independent.
-
-```sh
-just pack-all
-just publish-dry-run
-just publish
-```
+pr-log renders changelog text only. Consumers decide whether that text is written to one file, separate target files, release notes, or another destination.
+pr-log does not compute target impact, map build artifacts to source files, publish packages, commit files, create tags, or create releases.
 
 ### Options
 
