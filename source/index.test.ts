@@ -62,7 +62,9 @@ test('exports pull request collection and label resolution', async () => {
             pullRequests,
             pullRequestLabelReader: { getLabels: fake.resolves(['bug']) },
             waitForMilliseconds: fake.resolves(undefined),
-            labelLookupIntervalMilliseconds: 0
+            labelLookupIntervalMilliseconds: 0,
+            targetName: undefined,
+            targetScopedLabelPattern: undefined
         }),
         [{ id: pullRequestId, title: 'title', label: 'bug' }]
     );

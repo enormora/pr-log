@@ -95,6 +95,8 @@ export function getMergedPullRequestsFactory(dependencies: GetMergedPullRequests
             pullRequests,
             waitForMilliseconds,
             labelLookupIntervalMilliseconds,
+            targetName: undefined,
+            targetScopedLabelPattern: undefined,
             pullRequestLabelReader: {
                 async getLabels(repo, pullRequestId) {
                     return getPullRequestLabels(repo, pullRequestId, dependencies);
