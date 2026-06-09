@@ -1,12 +1,12 @@
 import type _prependFile from 'prepend-file';
 import type { Logger } from 'loglevel';
 import type { CliRunOptions } from './cli-run-options.ts';
-import type { CreateChangelog } from './create-changelog.ts';
 import type { GetMergedPullRequests } from './get-merged-pull-requests.ts';
 import type { EnsureCleanLocalGitState } from './ensure-clean-local-git-state.ts';
 import { getGithubRepoFromPackageInfo, getValidLabels } from './package-info.ts';
 import { type GetLatestVersionTag, resolveReleasedVersionNumber } from './resolve-version-number.ts';
 import { validateVersionNumber } from './version-number.ts';
+import type { renderChangelogMarkdown } from './render-changelog-markdown.ts';
 
 function stripTrailingEmptyLine(text: string): string {
     if (text.endsWith('\n\n')) {
@@ -20,7 +20,8 @@ export type CliRunnerDependencies = {
     readonly ensureCleanLocalGitState: EnsureCleanLocalGitState;
     readonly getLatestVersionTag: GetLatestVersionTag;
     readonly getMergedPullRequests: GetMergedPullRequests;
-    readonly createChangelog: CreateChangelog;
+    readonly renderChangelogMarkdown: typeof renderChangelogMarkdown;
+    readonly getCurrentDate: () => Readonly<Date>;
     readonly packageInfo: Record<string, unknown>;
     readonly prependFile: typeof _prependFile;
     readonly logger: Logger;
@@ -31,11 +32,14 @@ export type CliRunner = {
 };
 
 type ReleasedCliRunOptions = Extract<CliRunOptions, { unreleased: false }>;
-type UnreleasedCliRunOptions = Extract<CliRunOptions, { unreleased: true }>;
-
 type GenerateChangelogContext = Pick<
     CliRunnerDependencies,
-    'createChangelog' | 'ensureCleanLocalGitState' | 'getLatestVersionTag' | 'getMergedPullRequests' | 'packageInfo'
+    | 'ensureCleanLocalGitState'
+    | 'getCurrentDate'
+    | 'getLatestVersionTag'
+    | 'getMergedPullRequests'
+    | 'packageInfo'
+    | 'renderChangelogMarkdown'
 >;
 
 type ChangelogData = {
@@ -57,41 +61,48 @@ async function ensureCleanState(
 }
 
 function generateUnreleasedChangelog(
-    createChangelog: CreateChangelog,
-    options: UnreleasedCliRunOptions,
+    context: Pick<CliRunnerDependencies, 'getCurrentDate' | 'packageInfo' | 'renderChangelogMarkdown'>,
     changelogData: ChangelogData
 ): string {
+    const { getCurrentDate, packageInfo, renderChangelogMarkdown } = context;
     const { githubRepo, validLabels, mergedPullRequests } = changelogData;
 
     return stripTrailingEmptyLine(
-        createChangelog({
+        renderChangelogMarkdown({
+            packageInfo,
+            currentDate: getCurrentDate(),
             validLabels,
-            mergedPullRequests,
             githubRepo,
+            mergedPullRequests,
             unreleased: true,
-            versionNumber: options.versionNumber
+            versionNumber: undefined
         })
     );
 }
 
 async function generateReleasedChangelog(
-    context: Pick<CliRunnerDependencies, 'createChangelog' | 'getLatestVersionTag' | 'packageInfo'>,
+    context: Pick<
+        CliRunnerDependencies,
+        'getCurrentDate' | 'getLatestVersionTag' | 'packageInfo' | 'renderChangelogMarkdown'
+    >,
     options: ReleasedCliRunOptions,
     changelogData: ChangelogData
 ): Promise<string> {
-    const { createChangelog, packageInfo, getLatestVersionTag } = context;
+    const { getCurrentDate, packageInfo, getLatestVersionTag, renderChangelogMarkdown } = context;
     const { githubRepo, validLabels, mergedPullRequests } = changelogData;
     const versionNumber = options.autoVersion
         ? await resolveReleasedVersionNumber(packageInfo, validLabels, getLatestVersionTag, mergedPullRequests)
         : options.versionNumber;
 
     return stripTrailingEmptyLine(
-        createChangelog({
+        renderChangelogMarkdown({
+            packageInfo,
+            currentDate: getCurrentDate(),
             validLabels,
-            mergedPullRequests,
             githubRepo,
+            mergedPullRequests,
             unreleased: false,
-            versionNumber
+            versionNumber: versionNumber.value
         })
     );
 }
@@ -102,8 +113,14 @@ async function generateChangelog(
     githubRepo: string,
     validLabels: ReadonlyMap<string, string>
 ): Promise<string> {
-    const { ensureCleanLocalGitState, getLatestVersionTag, getMergedPullRequests, createChangelog, packageInfo } =
-        dependencies;
+    const {
+        ensureCleanLocalGitState,
+        getCurrentDate,
+        getLatestVersionTag,
+        getMergedPullRequests,
+        packageInfo,
+        renderChangelogMarkdown
+    } = dependencies;
 
     await ensureCleanState(ensureCleanLocalGitState, options, githubRepo);
 
@@ -114,10 +131,14 @@ async function generateChangelog(
     };
 
     if (options.unreleased) {
-        return generateUnreleasedChangelog(createChangelog, options, changelogData);
+        return generateUnreleasedChangelog({ getCurrentDate, packageInfo, renderChangelogMarkdown }, changelogData);
     }
 
-    return generateReleasedChangelog({ createChangelog, packageInfo, getLatestVersionTag }, options, changelogData);
+    return generateReleasedChangelog(
+        { getCurrentDate, packageInfo, getLatestVersionTag, renderChangelogMarkdown },
+        options,
+        changelogData
+    );
 }
 
 async function writeChangelog(
