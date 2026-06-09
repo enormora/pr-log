@@ -3,6 +3,7 @@ import type { Octokit } from '@octokit/rest';
 import { fake } from 'sinon';
 import { defaultValidLabels } from '../lib/valid-labels.ts';
 import type { GitCommandRunner } from '../lib/git-command-runner.ts';
+import type { GetPullRequestLabels } from '../lib/get-pull-request-label.ts';
 import type { PullRequestChangedFilesReader } from '../lib/pull-request-changed-files.ts';
 import { createPrLogEngineWithDependencies } from './pr-log-engine.ts';
 
@@ -15,6 +16,7 @@ function createEngine(
         readonly gitCommandRunner?: GitCommandRunner;
         readonly githubClient?: Octokit;
         readonly pullRequestChangedFilesReader?: PullRequestChangedFilesReader;
+        readonly getPullRequestLabels?: GetPullRequestLabels;
         readonly waitForMilliseconds?: (durationMilliseconds: number) => Promise<void>;
         readonly labelLookupIntervalMilliseconds?: number;
     } = {}
@@ -45,7 +47,7 @@ function createEngine(
         gitCommandRunner,
         githubClient,
         pullRequestChangedFilesReader,
-        getPullRequestLabels: fake.resolves(['bug']),
+        getPullRequestLabels: overrides.getPullRequestLabels ?? fake.resolves(['bug']),
         waitForMilliseconds: overrides.waitForMilliseconds ?? fake.resolves(undefined),
         getCurrentDate: fake.returns(new Date(0)),
         labelLookupIntervalMilliseconds: overrides.labelLookupIntervalMilliseconds ?? waitDurationMilliseconds,
@@ -166,7 +168,26 @@ test('resolves pull request labels', async () => {
         await engine.resolvePullRequestLabels({
             githubRepo,
             validLabels: defaultValidLabels,
-            pullRequests: [{ id: pullRequestId, title: 'Fix bug' }]
+            pullRequests: [{ id: pullRequestId, title: 'Fix bug' }],
+            targetName: undefined,
+            targetScopedLabelPattern: undefined
+        }),
+        [{ id: pullRequestId, title: 'Fix bug', label: 'bug' }]
+    );
+});
+
+test('resolves target scoped pull request labels', async () => {
+    const engine = createEngine({
+        getPullRequestLabels: fake.resolves(['feature', 'pkg-a:bug'])
+    });
+
+    assert.deepStrictEqual(
+        await engine.resolvePullRequestLabels({
+            githubRepo,
+            validLabels: defaultValidLabels,
+            pullRequests: [{ id: pullRequestId, title: 'Fix bug' }],
+            targetName: 'pkg-a',
+            targetScopedLabelPattern: undefined
         }),
         [{ id: pullRequestId, title: 'Fix bug', label: 'bug' }]
     );
