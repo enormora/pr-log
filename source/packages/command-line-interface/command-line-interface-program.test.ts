@@ -1,0 +1,126 @@
+import assert from 'node:assert';
+import { stub, type SinonStub } from 'sinon';
+import type { CliRunner } from '../../lib/cli.ts';
+import type { CliRunOptions } from '../../lib/cli-run-options.ts';
+import {
+    createCommandLineInterfaceError,
+    createCommandLineInterfaceProgram,
+    type CommandLineInterfaceProgramDependencies
+} from './command-line-interface-program.ts';
+
+type FactoryResult = {
+    readonly dependencies: CommandLineInterfaceProgramDependencies;
+    readonly auth: SinonStub;
+    readonly createCliRunner: SinonStub;
+    readonly readPackageInfo: SinonStub;
+    readonly reportError: SinonStub;
+    readonly run: SinonStub;
+};
+
+function createDependencies(githubToken: string | undefined): FactoryResult {
+    const auth = stub().resolves(undefined);
+    const readPackageInfo = stub().resolves({ name: 'consumer-package' });
+    const run = stub().resolves(undefined);
+    const cliRunner: CliRunner = { run };
+    const createCliRunner = stub().returns(cliRunner);
+    const reportError = stub();
+    const reportCommandLineInterfaceError: CommandLineInterfaceProgramDependencies['reportError'] = (
+        error,
+        options
+    ) => {
+        reportError(error, options);
+    };
+
+    return {
+        dependencies: {
+            packageMetadata: {
+                name: 'pr-log',
+                description: 'Changelog generator',
+                version: '1.2.3'
+            },
+            githubToken,
+            githubClient: { auth },
+            changelogPath: '/project/CHANGELOG.md',
+            readPackageInfo,
+            createCliRunner,
+            reportError: reportCommandLineInterfaceError
+        },
+        auth,
+        createCliRunner,
+        readPackageInfo,
+        reportError,
+        run
+    };
+}
+
+test('createCommandLineInterfaceProgram() runs the CLI with parsed release options', async () => {
+    const { dependencies, auth, createCliRunner, readPackageInfo, run } = createDependencies('github-token');
+    const program = createCommandLineInterfaceProgram(dependencies);
+
+    await program.run(['node', 'pr-log', '1.2.3', '--sloppy', '--stdout', '--default-branch', 'develop']);
+
+    assert.strictEqual(auth.callCount, 1);
+    assert.strictEqual(readPackageInfo.callCount, 1);
+    assert.deepStrictEqual(createCliRunner.firstCall.args, [
+        {
+            defaultBranch: 'develop',
+            packageInfo: { name: 'consumer-package' }
+        }
+    ]);
+    const runOptions = run.firstCall.args[0] as CliRunOptions;
+
+    assert.deepStrictEqual(runOptions, {
+        unreleased: false,
+        autoVersion: false,
+        versionNumber: runOptions.versionNumber,
+        changelogPath: '/project/CHANGELOG.md',
+        sloppy: true,
+        stdout: true
+    });
+    assert.strictEqual(runOptions.versionNumber.unwrapOr(''), '1.2.3');
+});
+
+test('createCommandLineInterfaceProgram() skips authentication without a GitHub token', async () => {
+    const { dependencies, auth, run } = createDependencies(undefined);
+    const program = createCommandLineInterfaceProgram(dependencies);
+
+    await program.run(['node', 'pr-log', '--unreleased']);
+
+    assert.strictEqual(auth.callCount, 0);
+    assert.strictEqual((run.firstCall.args[0] as CliRunOptions).unreleased, true);
+});
+
+test('createCommandLineInterfaceProgram() reports run option errors', async () => {
+    const { dependencies, reportError } = createDependencies(undefined);
+    const program = createCommandLineInterfaceProgram(dependencies);
+
+    await program.run(['node', 'pr-log', '1.2.3', '--unreleased']);
+
+    assert.strictEqual(reportError.callCount, 1);
+    assert.strictEqual(
+        (reportError.firstCall.args[0] as Error).message,
+        'A version number is not allowed when --unreleased was provided'
+    );
+    assert.deepStrictEqual(reportError.firstCall.args[1], { isTracingEnabled: false });
+});
+
+test('createCommandLineInterfaceProgram() reports runner errors with trace state', async () => {
+    const { dependencies, reportError, run } = createDependencies(undefined);
+    const error = new Error('run failed');
+    run.rejects(error);
+    const program = createCommandLineInterfaceProgram(dependencies);
+
+    await program.run(['node', 'pr-log', '1.2.3', '--trace']);
+
+    assert.deepStrictEqual(reportError.firstCall.args, [error, { isTracingEnabled: true }]);
+});
+
+test('createCommandLineInterfaceError() keeps Error values', () => {
+    const error = new Error('run failed');
+
+    assert.strictEqual(createCommandLineInterfaceError(error), error);
+});
+
+test('createCommandLineInterfaceError() wraps unknown values', () => {
+    assert.strictEqual(createCommandLineInterfaceError('run failed').message, 'run failed');
+});

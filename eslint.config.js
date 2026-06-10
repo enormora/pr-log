@@ -65,7 +65,10 @@ export default [
         }
     },
     {
-        files: ['source/packages/command-line-interface/bin.entry-point.ts'],
+        files: [
+            'source/packages/command-line-interface/bin.entry-point.ts',
+            'source/packages/command-line-interface/command-line-interface.composition.ts'
+        ],
         rules: {
             'no-console': 'off',
             'node/no-process-env': 'off',

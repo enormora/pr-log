@@ -1,6 +1,5 @@
 import { isPlainObject, isString } from '@sindresorhus/is';
 import { getGithubRepo } from './get-github-repo.ts';
-import { defaultValidLabels } from './valid-labels.ts';
 
 type PackageInfo = Record<string, unknown>;
 
@@ -18,7 +17,10 @@ export function getGithubRepoFromPackageInfo(packageInfo: PackageInfo): string {
     return getGithubRepo(repository.url);
 }
 
-export function getValidLabels(packageInfo: PackageInfo): ReadonlyMap<string, string> {
+export function getValidLabels(
+    packageInfo: PackageInfo,
+    defaultValidLabels: ReadonlyMap<string, string>
+): ReadonlyMap<string, string> {
     const prLogConfig = packageInfo['pr-log'];
 
     if (isPlainObject(prLogConfig) && Array.isArray(prLogConfig.validLabels)) {

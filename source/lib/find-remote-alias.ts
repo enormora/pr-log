@@ -1,6 +1,14 @@
 import parseGitUrl from 'git-url-parse';
 import { isUndefined } from '@sindresorhus/is';
-import type { GitCommandRunner } from './git-command-runner.ts';
+
+export type RemoteAlias = {
+    readonly alias: string;
+    readonly url: string;
+};
+
+export type RemoteAliasReader = {
+    getRemoteAliases(): Promise<readonly RemoteAlias[]>;
+};
 
 function isSameGitUrl(gitUrlA: string, gitUrlB: string): boolean {
     const parsedUrlA = parseGitUrl(gitUrlA);
@@ -16,18 +24,18 @@ function getGitUrl(githubRepo: string): string {
 }
 
 export type FindRemoteAliasDependencies = {
-    readonly gitCommandRunner: GitCommandRunner;
+    readonly remoteAliasReader: RemoteAliasReader;
 };
 
 export type FindRemoteAlias = (githubRepo: string) => Promise<string>;
 
 export function findRemoteAliasFactory(dependencies: FindRemoteAliasDependencies): FindRemoteAlias {
-    const { gitCommandRunner } = dependencies;
+    const { remoteAliasReader } = dependencies;
 
     return async function findRemoteAlias(githubRepo: string) {
         const gitRemote = getGitUrl(githubRepo);
 
-        const remotes = await gitCommandRunner.getRemoteAliases();
+        const remotes = await remoteAliasReader.getRemoteAliases();
         const matchedRemote = remotes.find((remote) => {
             return isSameGitUrl(gitRemote, remote.url);
         });

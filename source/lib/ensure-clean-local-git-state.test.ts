@@ -25,7 +25,7 @@ function factory(overrides: Overrides = {}): EnsureCleanLocalGitState {
         findRemoteAlias = fake.resolves('origin')
     } = overrides;
     const fakeDependencies = {
-        gitCommandRunner: {
+        localGitState: {
             getShortStatus,
             getCurrentBranchName,
             getSymmetricDifferencesBetweenBranches,
