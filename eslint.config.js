@@ -65,7 +65,7 @@ export default [
         }
     },
     {
-        files: ['source/bin/pr-log.ts'],
+        files: ['source/packages/command-line-interface/bin.entry-point.ts'],
         rules: {
             'no-console': 'off',
             'node/no-process-env': 'off',

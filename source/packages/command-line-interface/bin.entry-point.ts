@@ -9,15 +9,15 @@ import prependFile from 'prepend-file';
 import { execaCommand } from 'execa';
 import loglevel from 'loglevel';
 import { isString } from '@sindresorhus/is';
-import { createCliRunOptions } from '../lib/cli-run-options.ts';
-import { createCliRunner, type CliRunnerDependencies } from '../lib/cli.ts';
-import { ensureCleanLocalGitStateFactory } from '../lib/ensure-clean-local-git-state.ts';
-import { getMergedPullRequestsFactory } from '../lib/get-merged-pull-requests.ts';
-import { findRemoteAliasFactory } from '../lib/find-remote-alias.ts';
-import { getPullRequestLabels } from '../lib/get-pull-request-label.ts';
-import { createGitCommandRunner } from '../lib/git-command-runner.ts';
-import { determineLatestVersionTag } from '../lib/latest-version-tag.ts';
-import { renderChangelogMarkdown } from '../index.ts';
+import { createCliRunOptions } from '../../lib/cli-run-options.ts';
+import { createCliRunner, type CliRunnerDependencies } from '../../lib/cli.ts';
+import { ensureCleanLocalGitStateFactory } from '../../lib/ensure-clean-local-git-state.ts';
+import { getMergedPullRequestsFactory } from '../../lib/get-merged-pull-requests.ts';
+import { findRemoteAliasFactory } from '../../lib/find-remote-alias.ts';
+import { getPullRequestLabels } from '../../lib/get-pull-request-label.ts';
+import { createGitCommandRunner } from '../../lib/git-command-runner.ts';
+import { determineLatestVersionTag } from '../../lib/latest-version-tag.ts';
+import { renderChangelogMarkdown } from '../core/core.entry-point.ts';
 
 loglevel.enableAll();
 
@@ -26,7 +26,7 @@ async function readJson(filePath: string): Promise<Record<string, unknown>> {
     return JSON.parse(fileContent) as Record<string, unknown>;
 }
 
-const prLogPackageJsonURL = new URL('../../../../package.json', import.meta.url);
+const prLogPackageJsonURL = new URL('../../../../../package.json', import.meta.url);
 const config = (await readJson(prLogPackageJsonURL.pathname)) as Record<string, string>;
 
 const { GH_TOKEN } = process.env;
