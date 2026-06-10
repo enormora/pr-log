@@ -3,7 +3,7 @@ import { Octokit } from '@octokit/rest';
 import { execaCommand } from 'execa';
 import { createGitHubPullRequestChangedFilesReader } from '../../lib/github-pull-request-changed-files.ts';
 import { createGitCommandRunner, type GitCommandExecutor } from '../../lib/git-command-runner.ts';
-import { getPullRequestLabel } from '../../lib/get-pull-request-label.ts';
+import { getPullRequestLabels } from '../../lib/get-pull-request-label.ts';
 import { defaultValidLabels as defaultValidLabelsValue } from '../../lib/valid-labels.ts';
 import {
     createPrLogEngineWithDependencies,
@@ -14,6 +14,7 @@ import {
     type PullRequest as PullRequestValue,
     type PullRequestWithLabel as PullRequestWithLabelValue,
     type ReadPullRequestChangedFilesOptions as ReadPullRequestChangedFilesOptionsValue,
+    type ReadPullRequestLabelsOptions as ReadPullRequestLabelsOptionsValue,
     type RenderChangelogMarkdownInput as RenderChangelogMarkdownInputValue,
     type ResolvePullRequestLabelsOptions as ResolvePullRequestLabelsOptionsValue
 } from '../../core/pr-log-engine.ts';
@@ -44,7 +45,7 @@ export function createPrLogEngine(options: Readonly<PrLogEngineOptions>): PrLogE
         githubClient,
         gitCommandRunner,
         pullRequestChangedFilesReader: createGitHubPullRequestChangedFilesReader(githubClient),
-        getPullRequestLabel,
+        getPullRequestLabels,
         waitForMilliseconds: waitForTimeout,
         getCurrentDate: createCurrentDate,
         labelLookupIntervalMilliseconds: options.labelLookupIntervalMilliseconds,
@@ -61,5 +62,6 @@ export type PrLogEngine = PrLogEngineValue;
 export type PullRequest = PullRequestValue;
 export type PullRequestWithLabel = PullRequestWithLabelValue;
 export type ReadPullRequestChangedFilesOptions = ReadPullRequestChangedFilesOptionsValue;
+export type ReadPullRequestLabelsOptions = ReadPullRequestLabelsOptionsValue;
 export type RenderChangelogMarkdownInput = RenderChangelogMarkdownInputValue;
 export type ResolvePullRequestLabelsOptions = ResolvePullRequestLabelsOptionsValue;

@@ -15,6 +15,8 @@ function createEngine(
         readonly gitCommandRunner?: GitCommandRunner;
         readonly githubClient?: Octokit;
         readonly pullRequestChangedFilesReader?: PullRequestChangedFilesReader;
+        readonly waitForMilliseconds?: (durationMilliseconds: number) => Promise<void>;
+        readonly labelLookupIntervalMilliseconds?: number;
     } = {}
 ): ReturnType<typeof createPrLogEngineWithDependencies> {
     const gitCommandRunner =
@@ -43,10 +45,10 @@ function createEngine(
         gitCommandRunner,
         githubClient,
         pullRequestChangedFilesReader,
-        getPullRequestLabel: fake.resolves('bug'),
-        waitForMilliseconds: fake.resolves(undefined),
+        getPullRequestLabels: fake.resolves(['bug']),
+        waitForMilliseconds: overrides.waitForMilliseconds ?? fake.resolves(undefined),
         getCurrentDate: fake.returns(new Date(0)),
-        labelLookupIntervalMilliseconds: waitDurationMilliseconds,
+        labelLookupIntervalMilliseconds: overrides.labelLookupIntervalMilliseconds ?? waitDurationMilliseconds,
         maximumRateLimitRetryCount: 0
     });
 }
@@ -128,6 +130,33 @@ test('reads pull request changed files', async () => {
         }),
         new Map([[pullRequestId, ['source/index.ts']]])
     );
+});
+
+test('reads pull request labels', async () => {
+    const engine = createEngine();
+
+    assert.deepStrictEqual(
+        await engine.readPullRequestLabels({
+            githubRepo,
+            pullRequests: [{ id: pullRequestId, title: 'Fix bug' }]
+        }),
+        new Map([[pullRequestId, ['bug']]])
+    );
+});
+
+test('waits between raw pull request label reads', async () => {
+    const waitForMilliseconds = fake.resolves(undefined);
+    const engine = createEngine({ waitForMilliseconds, labelLookupIntervalMilliseconds: waitDurationMilliseconds });
+
+    await engine.readPullRequestLabels({
+        githubRepo,
+        pullRequests: [
+            { id: pullRequestId, title: 'Fix bug' },
+            { id: 2, title: 'Add feature' }
+        ]
+    });
+
+    assert.deepStrictEqual(waitForMilliseconds.firstCall.args, [waitDurationMilliseconds]);
 });
 
 test('resolves pull request labels', async () => {
