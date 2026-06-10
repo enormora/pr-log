@@ -4,6 +4,10 @@ import { execaCommand } from 'execa';
 import { createGitHubPullRequestChangedFilesReader } from '../../lib/github-pull-request-changed-files.ts';
 import { createGitCommandRunner, type GitCommandExecutor } from '../../lib/git-command-runner.ts';
 import { getPullRequestLabels } from '../../lib/get-pull-request-label.ts';
+import type {
+    MissingChangelogBaseRefError as MissingChangelogBaseRefErrorValue,
+    MissingChangelogBaseRefReason as MissingChangelogBaseRefReasonValue
+} from '../../lib/changelog-base-ref.ts';
 import { defaultValidLabels as defaultValidLabelsValue } from '../../lib/valid-labels.ts';
 import {
     createPrLogEngineWithDependencies,
@@ -62,6 +66,8 @@ export const defaultValidLabels: ReadonlyMap<string, string> = new Map(defaultVa
 export type ChangelogBaseRef = ChangelogBaseRefValue;
 export type CollectMergedPullRequestsOptions = CollectMergedPullRequestsOptionsValue;
 export type FilterPullRequestsByTargetFilesInput = FilterPullRequestsByTargetFilesInputValue;
+export type MissingChangelogBaseRefError = MissingChangelogBaseRefErrorValue;
+export type MissingChangelogBaseRefReason = MissingChangelogBaseRefReasonValue;
 export type PackageChangelogBaseRefInput = PackageChangelogBaseRefInputValue;
 export type PrLogEngine = PrLogEngineValue;
 export type PullRequest = PullRequestValue;

@@ -211,6 +211,7 @@ For example, `pkg-a:breaking` overrides a `bug` pull request label when renderin
 
 Package-aware release tags use `<packageName>@<version>` by default, for example `@scope/package@1.2.3`.
 Consumers can pass a package tag format with `{packageName}` and `{version}` placeholders.
+Missing package base refs reject with `MissingChangelogBaseRefError`.
 pr-log renders changelog text only. Consumers decide whether that text is written to one file, separate target files, release notes, or another destination.
 pr-log does not compute target impact, map build artifacts to source files, publish packages, commit files, create tags, or create releases.
 
