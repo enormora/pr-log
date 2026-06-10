@@ -2,7 +2,6 @@
 
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { setTimeout as waitForTimeout } from 'node:timers/promises';
 import { createCommand } from 'commander';
 import { Octokit } from '@octokit/rest';
 import prependFile from 'prepend-file';
@@ -12,12 +11,9 @@ import { isString } from '@sindresorhus/is';
 import { createCliRunOptions } from '../../lib/cli-run-options.ts';
 import { createCliRunner, type CliRunnerDependencies } from '../../lib/cli.ts';
 import { ensureCleanLocalGitStateFactory } from '../../lib/ensure-clean-local-git-state.ts';
-import { getMergedPullRequestsFactory } from '../../lib/get-merged-pull-requests.ts';
 import { findRemoteAliasFactory } from '../../lib/find-remote-alias.ts';
-import { getPullRequestLabels } from '../../lib/get-pull-request-label.ts';
 import { createGitCommandRunner } from '../../lib/git-command-runner.ts';
-import { determineLatestVersionTag } from '../../lib/latest-version-tag.ts';
-import { renderChangelogMarkdown } from '../core/core.entry-point.ts';
+import { createPrLogEngine } from '../core/core.entry-point.ts';
 
 loglevel.enableAll();
 
@@ -43,19 +39,25 @@ let isTracingEnabled = false;
 const changelogPath = path.join(process.cwd(), 'CHANGELOG.md');
 const gitCommandRunner = createGitCommandRunner({ execute: execaCommand });
 const findRemoteAlias = findRemoteAliasFactory({ gitCommandRunner });
-const getMergedPullRequests = getMergedPullRequestsFactory({
-    githubClient,
-    gitCommandRunner,
-    getPullRequestLabels,
-    waitForMilliseconds: async (durationMilliseconds) => {
-        await waitForTimeout(durationMilliseconds);
-    },
+const prLogEngine = createPrLogEngine({
+    githubToken: GH_TOKEN,
+    workingDirectory: process.cwd(),
     labelLookupIntervalMilliseconds,
-    getCurrentDate,
     maximumRateLimitRetryCount
 });
 const getLatestVersionTag = async (): Promise<string> => {
-    return determineLatestVersionTag(await gitCommandRunner.listTags());
+    const baseRef = await prLogEngine.resolveLatestSemverChangelogBaseRef();
+    return baseRef.ref;
+};
+const getMergedPullRequests: CliRunnerDependencies['getMergedPullRequests'] = async (githubRepo, validLabels) => {
+    const baseRef = await prLogEngine.resolveLatestSemverChangelogBaseRef();
+    const pullRequests = await prLogEngine.collectMergedPullRequests({ githubRepo, baseRef: baseRef.ref });
+
+    return prLogEngine.resolvePullRequestLabels({
+        githubRepo,
+        validLabels,
+        pullRequests
+    });
 };
 
 const program = createCommand(config.name ?? '');
@@ -93,7 +95,9 @@ program
                     getLatestVersionTag,
                     getMergedPullRequests,
                     getCurrentDate,
-                    renderChangelogMarkdown
+                    renderChangelogMarkdown(input) {
+                        return prLogEngine.renderChangelog(input);
+                    }
                 };
                 const cliRunner = createCliRunner(dependencies);
                 await cliRunner.run(runOptions);

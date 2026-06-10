@@ -1,4 +1,3 @@
-import type { execaCommand } from 'execa';
 import { oneLine } from 'common-tags';
 import { splitByString, splitByPattern } from './split.ts';
 
@@ -33,8 +32,14 @@ export type GitCommandRunner = {
     getFirstParentCommitLogs(from: string): Promise<readonly FirstParentCommitLogEntry[]>;
 };
 
+type GitCommandResult = {
+    readonly stdout: string;
+};
+
+export type GitCommandExecutor = (command: string) => Promise<GitCommandResult>;
+
 export type GitCommandRunnerDependencies = {
-    readonly execute: typeof execaCommand;
+    readonly execute: GitCommandExecutor;
 };
 
 function trim(value: string): string {
@@ -71,7 +76,7 @@ function createParsableFirstParentGitLogFormat(): string {
     return `${fields.join(fieldSeparator)}${lineSeparator}`;
 }
 
-async function hasExistingRef(execute: typeof execaCommand, ref: string): Promise<boolean> {
+async function hasExistingRef(execute: GitCommandExecutor, ref: string): Promise<boolean> {
     try {
         await execute(`git rev-parse --verify --quiet ${ref}^{commit}`);
         return true;
@@ -97,22 +102,22 @@ function parseFirstParentCommitLogFields(log: string): FirstParentCommitLogField
     return [hash, subject, body];
 }
 
-async function readShortStatus(execute: typeof execaCommand): Promise<string> {
+async function readShortStatus(execute: GitCommandExecutor): Promise<string> {
     const result = await execute('git status --short');
     return result.stdout.trim();
 }
 
-async function readCurrentBranchName(execute: typeof execaCommand): Promise<string> {
+async function readCurrentBranchName(execute: GitCommandExecutor): Promise<string> {
     const result = await execute('git rev-parse --abbrev-ref HEAD');
     return result.stdout.trim();
 }
 
-async function fetchRemoteByAlias(execute: typeof execaCommand, remoteAlias: string): Promise<void> {
+async function fetchRemoteByAlias(execute: GitCommandExecutor, remoteAlias: string): Promise<void> {
     await execute(`git fetch ${remoteAlias}`);
 }
 
 async function readSymmetricBranchDifferences(
-    execute: typeof execaCommand,
+    execute: GitCommandExecutor,
     branchA: string,
     branchB: string
 ): Promise<readonly string[]> {
@@ -120,7 +125,7 @@ async function readSymmetricBranchDifferences(
     return splitLines(result.stdout);
 }
 
-async function readRemoteAliases(execute: typeof execaCommand): Promise<readonly RemoteAlias[]> {
+async function readRemoteAliases(execute: GitCommandExecutor): Promise<readonly RemoteAlias[]> {
     const result = await execute('git remote -v');
 
     return splitLines(result.stdout).map((line: string) => {
@@ -135,15 +140,12 @@ async function readRemoteAliases(execute: typeof execaCommand): Promise<readonly
     });
 }
 
-async function readTags(execute: typeof execaCommand): Promise<readonly string[]> {
+async function readTags(execute: GitCommandExecutor): Promise<readonly string[]> {
     const result = await execute('git tag --list');
     return splitLines(result.stdout);
 }
 
-async function readMergeCommitLogs(
-    execute: typeof execaCommand,
-    from: string
-): Promise<readonly MergeCommitLogEntry[]> {
+async function readMergeCommitLogs(execute: GitCommandExecutor, from: string): Promise<readonly MergeCommitLogEntry[]> {
     const result = await execute(oneLine`git log --first-parent --no-color
         --pretty=format:${createParsableMergeGitLogFormat()} --merges ${from}..HEAD`);
 
@@ -157,7 +159,7 @@ async function readMergeCommitLogs(
 }
 
 async function readFirstParentCommitLogs(
-    execute: typeof execaCommand,
+    execute: GitCommandExecutor,
     from: string
 ): Promise<readonly FirstParentCommitLogEntry[]> {
     const result = await execute(
