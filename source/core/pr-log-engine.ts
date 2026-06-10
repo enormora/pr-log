@@ -27,8 +27,13 @@ import {
     type PullRequestWithLabel as PullRequestWithLabelValue
 } from '../lib/resolve-pull-request-labels.ts';
 import {
+    renderGroupedTargetChangelogMarkdown,
     renderChangelogMarkdown,
-    type RenderChangelogMarkdownInput as RenderChangelogMarkdownInputValue
+    renderTargetChangelogMarkdown,
+    type RenderChangelogMarkdownInput as RenderChangelogMarkdownInputValue,
+    type RenderGroupedTargetChangelogMarkdownInput as RenderGroupedTargetChangelogMarkdownInputValue,
+    type RenderTargetChangelogMarkdownInput as RenderTargetChangelogMarkdownInputValue,
+    type TargetChangelogSection as TargetChangelogSectionValue
 } from '../lib/render-changelog-markdown.ts';
 
 export type CollectMergedPullRequestsOptions = {
@@ -65,6 +70,8 @@ export type PrLogEngine = {
     filterPullRequestsByTargetFiles(input: FilterPullRequestsByTargetFilesInputValue): readonly PullRequestValue[];
     resolvePullRequestLabels(input: ResolvePullRequestLabelsOptions): Promise<readonly PullRequestWithLabelValue[]>;
     renderChangelog(input: RenderChangelogMarkdownInputValue): string;
+    renderTargetChangelog(input: RenderTargetChangelogMarkdownInputValue): string;
+    renderGroupedTargetChangelog(input: RenderGroupedTargetChangelogMarkdownInputValue): string;
 };
 
 type PullRequestData = Readonly<Awaited<ReturnType<Octokit['pulls']['get']>>['data']>;
@@ -197,7 +204,9 @@ export function createPrLogEngineWithDependencies(dependencies: PrLogEngineDepen
             });
         },
 
-        renderChangelog: renderChangelogMarkdown
+        renderChangelog: renderChangelogMarkdown,
+        renderTargetChangelog: renderTargetChangelogMarkdown,
+        renderGroupedTargetChangelog: renderGroupedTargetChangelogMarkdown
     };
 }
 
@@ -206,4 +215,7 @@ export type FilterPullRequestsByTargetFilesInput = FilterPullRequestsByTargetFil
 export type PackageChangelogBaseRefInput = PackageChangelogBaseRefInputValue;
 export type PullRequest = PullRequestValue;
 export type PullRequestWithLabel = PullRequestWithLabelValue;
+export type RenderGroupedTargetChangelogMarkdownInput = RenderGroupedTargetChangelogMarkdownInputValue;
 export type RenderChangelogMarkdownInput = RenderChangelogMarkdownInputValue;
+export type RenderTargetChangelogMarkdownInput = RenderTargetChangelogMarkdownInputValue;
+export type TargetChangelogSection = TargetChangelogSectionValue;

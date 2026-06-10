@@ -176,7 +176,7 @@ test('waits between raw pull request label reads', async () => {
         githubRepo,
         pullRequests: [
             { id: pullRequestId, title: 'Fix bug' },
-            { id: 2, title: 'Add feature' }
+            { id: documentationPullRequestId, title: 'Add feature' }
         ]
     });
 
@@ -229,4 +229,48 @@ test('renders changelog markdown', () => {
     });
 
     assert.ok(changelog.includes('## 1.0.0 (January 1, 1970)'));
+});
+test('renders target changelog markdown', () => {
+    const engine = createEngine();
+
+    const changelog = engine.renderTargetChangelog({
+        packageInfo: {},
+        currentDate: new Date(0),
+        validLabels: defaultValidLabels,
+        targetName: 'pkg-a',
+        mergedPullRequests: [{ id: pullRequestId, title: 'Fix bug', label: 'bug' }],
+        githubRepo,
+        unreleased: true,
+        versionNumber: undefined
+    });
+
+    assert.ok(changelog.includes('### Bug Fixes'));
+});
+
+test('renders grouped target changelog markdown', () => {
+    const engine = createEngine();
+
+    const changelog = engine.renderGroupedTargetChangelog({
+        packageInfo: {},
+        currentDate: new Date(0),
+        validLabels: defaultValidLabels,
+        targets: [
+            {
+                targetName: 'pkg-a',
+                mergedPullRequests: [{ id: pullRequestId, title: 'Fix bug', label: 'bug' }],
+                unreleased: false,
+                versionNumber: '1.0.0'
+            },
+            {
+                targetName: 'pkg-b',
+                mergedPullRequests: [{ id: documentationPullRequestId, title: 'Add docs', label: 'documentation' }],
+                unreleased: false,
+                versionNumber: '2.0.0'
+            }
+        ],
+        githubRepo
+    });
+
+    assert.ok(changelog.includes('## pkg-a 1.0.0 (January 1, 1970)'));
+    assert.ok(changelog.includes('## pkg-b 2.0.0 (January 1, 1970)'));
 });

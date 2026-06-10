@@ -16,8 +16,11 @@ import {
     type PullRequestWithLabel as PullRequestWithLabelValue,
     type ReadPullRequestChangedFilesOptions as ReadPullRequestChangedFilesOptionsValue,
     type ReadPullRequestLabelsOptions as ReadPullRequestLabelsOptionsValue,
+    type RenderGroupedTargetChangelogMarkdownInput as RenderGroupedTargetChangelogMarkdownInputValue,
     type RenderChangelogMarkdownInput as RenderChangelogMarkdownInputValue,
-    type ResolvePullRequestLabelsOptions as ResolvePullRequestLabelsOptionsValue
+    type RenderTargetChangelogMarkdownInput as RenderTargetChangelogMarkdownInputValue,
+    type ResolvePullRequestLabelsOptions as ResolvePullRequestLabelsOptionsValue,
+    type TargetChangelogSection as TargetChangelogSectionValue
 } from '../../core/pr-log-engine.ts';
 
 export type PrLogEngineOptions = {
@@ -65,5 +68,8 @@ export type PullRequest = PullRequestValue;
 export type PullRequestWithLabel = PullRequestWithLabelValue;
 export type ReadPullRequestChangedFilesOptions = ReadPullRequestChangedFilesOptionsValue;
 export type ReadPullRequestLabelsOptions = ReadPullRequestLabelsOptionsValue;
+export type RenderGroupedTargetChangelogMarkdownInput = RenderGroupedTargetChangelogMarkdownInputValue;
 export type RenderChangelogMarkdownInput = RenderChangelogMarkdownInputValue;
+export type RenderTargetChangelogMarkdownInput = RenderTargetChangelogMarkdownInputValue;
 export type ResolvePullRequestLabelsOptions = ResolvePullRequestLabelsOptionsValue;
+export type TargetChangelogSection = TargetChangelogSectionValue;
