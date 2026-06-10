@@ -9,6 +9,7 @@ import { createPrLogEngineWithDependencies } from './pr-log-engine.ts';
 
 const githubRepo = 'owner/repo';
 const pullRequestId = 1;
+const documentationPullRequestId = 2;
 const waitDurationMilliseconds = 25;
 
 function createEngine(
@@ -131,6 +132,27 @@ test('reads pull request changed files', async () => {
             pullRequests: [{ id: pullRequestId, title: 'Fix bug' }]
         }),
         new Map([[pullRequestId, ['source/index.ts']]])
+    );
+});
+
+test('filters pull requests by target files', () => {
+    const engine = createEngine();
+
+    assert.deepStrictEqual(
+        engine.filterPullRequestsByTargetFiles({
+            targetName: 'pkg',
+            targetSourceFiles: ['source/index.ts'],
+            pullRequests: [
+                { id: pullRequestId, title: 'Fix bug' },
+                { id: documentationPullRequestId, title: 'Add docs' }
+            ],
+            changedFilesByPullRequest: new Map([
+                [pullRequestId, ['source/index.ts']],
+                [documentationPullRequestId, ['README.md']]
+            ]),
+            ignoredAttributionPaths: []
+        }),
+        [{ id: pullRequestId, title: 'Fix bug' }]
     );
 });
 
