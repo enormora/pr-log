@@ -46,6 +46,8 @@ export type ResolvePullRequestLabelsOptions = {
     readonly githubRepo: string;
     readonly validLabels: ReadonlyMap<string, string>;
     readonly pullRequests: readonly PullRequestValue[];
+    readonly targetName: string | undefined;
+    readonly targetScopedLabelPattern: string | undefined;
 };
 
 export type PrLogEngine = {
@@ -183,8 +185,8 @@ export function createPrLogEngineWithDependencies(dependencies: PrLogEngineDepen
                 pullRequestLabelReader: createPullRequestLabelReader(dependencies),
                 waitForMilliseconds: dependencies.waitForMilliseconds,
                 labelLookupIntervalMilliseconds: dependencies.labelLookupIntervalMilliseconds,
-                targetName: undefined,
-                targetScopedLabelPattern: undefined
+                targetName: input.targetName,
+                targetScopedLabelPattern: input.targetScopedLabelPattern
             });
         },
 

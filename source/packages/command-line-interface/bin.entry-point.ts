@@ -56,7 +56,9 @@ const getMergedPullRequests: CliRunnerDependencies['getMergedPullRequests'] = as
     return prLogEngine.resolvePullRequestLabels({
         githubRepo,
         validLabels,
-        pullRequests
+        pullRequests,
+        targetName: undefined,
+        targetScopedLabelPattern: undefined
     });
 };
 
