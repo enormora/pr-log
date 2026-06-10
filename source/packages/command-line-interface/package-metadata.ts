@@ -1,6 +1,6 @@
 import { isString } from '@sindresorhus/is';
 
-export type CommandLineInterfacePackageMetadata = {
+export type PackageMetadata = {
     readonly name: string;
     readonly description: string;
     readonly version: string;
@@ -14,9 +14,7 @@ function readStringValue(value: unknown): string {
     return '';
 }
 
-export function createCommandLineInterfacePackageMetadata(
-    packageJson: Record<string, unknown>
-): CommandLineInterfacePackageMetadata {
+export function createPackageMetadata(packageJson: Record<string, unknown>): PackageMetadata {
     return {
         name: readStringValue(packageJson.name),
         description: readStringValue(packageJson.description),

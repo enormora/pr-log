@@ -11,5 +11,9 @@
     "reporter": ["lcov", "text-summary", "cobertura"],
     "reportDir": "./target/coverage",
     "tempDirectory": "./target/c8_output",
-    "exclude": ["source/**/*.test.ts", "source/**/*.entry-point.ts", "source/packages/**/*.composition.ts"]
+    "exclude": [
+        "source/**/*.test.ts",
+        "source/**/*.entry-point.ts",
+        "source/packages/command-line-interface/composition.ts"
+    ]
 }

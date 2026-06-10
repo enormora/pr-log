@@ -1,11 +1,11 @@
 import assert from 'node:assert';
 import { stub } from 'sinon';
-import { createCommandLineInterfaceErrorReporter } from './command-line-interface-error-reporter.ts';
+import { createErrorReporter } from './error-reporter.ts';
 
-test('createCommandLineInterfaceErrorReporter() reports plain errors', () => {
+test('createErrorReporter() reports plain errors', () => {
     const writeError = stub();
     const setExitCode = stub();
-    const reportError = createCommandLineInterfaceErrorReporter({
+    const reportError = createErrorReporter({
         writeError(message) {
             writeError(message);
         },
@@ -20,12 +20,12 @@ test('createCommandLineInterfaceErrorReporter() reports plain errors', () => {
     assert.deepStrictEqual(setExitCode.firstCall.args, [1]);
 });
 
-test('createCommandLineInterfaceErrorReporter() reports stack traces', () => {
+test('createErrorReporter() reports stack traces', () => {
     const writeError = stub();
     const setExitCode = stub();
     const error = new Error('failed');
     error.stack = 'stack trace';
-    const reportError = createCommandLineInterfaceErrorReporter({
+    const reportError = createErrorReporter({
         writeError(message) {
             writeError(message);
         },

@@ -17,9 +17,9 @@ import {
 import { createJsonFileReader } from '../../lib/read-json-file.ts';
 import { createRemoteAliasReader } from '../../lib/remote-alias-reader.ts';
 import { createPrLogEngine, defaultValidLabels } from '../core/core.entry-point.ts';
-import { createCommandLineInterfacePackageMetadata } from './command-line-interface-package-metadata.ts';
-import { createCommandLineInterfaceErrorReporter } from './command-line-interface-error-reporter.ts';
-import { createCommandLineInterfaceProgram } from './command-line-interface-program.ts';
+import { createPackageMetadata } from './package-metadata.ts';
+import { createErrorReporter } from './error-reporter.ts';
+import { createProgram } from './program.ts';
 
 loglevel.enableAll();
 
@@ -30,7 +30,7 @@ const readJsonFile = createJsonFileReader({
 });
 
 const prLogPackageJsonURL = new URL('../../../../../package.json', import.meta.url);
-const packageMetadata = createCommandLineInterfacePackageMetadata(await readJsonFile(prLogPackageJsonURL.pathname));
+const packageMetadata = createPackageMetadata(await readJsonFile(prLogPackageJsonURL.pathname));
 
 const { GH_TOKEN } = process.env;
 const githubClient = new Octokit({ auth: GH_TOKEN });
@@ -54,7 +54,7 @@ const getMergedPullRequests = createMergedPullRequestReader(prLogEngine, {
     targetScopedLabelPattern: undefined
 });
 const renderChangelogMarkdown = createChangelogMarkdownRenderer(prLogEngine);
-const reportError = createCommandLineInterfaceErrorReporter({
+const reportError = createErrorReporter({
     writeError(message) {
         console.error(message);
     },
@@ -63,7 +63,7 @@ const reportError = createCommandLineInterfaceErrorReporter({
     }
 });
 
-const commandLineInterfaceProgram = createCommandLineInterfaceProgram({
+const commandLineInterfaceProgram = createProgram({
     packageMetadata,
     githubToken: GH_TOKEN,
     githubClient,

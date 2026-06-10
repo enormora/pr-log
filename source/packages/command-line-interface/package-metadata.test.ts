@@ -1,8 +1,8 @@
 import assert from 'node:assert';
-import { createCommandLineInterfacePackageMetadata } from './command-line-interface-package-metadata.ts';
+import { createPackageMetadata } from './package-metadata.ts';
 
-test('createCommandLineInterfacePackageMetadata() reads string package fields', () => {
-    const packageMetadata = createCommandLineInterfacePackageMetadata({
+test('createPackageMetadata() reads string package fields', () => {
+    const packageMetadata = createPackageMetadata({
         name: 'pr-log',
         description: 'Changelog generator',
         version: '1.2.3'
@@ -15,8 +15,8 @@ test('createCommandLineInterfacePackageMetadata() reads string package fields', 
     });
 });
 
-test('createCommandLineInterfacePackageMetadata() ignores non-string package fields', () => {
-    const packageMetadata = createCommandLineInterfacePackageMetadata({
+test('createPackageMetadata() ignores non-string package fields', () => {
+    const packageMetadata = createPackageMetadata({
         name: 1,
         description: false,
         version: null

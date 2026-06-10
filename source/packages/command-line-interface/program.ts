@@ -2,10 +2,10 @@ import { createCommand } from 'commander';
 import { isString } from '@sindresorhus/is';
 import { createCliRunOptions } from '../../lib/cli-run-options.ts';
 import type { CliRunner } from '../../lib/cli.ts';
-import type { CommandLineInterfaceErrorReporter } from './command-line-interface-error-reporter.ts';
-import type { CommandLineInterfacePackageMetadata } from './command-line-interface-package-metadata.ts';
+import type { ErrorReporter } from './error-reporter.ts';
+import type { PackageMetadata } from './package-metadata.ts';
 
-type CommandLineInterfaceProgramRunnerOptions = {
+type ProgramRunnerOptions = {
     readonly defaultBranch: string;
     readonly packageInfo: Record<string, unknown>;
 };
@@ -14,21 +14,21 @@ type GitHubAuthenticator = {
     auth(): Promise<unknown>;
 };
 
-export type CommandLineInterfaceProgramDependencies = {
-    readonly packageMetadata: CommandLineInterfacePackageMetadata;
+export type ProgramDependencies = {
+    readonly packageMetadata: PackageMetadata;
     readonly githubToken: string | undefined;
     readonly githubClient: GitHubAuthenticator;
     readonly changelogPath: string;
     readonly readPackageInfo: () => Promise<Record<string, unknown>>;
-    readonly createCliRunner: (options: CommandLineInterfaceProgramRunnerOptions) => CliRunner;
-    readonly reportError: CommandLineInterfaceErrorReporter;
+    readonly createCliRunner: (options: ProgramRunnerOptions) => CliRunner;
+    readonly reportError: ErrorReporter;
 };
 
-export type CommandLineInterfaceProgram = {
+export type Program = {
     run(commandLineArguments: readonly string[]): Promise<void>;
 };
 
-export function createCommandLineInterfaceError(value: unknown): Readonly<Error> {
+export function createProgramError(value: unknown): Readonly<Error> {
     if (value instanceof Error) {
         return value;
     }
@@ -36,9 +36,7 @@ export function createCommandLineInterfaceError(value: unknown): Readonly<Error>
     return new Error(String(value));
 }
 
-export function createCommandLineInterfaceProgram(
-    dependencies: CommandLineInterfaceProgramDependencies
-): CommandLineInterfaceProgram {
+export function createProgram(dependencies: ProgramDependencies): Program {
     const { packageMetadata, githubToken, githubClient, changelogPath, readPackageInfo, createCliRunner, reportError } =
         dependencies;
     let isTracingEnabled = false;
@@ -82,7 +80,7 @@ export function createCommandLineInterfaceProgram(
     return {
         async run(commandLineArguments) {
             await program.parseAsync(Array.from(commandLineArguments)).catch((error: unknown) => {
-                reportError(createCommandLineInterfaceError(error), { isTracingEnabled });
+                reportError(createProgramError(error), { isTracingEnabled });
             });
         }
     };
