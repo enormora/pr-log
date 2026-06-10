@@ -17,6 +17,7 @@ function stripTrailingEmptyLine(text: string): string {
 }
 
 export type CliRunnerDependencies = {
+    readonly defaultValidLabels: ReadonlyMap<string, string>;
     readonly ensureCleanLocalGitState: EnsureCleanLocalGitState;
     readonly getLatestVersionTag: GetLatestVersionTag;
     readonly getMergedPullRequests: GetMergedPullRequests;
@@ -157,12 +158,12 @@ async function writeChangelog(
 }
 
 export function createCliRunner(dependencies: CliRunnerDependencies): CliRunner {
-    const { packageInfo } = dependencies;
+    const { defaultValidLabels, packageInfo } = dependencies;
 
     return {
         async run(options: CliRunOptions) {
             const githubRepo = getGithubRepoFromPackageInfo(packageInfo);
-            const validLabels = getValidLabels(packageInfo);
+            const validLabels = getValidLabels(packageInfo, defaultValidLabels);
 
             validateVersionNumber(options).unwrapOrElse((error) => {
                 throw error;

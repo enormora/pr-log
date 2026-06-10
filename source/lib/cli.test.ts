@@ -28,10 +28,12 @@ function createCli(dependencies: Partial<CliRunnerDependencies> = {}): CliRunner
         getCurrentDate = stub().returns(new Date(0)),
         prependFile = stub().resolves() as unknown as typeof _prependFile,
         packageInfo = { repository: { url: 'https://github.com/foo/bar.git' } },
+        defaultValidLabels: defaultValidLabelsDependency = defaultValidLabels,
         logger = { log: stub() } as unknown as Logger
     } = dependencies;
 
     return createCliRunner({
+        defaultValidLabels: defaultValidLabelsDependency,
         ensureCleanLocalGitState,
         getLatestVersionTag,
         getMergedPullRequests,

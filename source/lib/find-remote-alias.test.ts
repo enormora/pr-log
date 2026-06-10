@@ -1,13 +1,17 @@
 import assert from 'node:assert';
 import { fake } from 'sinon';
-import { findRemoteAliasFactory, type FindRemoteAliasDependencies, type FindRemoteAlias } from './find-remote-alias.ts';
-import type { RemoteAlias } from './git-command-runner.ts';
+import {
+    findRemoteAliasFactory,
+    type FindRemoteAliasDependencies,
+    type FindRemoteAlias,
+    type RemoteAlias
+} from './find-remote-alias.ts';
 
 const githubRepo = 'foo/bar';
 
 function factory(result: readonly RemoteAlias[] = []): FindRemoteAlias {
     const getRemoteAliases = fake.resolves(result);
-    const dependencies = { gitCommandRunner: { getRemoteAliases } } as unknown as FindRemoteAliasDependencies;
+    const dependencies = { remoteAliasReader: { getRemoteAliases } } as unknown as FindRemoteAliasDependencies;
 
     return findRemoteAliasFactory(dependencies);
 }

@@ -1,13 +1,19 @@
 import { oneLine } from 'common-tags';
 import type { FindRemoteAlias } from './find-remote-alias.ts';
-import type { GitCommandRunner } from './git-command-runner.ts';
+
+export type LocalGitState = {
+    getShortStatus(): Promise<string>;
+    getCurrentBranchName(): Promise<string>;
+    fetchRemote(remoteAlias: string): Promise<void>;
+    getSymmetricDifferencesBetweenBranches(branchA: string, branchB: string): Promise<readonly string[]>;
+};
 
 type EnsureCleanLocalGitStateOptions = {
     readonly defaultBranch: string;
 };
 
 export type EnsureCleanLocalGitStateDependencies = {
-    readonly gitCommandRunner: GitCommandRunner;
+    readonly localGitState: LocalGitState;
     readonly findRemoteAlias: FindRemoteAlias;
 };
 
@@ -17,17 +23,17 @@ export function ensureCleanLocalGitStateFactory(
     dependencies: EnsureCleanLocalGitStateDependencies,
     options: EnsureCleanLocalGitStateOptions
 ): EnsureCleanLocalGitState {
-    const { gitCommandRunner, findRemoteAlias } = dependencies;
+    const { localGitState, findRemoteAlias } = dependencies;
 
     async function ensureCleanLocalCopy(): Promise<void> {
-        const status = await gitCommandRunner.getShortStatus();
+        const status = await localGitState.getShortStatus();
         if (status !== '') {
             throw new Error('Local copy is not clean');
         }
     }
 
     async function ensureDefaultBranch(): Promise<void> {
-        const branchName = await gitCommandRunner.getCurrentBranchName();
+        const branchName = await localGitState.getCurrentBranchName();
         if (branchName !== options.defaultBranch) {
             throw new Error(`Not on ${options.defaultBranch} branch`);
         }
@@ -36,10 +42,7 @@ export function ensureCleanLocalGitStateFactory(
     async function ensureLocalIsEqualToRemote(remoteAlias: string): Promise<void> {
         const remoteBranch = `${remoteAlias}/${options.defaultBranch}`;
 
-        const commits = await gitCommandRunner.getSymmetricDifferencesBetweenBranches(
-            options.defaultBranch,
-            remoteBranch
-        );
+        const commits = await localGitState.getSymmetricDifferencesBetweenBranches(options.defaultBranch, remoteBranch);
         let commitsAhead = 0;
         let commitsBehind = 0;
 
@@ -65,7 +68,7 @@ export function ensureCleanLocalGitStateFactory(
 
         const remoteAlias = await findRemoteAlias(githubRepo);
 
-        await gitCommandRunner.fetchRemote(remoteAlias);
+        await localGitState.fetchRemote(remoteAlias);
         await ensureLocalIsEqualToRemote(remoteAlias);
     };
 }
