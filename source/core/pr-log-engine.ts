@@ -12,6 +12,10 @@ import {
     type PullRequest as PullRequestValue,
     type PullRequestTitleReader
 } from '../lib/collect-merged-pull-requests.ts';
+import {
+    filterPullRequestsByTargetFiles as filterPullRequestsByTargetFilesValue,
+    type FilterPullRequestsByTargetFilesInput as FilterPullRequestsByTargetFilesInputValue
+} from '../lib/filter-pull-requests-by-target-files.ts';
 import type { GitCommandRunner } from '../lib/git-command-runner.ts';
 import type { GetPullRequestLabels } from '../lib/get-pull-request-label.ts';
 import {
@@ -58,6 +62,7 @@ export type PrLogEngine = {
         input: ReadPullRequestChangedFilesOptions
     ): Promise<ReadonlyMap<number, readonly string[]>>;
     readPullRequestLabels(input: ReadPullRequestLabelsOptions): Promise<ReadonlyMap<number, readonly string[]>>;
+    filterPullRequestsByTargetFiles(input: FilterPullRequestsByTargetFilesInputValue): readonly PullRequestValue[];
     resolvePullRequestLabels(input: ResolvePullRequestLabelsOptions): Promise<readonly PullRequestWithLabelValue[]>;
     renderChangelog(input: RenderChangelogMarkdownInputValue): string;
 };
@@ -177,6 +182,8 @@ export function createPrLogEngineWithDependencies(dependencies: PrLogEngineDepen
             return readPullRequestLabels(dependencies, input);
         },
 
+        filterPullRequestsByTargetFiles: filterPullRequestsByTargetFilesValue,
+
         async resolvePullRequestLabels(input) {
             return resolvePullRequestLabelsValue({
                 githubRepo: input.githubRepo,
@@ -195,6 +202,7 @@ export function createPrLogEngineWithDependencies(dependencies: PrLogEngineDepen
 }
 
 export type ChangelogBaseRef = ChangelogBaseRefValue;
+export type FilterPullRequestsByTargetFilesInput = FilterPullRequestsByTargetFilesInputValue;
 export type PackageChangelogBaseRefInput = PackageChangelogBaseRefInputValue;
 export type PullRequest = PullRequestValue;
 export type PullRequestWithLabel = PullRequestWithLabelValue;

@@ -9,6 +9,7 @@ import {
     createPrLogEngineWithDependencies,
     type ChangelogBaseRef as ChangelogBaseRefValue,
     type CollectMergedPullRequestsOptions as CollectMergedPullRequestsOptionsValue,
+    type FilterPullRequestsByTargetFilesInput as FilterPullRequestsByTargetFilesInputValue,
     type PackageChangelogBaseRefInput as PackageChangelogBaseRefInputValue,
     type PrLogEngine as PrLogEngineValue,
     type PullRequest as PullRequestValue,
@@ -57,6 +58,7 @@ export const defaultValidLabels: ReadonlyMap<string, string> = new Map(defaultVa
 
 export type ChangelogBaseRef = ChangelogBaseRefValue;
 export type CollectMergedPullRequestsOptions = CollectMergedPullRequestsOptionsValue;
+export type FilterPullRequestsByTargetFilesInput = FilterPullRequestsByTargetFilesInputValue;
 export type PackageChangelogBaseRefInput = PackageChangelogBaseRefInputValue;
 export type PrLogEngine = PrLogEngineValue;
 export type PullRequest = PullRequestValue;
