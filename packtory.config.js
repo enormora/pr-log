@@ -28,7 +28,7 @@ function commonPackageSettings(packageInfo) {
         sourcesFolder,
         mainPackageJson: { type: 'module', dependencies: packageInfo.dependencies },
         additionalFiles: [{ sourceFilePath: licensePath, targetFilePath: 'LICENSE' }],
-        deadCodeElimination: { enabled: false },
+        deadCodeElimination: { enabled: true },
         publishSettings: {
             access: 'public',
             provenance: { type: 'auto' }
@@ -88,7 +88,11 @@ export async function buildConfig() {
             areTheTypesWrong: { enabled: true, profile: 'esm-only' },
             noDuplicatedFiles: { enabled: true, allowList: [licensePath] },
             requiredFiles: { enabled: true, files: ['LICENSE', 'README.md'] },
-            uniqueTargetPaths: { enabled: true }
+            maxBundleSize: { enabled: true },
+            noUnusedBundleDependencies: { enabled: true },
+            noDevDependencyImports: { enabled: true },
+            uniqueTargetPaths: { enabled: true },
+            noSideEffects: { enabled: false }
         },
         packages: [corePackage(sharedAttributes), cliPackage(packageInfo, sharedAttributes)]
     };
