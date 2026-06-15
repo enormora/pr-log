@@ -33,7 +33,9 @@ import {
     type RenderChangelogMarkdownInput as RenderChangelogMarkdownInputValue,
     type RenderGroupedTargetChangelogMarkdownInput as RenderGroupedTargetChangelogMarkdownInputValue,
     type RenderTargetChangelogMarkdownInput as RenderTargetChangelogMarkdownInputValue,
-    type TargetChangelogSection as TargetChangelogSectionValue
+    updateChangelogMarkdown,
+    type TargetChangelogSection as TargetChangelogSectionValue,
+    type UpdateChangelogMarkdownInput as UpdateChangelogMarkdownInputValue
 } from '../lib/render-changelog-markdown.ts';
 
 export type CollectMergedPullRequestsOptions = {
@@ -72,6 +74,7 @@ export type PrLogEngine = {
     renderChangelog(input: RenderChangelogMarkdownInputValue): string;
     renderTargetChangelog(input: RenderTargetChangelogMarkdownInputValue): string;
     renderGroupedTargetChangelog(input: RenderGroupedTargetChangelogMarkdownInputValue): string;
+    updateChangelog(input: UpdateChangelogMarkdownInputValue): string;
 };
 
 type PullRequestData = Readonly<Awaited<ReturnType<Octokit['pulls']['get']>>['data']>;
@@ -206,7 +209,8 @@ export function createPrLogEngineWithDependencies(dependencies: PrLogEngineDepen
 
         renderChangelog: renderChangelogMarkdown,
         renderTargetChangelog: renderTargetChangelogMarkdown,
-        renderGroupedTargetChangelog: renderGroupedTargetChangelogMarkdown
+        renderGroupedTargetChangelog: renderGroupedTargetChangelogMarkdown,
+        updateChangelog: updateChangelogMarkdown
     };
 }
 
@@ -219,3 +223,4 @@ export type RenderGroupedTargetChangelogMarkdownInput = RenderGroupedTargetChang
 export type RenderChangelogMarkdownInput = RenderChangelogMarkdownInputValue;
 export type RenderTargetChangelogMarkdownInput = RenderTargetChangelogMarkdownInputValue;
 export type TargetChangelogSection = TargetChangelogSectionValue;
+export type UpdateChangelogInput = UpdateChangelogMarkdownInputValue;

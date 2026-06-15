@@ -274,3 +274,14 @@ test('renders grouped target changelog markdown', () => {
     assert.ok(changelog.includes('## pkg-a 1.0.0 (January 1, 1970)'));
     assert.ok(changelog.includes('## pkg-b 2.0.0 (January 1, 1970)'));
 });
+
+test('updates changelog markdown', () => {
+    const engine = createEngine();
+
+    const changelog = engine.updateChangelog({
+        existingChangelogMarkdown: '## 0.9.0\n\n* Older change\n',
+        generatedChangelogMarkdown: '## 1.0.0\n\n* New change\n'
+    });
+
+    assert.strictEqual(changelog, '## 1.0.0\n\n* New change\n\n## 0.9.0\n\n* Older change\n');
+});
