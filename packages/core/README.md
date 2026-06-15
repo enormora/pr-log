@@ -21,7 +21,7 @@ const prLogEngine = createPrLogEngine({
 });
 ```
 
-`@pr-log/core` owns Git/GitHub range resolution, pull request collection, label resolution, changed-file lookup, and changelog rendering.
+`@pr-log/core` owns Git/GitHub range resolution, pull request collection, label resolution, changed-file lookup, changelog rendering, and changelog Markdown merging.
 Target impact and release planning stay outside pr-log. Consumers pass target source files into pr-log when they need target-specific changelogs.
 
 A target-aware integration usually follows this flow:
@@ -33,6 +33,9 @@ A target-aware integration usually follows this flow:
 5. Filter pull requests by target source files.
 6. Resolve labels for each target.
 7. Render one Markdown string per target, or one grouped Markdown string for all targets.
+8. Read the existing changelog outside pr-log.
+9. Pass the existing and generated Markdown to `prLogEngine.updateChangelog()`.
+10. Write the returned Markdown outside pr-log.
 
 Target-scoped labels can override the pull request level label for one target. The default pattern is `{targetName}:{label}`.
 For example, `pkg-a:breaking` overrides a `bug` pull request label when rendering `pkg-a`, while other targets still use `bug`.
@@ -40,5 +43,5 @@ For example, `pkg-a:breaking` overrides a `bug` pull request label when renderin
 Package-aware release tags use `<packageName>@<version>` by default, for example `@scope/package@1.2.3`.
 Consumers can pass a package tag format with `{packageName}` and `{version}` placeholders.
 Missing package base refs reject with `MissingChangelogBaseRefError`.
-pr-log renders changelog text only. Consumers decide whether that text is written to one file, separate target files, release notes, or another destination.
+pr-log renders and merges Markdown only. Consumers decide whether that text is written to one file, separate target files, release notes, or another destination.
 pr-log does not compute target impact, map build artifacts to source files, publish packages, commit files, create tags, or create releases.
