@@ -51,6 +51,11 @@ export type RenderGroupedTargetChangelogMarkdownInput = {
 
 export type RenderTargetChangelogMarkdownInput = RenderChangelogMarkdownInputBase & TargetChangelogSection;
 
+export type UpdateChangelogMarkdownInput = {
+    readonly existingChangelogMarkdown: string;
+    readonly generatedChangelogMarkdown: string;
+};
+
 export function renderChangelogMarkdown(input: RenderChangelogMarkdownInput): string {
     const createChangelog = createChangelogFactory({
         packageInfo: input.packageInfo,
@@ -119,4 +124,10 @@ export function renderGroupedTargetChangelogMarkdown(input: RenderGroupedTargetC
         .join('');
 
     return sections;
+}
+
+export function updateChangelogMarkdown(input: UpdateChangelogMarkdownInput): string {
+    const generatedChangelogMarkdown = input.generatedChangelogMarkdown.trim();
+
+    return `${generatedChangelogMarkdown}\n\n${input.existingChangelogMarkdown}`;
 }
