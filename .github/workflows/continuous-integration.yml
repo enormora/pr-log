@@ -7,6 +7,11 @@ on:
     pull_request:
         types: [opened, reopened, synchronize]
     merge_group:
+    workflow_dispatch:
+        inputs:
+            release_commit_sha:
+                required: false
+                type: string
 
 jobs:
     build:
@@ -29,8 +34,33 @@ jobs:
               run: npx just compile
             - name: Run tests
               run: npx just test
+            - name: Read package check release version
+              id: package-check-release-version
+              if: >
+                  matrix.node-version == 24 &&
+                  github.event_name == 'workflow_dispatch' &&
+                  github.actor == 'github-actions[bot]' &&
+                  inputs.release_commit_sha != ''
+              run: |
+                  node --input-type=module <<'NODE'
+                  import fs from 'node:fs/promises';
+                  import semver from 'semver';
+
+                  const changelogPath = 'source/packages/command-line-interface/CHANGELOG.md';
+                  const changelog = await fs.readFile(changelogPath, { encoding: 'utf8' });
+                  const match = /^## (?<version>\S+) \(/u.exec(changelog);
+                  const version = match?.groups?.version;
+
+                  if (version === undefined || semver.valid(version) === null) {
+                      throw new Error(`${changelogPath} does not start with a valid release version`);
+                  }
+
+                  await fs.appendFile(process.env.GITHUB_OUTPUT, `pr_log_version=${version}\n`, { encoding: 'utf8' });
+                  NODE
             - name: Check packages
               if: matrix.node-version == 24
+              env:
+                  PR_LOG_RELEASE_VERSION: ${{ steps.package-check-release-version.outputs.pr_log_version || '9.9.9' }}
               run: npx just publish-dry-run
             - name: Coveralls
               uses: coverallsapp/github-action@v2
@@ -38,6 +68,267 @@ jobs:
                   github-token: ${{ secrets.GITHUB_TOKEN }}
                   path-to-lcov: ./target/coverage/lcov.info
                   parallel: true
+
+    publish-release:
+        needs: build
+        runs-on: ubuntu-latest
+        if: >
+            github.event_name == 'workflow_dispatch' &&
+            github.actor == 'github-actions[bot]' &&
+            inputs.release_commit_sha != ''
+        permissions:
+            contents: write
+            id-token: write
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  ref: main
+                  fetch-depth: 0
+                  persist-credentials: true
+
+            - name: Use Node.js
+              uses: actions/setup-node@v6
+              with:
+                  node-version: 24
+
+            - name: Install dependencies
+              run: npm clean-install --ignore-scripts
+
+            - name: Audit npm signatures and attestations
+              run: |
+                  mkdir -p target/release
+                  npm audit signatures --json --include-attestations > target/release/npm-audit-signatures.json
+                  node --input-type=module <<'NODE'
+                  import fs from 'node:fs/promises';
+
+                  const report = JSON.parse(
+                      await fs.readFile('target/release/npm-audit-signatures.json', { encoding: 'utf8' })
+                  );
+                  const packtory = report.verified.find((entry) => {
+                      return entry.name === '@packtory/cli';
+                  });
+
+                  if (packtory?.attestations?.provenance?.predicateType !== 'https://slsa.dev/provenance/v1') {
+                      throw new Error('Missing npm provenance for @packtory/cli');
+                  }
+                  NODE
+
+            - name: Validate release commit
+              id: release-metadata
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  RELEASE_COMMIT_SHA: ${{ inputs.release_commit_sha }}
+              run: |
+                  node --input-type=module <<'NODE'
+                  import fs from 'node:fs/promises';
+                  import { execFileSync } from 'node:child_process';
+                  import semver from 'semver';
+
+                  const cliChangelog = 'source/packages/command-line-interface/CHANGELOG.md';
+                  const coreChangelog = 'source/packages/core/CHANGELOG.md';
+
+                  function runGit(args) {
+                      return execFileSync('git', args, { encoding: 'utf8' }).trim();
+                  }
+
+                  function readChangelogVersion(changelog, changelogPath) {
+                      const match = /^## (?<version>\S+) \(/u.exec(changelog);
+                      const version = match?.groups?.version;
+
+                      if (version === undefined || semver.valid(version) === null) {
+                          throw new Error(`${changelogPath} does not start with a valid release version`);
+                      }
+
+                      return version;
+                  }
+
+                  function assertTagDoesNotExist(tagName) {
+                      try {
+                          runGit(['rev-parse', '--verify', `refs/tags/${tagName}`]);
+                      } catch {
+                          return;
+                      }
+
+                      throw new Error(`Release tag already exists: ${tagName}`);
+                  }
+
+                  async function writeOutput(name, value) {
+                      await fs.appendFile(process.env.GITHUB_OUTPUT, `${name}=${value}\n`, { encoding: 'utf8' });
+                  }
+
+                  async function githubApi(path) {
+                      const response = await fetch(`https://api.github.com${path}`, {
+                          headers: {
+                              Accept: 'application/vnd.github+json',
+                              Authorization: `Bearer ${process.env.GH_TOKEN}`,
+                              'X-GitHub-Api-Version': '2022-11-28'
+                          }
+                      });
+
+                      if (!response.ok) {
+                          const body = await response.text();
+                          throw new Error(`GitHub API request failed: ${response.status} ${response.statusText}\n${body}`);
+                      }
+
+                      return response.json();
+                  }
+
+                  if (process.env.GITHUB_ACTOR !== 'github-actions[bot]') {
+                      throw new Error(`Unexpected workflow actor: ${process.env.GITHUB_ACTOR}`);
+                  }
+
+                  const headSha = runGit(['rev-parse', 'HEAD']);
+
+                  if (headSha !== process.env.RELEASE_COMMIT_SHA) {
+                      throw new Error(`HEAD ${headSha} does not match release commit ${process.env.RELEASE_COMMIT_SHA}`);
+                  }
+
+                  const subject = runGit(['log', '-1', '--format=%s']);
+
+                  if (subject !== 'Prepare release') {
+                      throw new Error(`Unexpected release commit subject: ${subject}`);
+                  }
+
+                  const commit = await githubApi(`/repos/${process.env.GITHUB_REPOSITORY}/commits/${headSha}`);
+
+                  if (commit.committer?.login !== 'github-actions[bot]') {
+                      throw new Error(`Unexpected release committer: ${commit.committer?.login ?? 'unknown'}`);
+                  }
+
+                  if (commit.commit.verification.verified !== true) {
+                      throw new Error(`Release commit is not verified: ${commit.commit.verification.reason}`);
+                  }
+
+                  const changedFiles = runGit(['diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'])
+                      .split('\n')
+                      .filter((filePath) => {
+                          return filePath !== '';
+                      });
+                  const hasCoreRelease = changedFiles.includes(coreChangelog);
+                  const allowedFiles = new Set([cliChangelog]);
+
+                  if (hasCoreRelease) {
+                      allowedFiles.add(coreChangelog);
+                  }
+
+                  if (!changedFiles.includes(cliChangelog)) {
+                      throw new Error(`${cliChangelog} must be changed`);
+                  }
+
+                  for (const changedFile of changedFiles) {
+                      if (!allowedFiles.has(changedFile)) {
+                          throw new Error(`Unexpected release file change: ${changedFile}`);
+                      }
+                  }
+
+                  const cliChangelogContent = await fs.readFile(cliChangelog, { encoding: 'utf8' });
+                  const prLogVersion = readChangelogVersion(cliChangelogContent, cliChangelog);
+                  const prLogTag = `pr-log@${prLogVersion}`;
+                  let predictedCoreVersion = '';
+                  let predictedCoreTag = '';
+
+                  if (hasCoreRelease) {
+                      const coreChangelogContent = await fs.readFile(coreChangelog, { encoding: 'utf8' });
+                      predictedCoreVersion = readChangelogVersion(coreChangelogContent, coreChangelog);
+                      predictedCoreTag = `@pr-log/core@${predictedCoreVersion}`;
+                  }
+
+                  assertTagDoesNotExist(prLogTag);
+
+                  if (hasCoreRelease) {
+                      assertTagDoesNotExist(predictedCoreTag);
+                  }
+
+                  await writeOutput('pr_log_version', prLogVersion);
+                  await writeOutput('pr_log_tag', prLogTag);
+                  await writeOutput('core_release_needed', hasCoreRelease ? 'true' : 'false');
+                  await writeOutput('predicted_core_version', predictedCoreVersion);
+                  await writeOutput('predicted_core_tag', predictedCoreTag);
+                  NODE
+
+            - name: Check packages
+              env:
+                  PR_LOG_RELEASE_VERSION: ${{ steps.release-metadata.outputs.pr_log_version }}
+              run: npx just publish-dry-run
+
+            - name: Publish packages
+              env:
+                  PR_LOG_RELEASE_VERSION: ${{ steps.release-metadata.outputs.pr_log_version }}
+              run: |
+                  mkdir -p target/release
+                  set +e
+                  PR_LOG_RELEASE_VERSION="$PR_LOG_RELEASE_VERSION" npx just publish 2>&1 | tee target/release/publish.log
+                  status=${PIPESTATUS[0]}
+                  set -e
+
+                  if [ "$status" -eq 0 ]; then
+                      exit 0
+                  fi
+
+                  if grep -Eiq 'attestation|oidc|provenance|rekor|sigstore|tlog' target/release/publish.log; then
+                      sleep 30
+                      PR_LOG_RELEASE_VERSION="$PR_LOG_RELEASE_VERSION" npx just publish
+                      exit 0
+                  fi
+
+                  exit "$status"
+
+            - name: Validate core package version
+              if: steps.release-metadata.outputs.core_release_needed == 'true'
+              env:
+                  PREDICTED_CORE_VERSION: ${{ steps.release-metadata.outputs.predicted_core_version }}
+              run: |
+                  node --input-type=module <<'NODE'
+                  import { execFileSync } from 'node:child_process';
+
+                  function readPublishedCoreVersion() {
+                      try {
+                          const output = execFileSync('npm', ['view', '@pr-log/core', 'version', '--json'], {
+                              encoding: 'utf8'
+                          }).trim();
+
+                          return JSON.parse(output);
+                      } catch {
+                          return undefined;
+                      }
+                  }
+
+                  for (let attempt = 1; attempt <= 12; attempt += 1) {
+                      const publishedCoreVersion = readPublishedCoreVersion();
+
+                      if (publishedCoreVersion === process.env.PREDICTED_CORE_VERSION) {
+                          process.exit(0);
+                      }
+
+                      if (attempt === 12) {
+                          throw new Error(
+                              `Packtory published @pr-log/core ${publishedCoreVersion}, expected ${process.env.PREDICTED_CORE_VERSION}`
+                          );
+                      }
+
+                      await new Promise((resolve) => {
+                          setTimeout(resolve, 10_000);
+                      });
+                  }
+                  NODE
+
+            - name: Push release tags
+              env:
+                  PR_LOG_TAG: ${{ steps.release-metadata.outputs.pr_log_tag }}
+                  CORE_RELEASE_NEEDED: ${{ steps.release-metadata.outputs.core_release_needed }}
+                  PREDICTED_CORE_TAG: ${{ steps.release-metadata.outputs.predicted_core_tag }}
+              run: |
+                  git tag "$PR_LOG_TAG"
+
+                  if [ "$CORE_RELEASE_NEEDED" = "true" ]; then
+                      git tag "$PREDICTED_CORE_TAG"
+                  fi
+
+                  git push origin "$PR_LOG_TAG"
+
+                  if [ "$CORE_RELEASE_NEEDED" = "true" ]; then
+                      git push origin "$PREDICTED_CORE_TAG"
+                  fi
 
     coverage:
         needs: build
