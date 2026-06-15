@@ -24,7 +24,8 @@ import {
     type RenderChangelogMarkdownInput as RenderChangelogMarkdownInputValue,
     type RenderTargetChangelogMarkdownInput as RenderTargetChangelogMarkdownInputValue,
     type ResolvePullRequestLabelsOptions as ResolvePullRequestLabelsOptionsValue,
-    type TargetChangelogSection as TargetChangelogSectionValue
+    type TargetChangelogSection as TargetChangelogSectionValue,
+    type UpdateChangelogInput as UpdateChangelogInputValue
 } from '../../core/pr-log-engine.ts';
 
 export type PrLogEngineOptions = {
@@ -79,3 +80,4 @@ export type RenderChangelogMarkdownInput = RenderChangelogMarkdownInputValue;
 export type RenderTargetChangelogMarkdownInput = RenderTargetChangelogMarkdownInputValue;
 export type ResolvePullRequestLabelsOptions = ResolvePullRequestLabelsOptionsValue;
 export type TargetChangelogSection = TargetChangelogSectionValue;
+export type UpdateChangelogInput = UpdateChangelogInputValue;
