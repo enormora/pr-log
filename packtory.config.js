@@ -36,10 +36,16 @@ function commonPackageSettings(packageInfo) {
     };
 }
 
+function registrySettings() {
+    return {
+        auth: { type: 'npm-oidc', provider: 'github-actions' }
+    };
+}
+
 function corePackage(sharedAttributes) {
     return {
         name: '@pr-log/core',
-        versioning: { automatic: false, version: '0.1.0' },
+        versioning: { automatic: true, minimumVersion: '0.1.0' },
         additionalFiles: [{ sourceFilePath: coreReadmePath, targetFilePath: 'README.md' }],
         roots: {
             main: {
@@ -56,9 +62,16 @@ function corePackage(sharedAttributes) {
 }
 
 function cliPackage(packageInfo, sharedAttributes) {
+    const environment = globalThis.process.env;
+    const version = environment.PR_LOG_RELEASE_VERSION;
+
+    if (version === undefined || version === '') {
+        throw new Error('PR_LOG_RELEASE_VERSION must be set to publish pr-log');
+    }
+
     return {
         name: 'pr-log',
-        versioning: { automatic: false, version: packageInfo.version },
+        versioning: { automatic: false, version },
         additionalFiles: [{ sourceFilePath: cliReadmePath, targetFilePath: 'README.md' }],
         roots: {
             cli: {
@@ -83,6 +96,7 @@ export async function buildConfig() {
     const sharedAttributes = sharedPackageAttributes(packageInfo);
 
     return {
+        registrySettings: registrySettings(),
         commonPackageSettings: commonPackageSettings(packageInfo),
         checks: {
             areTheTypesWrong: { enabled: true, profile: 'esm-only' },

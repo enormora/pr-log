@@ -17,7 +17,7 @@ import {
 import { createJsonFileReader } from '../../lib/read-json-file.ts';
 import { createRemoteAliasReader } from '../../lib/remote-alias-reader.ts';
 import { createPrLogEngine, defaultValidLabels } from '../core/core.entry-point.ts';
-import { createPackageMetadata } from './package-metadata.ts';
+import { readPackageMetadata } from './package-metadata.ts';
 import { createErrorReporter } from './error-reporter.ts';
 import { createProgram } from './program.ts';
 
@@ -29,8 +29,14 @@ const readJsonFile = createJsonFileReader({
     }
 });
 
-const prLogPackageJsonURL = new URL('../../../../../package.json', import.meta.url);
-const packageMetadata = createPackageMetadata(await readJsonFile(prLogPackageJsonURL.pathname));
+const packageMetadata = await readPackageMetadata({
+    packageJsonUrls: [
+        new URL('../../package.json', import.meta.url),
+        new URL('../../../package.json', import.meta.url),
+        new URL('../../../../../package.json', import.meta.url)
+    ],
+    readJsonFile
+});
 
 const { GH_TOKEN } = process.env;
 const githubClient = new Octokit({ auth: GH_TOKEN });
