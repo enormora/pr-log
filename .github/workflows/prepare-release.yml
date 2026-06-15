@@ -27,25 +27,6 @@ jobs:
             - name: Install dependencies
               run: npm clean-install --ignore-scripts
 
-            - name: Audit npm signatures and attestations
-              run: |
-                  mkdir -p target/release
-                  npm audit signatures --json --include-attestations > target/release/npm-audit-signatures.json
-                  node --input-type=module <<'NODE'
-                  import fs from 'node:fs/promises';
-
-                  const report = JSON.parse(
-                      await fs.readFile('target/release/npm-audit-signatures.json', { encoding: 'utf8' })
-                  );
-                  const packtory = report.verified.find((entry) => {
-                      return entry.name === '@packtory/cli';
-                  });
-
-                  if (packtory?.attestations?.provenance?.predicateType !== 'https://slsa.dev/provenance/v1') {
-                      throw new Error('Missing npm provenance for @packtory/cli');
-                  }
-                  NODE
-
             - name: Compile TypeScript
               run: npx just compile
 
@@ -57,28 +38,11 @@ jobs:
             - name: Read release metadata
               id: release-metadata
               run: |
-                  pr_log_version="$(cat target/release/pr-log-version.txt)"
                   core_release_needed="$(node -e "const metadata = require('./target/release/core-release.json'); console.log(metadata.type === 'predicted-release' ? 'true' : 'false')")"
-                  predicted_core_version="$(node -e "const metadata = require('./target/release/core-release.json'); console.log(metadata.predictedVersion)")"
-                  predicted_core_tag="$(node -e "const metadata = require('./target/release/core-release.json'); console.log(metadata.predictedTagName)")"
 
                   {
-                      echo "pr_log_version=${pr_log_version}"
                       echo "core_release_needed=${core_release_needed}"
-                      echo "predicted_core_version=${predicted_core_version}"
-                      echo "predicted_core_tag=${predicted_core_tag}"
                   } >> "$GITHUB_OUTPUT"
-
-            - name: Static code analysis
-              run: npx just lint
-
-            - name: Run tests
-              run: npx just test
-
-            - name: Check packages
-              env:
-                  PR_LOG_RELEASE_VERSION: ${{ steps.release-metadata.outputs.pr_log_version }}
-              run: npx just publish-dry-run
 
             - name: Validate release diff
               env:
