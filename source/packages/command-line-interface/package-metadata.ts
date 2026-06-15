@@ -6,6 +6,11 @@ export type PackageMetadata = {
     readonly version: string;
 };
 
+type PackageMetadataReader = {
+    readonly packageJsonUrls: readonly URL[];
+    readonly readJsonFile: (filePath: string) => Promise<Record<string, unknown>>;
+};
+
 function readStringValue(value: unknown): string {
     if (isString(value)) {
         return value;
@@ -20,4 +25,18 @@ export function createPackageMetadata(packageJson: Record<string, unknown>): Pac
         description: readStringValue(packageJson.description),
         version: readStringValue(packageJson.version)
     };
+}
+
+export async function readPackageMetadata(reader: PackageMetadataReader): Promise<PackageMetadata> {
+    for (const packageJsonUrl of reader.packageJsonUrls) {
+        try {
+            return createPackageMetadata(await reader.readJsonFile(packageJsonUrl.pathname));
+        } catch (error: unknown) {
+            if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
+                throw error;
+            }
+        }
+    }
+
+    throw new Error('Failed to read package metadata');
 }
