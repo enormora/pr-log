@@ -7,8 +7,6 @@ const sourcesFolder = path.join(projectFolder, 'target/packtory/source');
 const licensePath = path.join(projectFolder, 'LICENSE');
 const coreReadmePath = path.join(projectFolder, 'packages/core/README.md');
 const cliReadmePath = path.join(projectFolder, 'packages/pr-log/README.md');
-const coreChangelogPath = path.join(projectFolder, 'source/packages/core/CHANGELOG.md');
-const cliChangelogPath = path.join(projectFolder, 'source/packages/command-line-interface/CHANGELOG.md');
 
 async function readPackageInfo() {
     const packageJsonContent = await fs.readFile(path.join(projectFolder, 'package.json'), { encoding: 'utf8' });
@@ -31,36 +29,24 @@ function commonPackageSettings(packageInfo) {
         mainPackageJson: { type: 'module', dependencies: packageInfo.dependencies },
         additionalFiles: [{ sourceFilePath: licensePath, targetFilePath: 'LICENSE' }],
         deadCodeElimination: { enabled: true },
-        publishSettings: publishSettings()
+        publishSettings: {
+            access: 'public',
+            provenance: { type: 'auto' }
+        }
     };
 }
 
 function registrySettings() {
-    const { NPM_TOKEN } = process.env;
-
-    if (NPM_TOKEN === undefined || NPM_TOKEN === '') {
-        return undefined;
-    }
-
     return {
-        auth: { type: 'bearer-token', token: NPM_TOKEN }
-    };
-}
-
-function publishSettings() {
-    return {
-        access: 'public'
+        auth: { type: 'npm-oidc', provider: 'github-actions' }
     };
 }
 
 function corePackage(sharedAttributes) {
     return {
         name: '@pr-log/core',
-        versioning: { automatic: true, minimumVersion: '0.0.1' },
-        additionalFiles: [
-            { sourceFilePath: coreReadmePath, targetFilePath: 'README.md' },
-            { sourceFilePath: coreChangelogPath, targetFilePath: 'CHANGELOG.md' }
-        ],
+        versioning: { automatic: true, minimumVersion: '0.1.0' },
+        additionalFiles: [{ sourceFilePath: coreReadmePath, targetFilePath: 'README.md' }],
         roots: {
             main: {
                 js: 'packages/core/core.entry-point.js',
@@ -76,13 +62,17 @@ function corePackage(sharedAttributes) {
 }
 
 function cliPackage(packageInfo, sharedAttributes) {
+    const environment = globalThis.process.env;
+    const version = environment.PR_LOG_RELEASE_VERSION;
+
+    if (version === undefined || version === '') {
+        throw new Error('PR_LOG_RELEASE_VERSION must be set to publish pr-log');
+    }
+
     return {
         name: 'pr-log',
-        versioning: { automatic: false, version: packageInfo.version },
-        additionalFiles: [
-            { sourceFilePath: cliReadmePath, targetFilePath: 'README.md' },
-            { sourceFilePath: cliChangelogPath, targetFilePath: 'CHANGELOG.md' }
-        ],
+        versioning: { automatic: false, version },
+        additionalFiles: [{ sourceFilePath: cliReadmePath, targetFilePath: 'README.md' }],
         roots: {
             cli: {
                 js: 'packages/command-line-interface/bin.entry-point.js'
