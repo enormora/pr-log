@@ -45,7 +45,7 @@ function registrySettings() {
 function corePackage(sharedAttributes) {
     return {
         name: '@pr-log/core',
-        versioning: { automatic: true, minimumVersion: '0.1.0' },
+        versioning: { automatic: true, minimumVersion: '0.0.1' },
         additionalFiles: [{ sourceFilePath: coreReadmePath, targetFilePath: 'README.md' }],
         roots: {
             main: {
