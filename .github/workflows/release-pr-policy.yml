@@ -1,0 +1,182 @@
+name: Release PR policy
+
+on:
+    pull_request:
+        types: [opened, reopened, synchronize, edited, labeled, unlabeled]
+    merge_group:
+
+permissions:
+    contents: read
+    pull-requests: read
+
+jobs:
+    release-pr-policy:
+        runs-on: ubuntu-latest
+        name: Release PR policy
+        steps:
+            - uses: actions/checkout@v6
+            - name: Use Node.js
+              uses: actions/setup-node@v6
+              with:
+                  node-version: 24
+
+            - name: Validate pull request
+              if: github.event_name == 'pull_request'
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  PULL_REQUEST: ${{ toJSON(github.event.pull_request) }}
+                  GITHUB_REPOSITORY: ${{ github.repository }}
+              run: |
+                  node --input-type=module <<'NODE'
+                  import { validatePullRequestPolicy } from './source/release/release-pr-policy.ts';
+
+                  function labelNames(labels) {
+                      return labels.map((label) => {
+                          return label.name;
+                      });
+                  }
+
+                  async function githubApi(path, options = {}) {
+                      const response = await fetch(`https://api.github.com${path}`, {
+                          ...options,
+                          headers: {
+                              Accept: 'application/vnd.github+json',
+                              Authorization: `Bearer ${process.env.GH_TOKEN}`,
+                              'X-GitHub-Api-Version': '2022-11-28',
+                              ...options.headers
+                          }
+                      });
+
+                      if (!response.ok) {
+                          const body = await response.text();
+                          throw new Error(`GitHub API request failed: ${response.status} ${response.statusText}\n${body}`);
+                      }
+
+                      return response.json();
+                  }
+
+                  async function readPullRequestFiles(number) {
+                      const files = [];
+
+                      for (let page = 1; ; page += 1) {
+                          const pageFiles = await githubApi(
+                              `/repos/${process.env.GITHUB_REPOSITORY}/pulls/${number}/files?per_page=100&page=${page}`
+                          );
+
+                          files.push(...pageFiles);
+
+                          if (pageFiles.length < 100) {
+                              return files;
+                          }
+                      }
+                  }
+
+                  async function readPolicyInput(pr, expectedBaseSha) {
+                      const files = await readPullRequestFiles(pr.number);
+                      const commit = await githubApi(`/repos/${process.env.GITHUB_REPOSITORY}/commits/${pr.head.sha}`);
+
+                      return {
+                          labels: labelNames(pr.labels),
+                          author: pr.user.login,
+                          headRef: pr.head.ref,
+                          title: pr.title,
+                          subject: commit.commit.message.split('\n')[0],
+                          parentShas: commit.parents.map((parent) => {
+                              return parent.sha;
+                          }),
+                          expectedBaseSha,
+                          changedFiles: files.map((file) => {
+                              return file.filename;
+                          })
+                      };
+                  }
+
+                  const pullRequest = JSON.parse(process.env.PULL_REQUEST);
+                  const mainRef = await githubApi(`/repos/${process.env.GITHUB_REPOSITORY}/git/ref/heads/main`);
+
+                  validatePullRequestPolicy(await readPolicyInput(pullRequest, mainRef.object.sha));
+                  NODE
+
+            - name: Validate merge group
+              if: github.event_name == 'merge_group'
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  GITHUB_REPOSITORY: ${{ github.repository }}
+                  MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+                  MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+              run: |
+                  node --input-type=module <<'NODE'
+                  import { validateMergeGroupPolicy } from './source/release/release-pr-policy.ts';
+
+                  function labelNames(labels) {
+                      return labels.map((label) => {
+                          return label.name;
+                      });
+                  }
+
+                  async function githubApi(path, options = {}) {
+                      const response = await fetch(`https://api.github.com${path}`, {
+                          ...options,
+                          headers: {
+                              Accept: 'application/vnd.github+json',
+                              Authorization: `Bearer ${process.env.GH_TOKEN}`,
+                              'X-GitHub-Api-Version': '2022-11-28',
+                              ...options.headers
+                          }
+                      });
+
+                      if (!response.ok) {
+                          const body = await response.text();
+                          throw new Error(`GitHub API request failed: ${response.status} ${response.statusText}\n${body}`);
+                      }
+
+                      return response.json();
+                  }
+
+                  async function readPullRequestFiles(number) {
+                      const files = [];
+
+                      for (let page = 1; ; page += 1) {
+                          const pageFiles = await githubApi(
+                              `/repos/${process.env.GITHUB_REPOSITORY}/pulls/${number}/files?per_page=100&page=${page}`
+                          );
+
+                          files.push(...pageFiles);
+
+                          if (pageFiles.length < 100) {
+                              return files;
+                          }
+                      }
+                  }
+
+                  async function readPolicyInput(pr) {
+                      const files = await readPullRequestFiles(pr.number);
+                      const commit = await githubApi(`/repos/${process.env.GITHUB_REPOSITORY}/commits/${pr.head.sha}`);
+
+                      return {
+                          labels: labelNames(pr.labels),
+                          author: pr.user.login,
+                          headRef: pr.head.ref,
+                          title: pr.title,
+                          subject: commit.commit.message.split('\n')[0],
+                          parentShas: commit.parents.map((parent) => {
+                              return parent.sha;
+                          }),
+                          expectedBaseSha: process.env.MERGE_GROUP_BASE_SHA,
+                          changedFiles: files.map((file) => {
+                              return file.filename;
+                          })
+                      };
+                  }
+
+                  const pullRequests = await githubApi(
+                      `/repos/${process.env.GITHUB_REPOSITORY}/commits/${process.env.MERGE_GROUP_HEAD_SHA}/pulls`
+                  );
+                  const policyInputs = await Promise.all(
+                      pullRequests.map((pullRequest) => {
+                          return readPolicyInput(pullRequest);
+                      })
+                  );
+
+                  validateMergeGroupPolicy({ pullRequests: policyInputs });
+                  NODE
