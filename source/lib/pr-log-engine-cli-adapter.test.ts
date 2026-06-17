@@ -54,7 +54,7 @@ test('createMergedPullRequestReader() collects pull requests from the latest bas
         targetScopedLabelPattern: undefined
     });
 
-    const result = await getMergedPullRequests('owner/repository', validLabels);
+    const result = await getMergedPullRequests('owner/repository', validLabels, []);
 
     assert.deepStrictEqual(result, [{ id: 1, title: 'Fix bug', label: 'bug' }]);
     assert.deepStrictEqual(collectMergedPullRequests.firstCall.args, [
@@ -64,6 +64,7 @@ test('createMergedPullRequestReader() collects pull requests from the latest bas
         {
             githubRepo: 'owner/repository',
             validLabels,
+            ignoredLabels: [],
             pullRequests: [{ id: 1, title: 'Fix bug' }],
             targetName: undefined,
             targetScopedLabelPattern: undefined

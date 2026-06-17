@@ -6,7 +6,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { execaCommand } from 'execa';
 import { createPrLogEngine, defaultValidLabels } from './source/packages/core/core.entry-point.ts';
-import { getGithubRepoFromPackageInfo, getValidLabels } from './source/lib/package-info.ts';
+import { getGithubRepoFromPackageInfo, getIgnoredLabels, getValidLabels } from './source/lib/package-info.ts';
 import { createJsonFileReader } from './source/lib/read-json-file.ts';
 import { splitByString } from './source/lib/split.ts';
 import { prepareRelease } from './source/release/prepare-release.ts';
@@ -67,6 +67,7 @@ const projectFolder = process.cwd();
 const packageInfo = await readJsonFile(path.join(projectFolder, 'package.json'));
 const githubRepo = getGithubRepoFromPackageInfo(packageInfo);
 const validLabels = getValidLabels(packageInfo, defaultValidLabels);
+const ignoredLabels = getIgnoredLabels(packageInfo);
 const prLogEngine = createPrLogEngine({
     githubToken: process.env.GH_TOKEN,
     workingDirectory: projectFolder,
@@ -78,6 +79,7 @@ await prepareRelease({
     packageInfo,
     githubRepo,
     validLabels,
+    ignoredLabels,
     currentDate: new Date(),
     tags: await listTags(),
     trackedFiles: await listTrackedFiles(),

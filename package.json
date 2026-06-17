@@ -54,6 +54,11 @@
         "type": "git",
         "url": "https://github.com/lo1tuma/pr-log.git"
     },
+    "pr-log": {
+        "ignoredLabels": [
+            "release"
+        ]
+    },
     "keywords": [
         "pr-log",
         "changelog",

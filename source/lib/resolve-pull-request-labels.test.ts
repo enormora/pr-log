@@ -15,6 +15,7 @@ test('resolves labels for pull requests sequentially', async () => {
     const pullRequests = await resolvePullRequestLabels({
         githubRepo: 'owner/repo',
         validLabels: defaultValidLabels,
+        ignoredLabels: [],
         pullRequests: [
             { id: 1, title: 'Fix bug' },
             { id: secondPullRequestId, title: 'Update docs' }
@@ -38,6 +39,7 @@ test('applies target scoped labels over pull request level labels', async () => 
     const pullRequests = await resolvePullRequestLabels({
         githubRepo: 'owner/repo',
         validLabels: defaultValidLabels,
+        ignoredLabels: [],
         pullRequests: [{ id: 1, title: 'Fix bug' }],
         pullRequestLabelReader: { getLabels: fake.resolves(['bug', 'pkg-a:breaking']) },
         waitForMilliseconds: fake.resolves(undefined),
@@ -53,6 +55,7 @@ test('ignores raw labels that are not valid labels', async () => {
     const pullRequests = await resolvePullRequestLabels({
         githubRepo: 'owner/repo',
         validLabels: defaultValidLabels,
+        ignoredLabels: [],
         pullRequests: [{ id: 1, title: 'Fix bug' }],
         pullRequestLabelReader: { getLabels: fake.resolves(['bug', 'not-for-changelog']) },
         waitForMilliseconds: fake.resolves(undefined),
@@ -69,6 +72,7 @@ test('rejects missing pull request level labels', async () => {
         resolvePullRequestLabels({
             githubRepo: 'owner/repo',
             validLabels: defaultValidLabels,
+            ignoredLabels: [],
             pullRequests: [{ id: 1, title: 'Fix bug' }],
             pullRequestLabelReader: { getLabels: fake.resolves(['not-for-changelog']) },
             waitForMilliseconds: fake.resolves(undefined),
@@ -88,6 +92,7 @@ test('rejects multiple pull request level labels', async () => {
         resolvePullRequestLabels({
             githubRepo: 'owner/repo',
             validLabels: defaultValidLabels,
+            ignoredLabels: [],
             pullRequests: [{ id: 1, title: 'Fix bug' }],
             pullRequestLabelReader: { getLabels: fake.resolves(['bug', 'documentation']) },
             waitForMilliseconds: fake.resolves(undefined),
@@ -106,6 +111,7 @@ test('ignores scoped labels for other targets', async () => {
     const pullRequests = await resolvePullRequestLabels({
         githubRepo: 'owner/repo',
         validLabels: defaultValidLabels,
+        ignoredLabels: [],
         pullRequests: [{ id: 1, title: 'Fix bug' }],
         pullRequestLabelReader: { getLabels: fake.resolves(['bug', 'pkg-a:breaking']) },
         waitForMilliseconds: fake.resolves(undefined),
@@ -122,6 +128,7 @@ test('rejects conflicting target scoped labels', async () => {
         resolvePullRequestLabels({
             githubRepo: 'owner/repo',
             validLabels: defaultValidLabels,
+            ignoredLabels: [],
             pullRequests: [{ id: 1, title: 'Fix bug' }],
             pullRequestLabelReader: { getLabels: fake.resolves(['bug', 'pkg-a:breaking', 'pkg-a:feature']) },
             waitForMilliseconds: fake.resolves(undefined),
@@ -138,6 +145,7 @@ test('rejects unknown target scoped labels', async () => {
         resolvePullRequestLabels({
             githubRepo: 'owner/repo',
             validLabels: defaultValidLabels,
+            ignoredLabels: [],
             pullRequests: [{ id: 1, title: 'Fix bug' }],
             pullRequestLabelReader: { getLabels: fake.resolves(['bug', 'pkg-a:not-real']) },
             waitForMilliseconds: fake.resolves(undefined),
@@ -153,6 +161,7 @@ test('supports scoped package names in target labels', async () => {
     const pullRequests = await resolvePullRequestLabels({
         githubRepo: 'owner/repo',
         validLabels: defaultValidLabels,
+        ignoredLabels: [],
         pullRequests: [{ id: 1, title: 'Fix bug' }],
         pullRequestLabelReader: { getLabels: fake.resolves(['bug', '@scope/pkg:documentation']) },
         waitForMilliseconds: fake.resolves(undefined),
@@ -162,4 +171,20 @@ test('supports scoped package names in target labels', async () => {
     });
 
     assert.deepStrictEqual(pullRequests, [{ id: 1, title: 'Fix bug', label: 'documentation' }]);
+});
+
+test('skips ignored pull requests before changelog label validation', async () => {
+    const pullRequests = await resolvePullRequestLabels({
+        githubRepo: 'owner/repo',
+        validLabels: defaultValidLabels,
+        ignoredLabels: ['release'],
+        pullRequests: [{ id: 1, title: 'Prepare release' }],
+        pullRequestLabelReader: { getLabels: fake.resolves(['release']) },
+        waitForMilliseconds: fake.resolves(undefined),
+        labelLookupIntervalMilliseconds: 0,
+        targetName: undefined,
+        targetScopedLabelPattern: undefined
+    });
+
+    assert.deepStrictEqual(pullRequests, []);
 });

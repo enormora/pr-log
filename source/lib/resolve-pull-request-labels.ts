@@ -11,6 +11,7 @@ export type PullRequestLabelReader = {
 export type ResolvePullRequestLabelsInput = {
     readonly githubRepo: string;
     readonly validLabels: ReadonlyMap<string, string>;
+    readonly ignoredLabels: readonly string[];
     readonly pullRequests: readonly PullRequest[];
     readonly pullRequestLabelReader: PullRequestLabelReader;
     readonly waitForMilliseconds: (durationMilliseconds: number) => Promise<void>;
@@ -115,24 +116,46 @@ function resolveLabel(
     );
 }
 
+function hasIgnoredLabel(labels: readonly string[], ignoredLabels: ReadonlySet<string>): boolean {
+    return labels.some((label) => {
+        return ignoredLabels.has(label);
+    });
+}
+
+async function resolvePullRequestLabel(
+    input: ResolvePullRequestLabelsInput,
+    ignoredLabels: ReadonlySet<string>,
+    pullRequest: PullRequest
+): Promise<PullRequestWithLabel | undefined> {
+    const labels = await input.pullRequestLabelReader.getLabels(input.githubRepo, pullRequest.id);
+
+    if (hasIgnoredLabel(labels, ignoredLabels)) {
+        return undefined;
+    }
+
+    return {
+        id: pullRequest.id,
+        title: pullRequest.title,
+        label: resolveLabel(input, pullRequest, labels)
+    };
+}
+
 export async function resolvePullRequestLabels(
     input: ResolvePullRequestLabelsInput
 ): Promise<readonly PullRequestWithLabel[]> {
     const pullRequestsWithLabels: PullRequestWithLabel[] = [];
+    const ignoredLabels = new Set(input.ignoredLabels);
 
     for (const [pullRequestIndex, pullRequest] of input.pullRequests.entries()) {
         if (pullRequestIndex > 0 && input.labelLookupIntervalMilliseconds > 0) {
             await input.waitForMilliseconds(input.labelLookupIntervalMilliseconds);
         }
 
-        const labels = await input.pullRequestLabelReader.getLabels(input.githubRepo, pullRequest.id);
-        const label = resolveLabel(input, pullRequest, labels);
+        const pullRequestWithLabel = await resolvePullRequestLabel(input, ignoredLabels, pullRequest);
 
-        pullRequestsWithLabels.push({
-            id: pullRequest.id,
-            title: pullRequest.title,
-            label
-        });
+        if (pullRequestWithLabel !== undefined) {
+            pullRequestsWithLabels.push(pullRequestWithLabel);
+        }
     }
 
     return pullRequestsWithLabels;

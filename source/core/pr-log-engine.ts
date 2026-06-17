@@ -56,6 +56,7 @@ export type ReadPullRequestLabelsOptions = {
 export type ResolvePullRequestLabelsOptions = {
     readonly githubRepo: string;
     readonly validLabels: ReadonlyMap<string, string>;
+    readonly ignoredLabels: readonly string[];
     readonly pullRequests: readonly PullRequestValue[];
     readonly targetName: string | undefined;
     readonly targetScopedLabelPattern: string | undefined;
@@ -198,6 +199,7 @@ export function createPrLogEngineWithDependencies(dependencies: PrLogEngineDepen
             return resolvePullRequestLabelsValue({
                 githubRepo: input.githubRepo,
                 validLabels: input.validLabels,
+                ignoredLabels: input.ignoredLabels,
                 pullRequests: input.pullRequests,
                 pullRequestLabelReader: createPullRequestLabelReader(dependencies),
                 waitForMilliseconds: dependencies.waitForMilliseconds,

@@ -27,7 +27,8 @@ export type GetMergedPullRequestsDependencies = {
 
 export type GetMergedPullRequests = (
     repo: string,
-    validLabels: ReadonlyMap<string, string>
+    validLabels: ReadonlyMap<string, string>,
+    ignoredLabels: readonly string[]
 ) => Promise<readonly PullRequestWithLabel[]>;
 
 type PullRequestData = Readonly<Awaited<ReturnType<Octokit['pulls']['get']>>['data']>;
@@ -86,12 +87,17 @@ export function getMergedPullRequestsFactory(dependencies: GetMergedPullRequests
         });
     }
 
-    return async function getMergedPullRequests(githubRepo: string, validLabels: ReadonlyMap<string, string>) {
+    return async function getMergedPullRequests(
+        githubRepo: string,
+        validLabels: ReadonlyMap<string, string>,
+        ignoredLabels: readonly string[]
+    ) {
         const latestVersionTag = await getLatestVersionTag();
         const pullRequests = await getPullRequests(latestVersionTag, githubRepo);
         const pullRequestsWithLabels = await resolvePullRequestLabels({
             githubRepo,
             validLabels,
+            ignoredLabels,
             pullRequests,
             waitForMilliseconds,
             labelLookupIntervalMilliseconds,

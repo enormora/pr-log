@@ -176,7 +176,7 @@ test('uses custom labels if they are provided in package.json', async () => {
     await cli.run(cliRunOptionsFactory.build());
 
     assert.strictEqual(getMergedPullRequests.callCount, 1);
-    assert.deepStrictEqual(getMergedPullRequests.firstCall.args, ['foo/bar', expectedLabels]);
+    assert.deepStrictEqual(getMergedPullRequests.firstCall.args, ['foo/bar', expectedLabels, []]);
 
     assert.strictEqual(renderChangelogMarkdown.callCount, 1);
     assert.deepStrictEqual(renderChangelogMarkdown.firstCall.args[0], {
@@ -188,6 +188,21 @@ test('uses custom labels if they are provided in package.json', async () => {
         unreleased: false,
         versionNumber: '1.2.3'
     });
+});
+
+test('passes configured ignored labels to merged pull request collection', async () => {
+    const packageInfo = {
+        repository: { url: 'https://github.com/foo/bar.git' },
+        'pr-log': {
+            ignoredLabels: ['release']
+        }
+    };
+    const getMergedPullRequests = stub().resolves([]);
+    const cli = createCli({ packageInfo, getMergedPullRequests });
+
+    await cli.run(cliRunOptionsFactory.build());
+
+    assert.deepStrictEqual(getMergedPullRequests.firstCall.args, ['foo/bar', defaultValidLabels, ['release']]);
 });
 
 test('calls ensureCleanLocalGitState with correct parameters', async () => {

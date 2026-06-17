@@ -3,7 +3,7 @@ import type { Logger } from 'loglevel';
 import type { CliRunOptions } from './cli-run-options.ts';
 import type { GetMergedPullRequests } from './get-merged-pull-requests.ts';
 import type { EnsureCleanLocalGitState } from './ensure-clean-local-git-state.ts';
-import { getGithubRepoFromPackageInfo, getValidLabels } from './package-info.ts';
+import { getGithubRepoFromPackageInfo, getIgnoredLabels, getValidLabels } from './package-info.ts';
 import { type GetLatestVersionTag, resolveReleasedVersionNumber } from './resolve-version-number.ts';
 import { validateVersionNumber } from './version-number.ts';
 import type { renderChangelogMarkdown } from './render-changelog-markdown.ts';
@@ -50,6 +50,12 @@ type ChangelogData = {
 };
 
 type WriteChangelogContext = Pick<CliRunnerDependencies, 'logger' | 'prependFile'>;
+
+type ChangelogRequest = {
+    readonly githubRepo: string;
+    readonly validLabels: ReadonlyMap<string, string>;
+    readonly ignoredLabels: readonly string[];
+};
 
 async function ensureCleanState(
     ensureCleanLocalGitState: EnsureCleanLocalGitState,
@@ -111,8 +117,7 @@ async function generateReleasedChangelog(
 async function generateChangelog(
     dependencies: GenerateChangelogContext,
     options: CliRunOptions,
-    githubRepo: string,
-    validLabels: ReadonlyMap<string, string>
+    request: ChangelogRequest
 ): Promise<string> {
     const {
         ensureCleanLocalGitState,
@@ -123,12 +128,12 @@ async function generateChangelog(
         renderChangelogMarkdown
     } = dependencies;
 
-    await ensureCleanState(ensureCleanLocalGitState, options, githubRepo);
+    await ensureCleanState(ensureCleanLocalGitState, options, request.githubRepo);
 
     const changelogData: ChangelogData = {
-        githubRepo,
-        validLabels,
-        mergedPullRequests: await getMergedPullRequests(githubRepo, validLabels)
+        githubRepo: request.githubRepo,
+        validLabels: request.validLabels,
+        mergedPullRequests: await getMergedPullRequests(request.githubRepo, request.validLabels, request.ignoredLabels)
     };
 
     if (options.unreleased) {
@@ -164,12 +169,17 @@ export function createCliRunner(dependencies: CliRunnerDependencies): CliRunner 
         async run(options: CliRunOptions) {
             const githubRepo = getGithubRepoFromPackageInfo(packageInfo);
             const validLabels = getValidLabels(packageInfo, defaultValidLabels);
+            const ignoredLabels = getIgnoredLabels(packageInfo);
 
             validateVersionNumber(options).unwrapOrElse((error) => {
                 throw error;
             });
 
-            const changelog = await generateChangelog(dependencies, options, githubRepo, validLabels);
+            const changelog = await generateChangelog(dependencies, options, {
+                githubRepo,
+                validLabels,
+                ignoredLabels
+            });
 
             await writeChangelog(dependencies, changelog, options);
         }
