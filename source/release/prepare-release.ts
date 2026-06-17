@@ -27,6 +27,7 @@ export type ReleasePreparation = {
     readonly packageInfo: Record<string, unknown>;
     readonly githubRepo: string;
     readonly validLabels: ReadonlyMap<string, string>;
+    readonly ignoredLabels: readonly string[];
     readonly currentDate: Readonly<Date>;
     readonly tags: readonly string[];
     readonly trackedFiles: readonly string[];
@@ -37,6 +38,7 @@ export type ReleasePreparation = {
     readonly resolvePullRequestLabels: (input: {
         readonly githubRepo: string;
         readonly validLabels: ReadonlyMap<string, string>;
+        readonly ignoredLabels: readonly string[];
         readonly pullRequests: readonly PullRequest[];
         readonly targetName: string | undefined;
         readonly targetScopedLabelPattern: string | undefined;
@@ -94,7 +96,7 @@ export const coreReleaseTarget: ReleaseTarget = {
     ignoredAttributionPaths: ['source/packages/core/CHANGELOG.md']
 };
 
-async function preparePrLogRelease(dependencies: ReleasePreparation): Promise<void> {
+async function preparePrLogRelease(dependencies: ReleasePreparation): Promise<boolean> {
     const latestCliTag = determineLatestPackageVersionTag(dependencies.tags, cliReleaseTarget.packageName);
     const cliPullRequests = await dependencies.collectMergedPullRequests({
         githubRepo: dependencies.githubRepo,
@@ -103,10 +105,16 @@ async function preparePrLogRelease(dependencies: ReleasePreparation): Promise<vo
     const labeledCliPullRequests = await dependencies.resolvePullRequestLabels({
         githubRepo: dependencies.githubRepo,
         validLabels: dependencies.validLabels,
+        ignoredLabels: dependencies.ignoredLabels,
         pullRequests: cliPullRequests,
         targetName: undefined,
         targetScopedLabelPattern: undefined
     });
+
+    if (labeledCliPullRequests.length === 0) {
+        return false;
+    }
+
     const nextPrLogVersion = selectNextPrLogVersion({
         latestVersion: latestCliTag.version,
         packageInfo: dependencies.packageInfo,
@@ -127,6 +135,8 @@ async function preparePrLogRelease(dependencies: ReleasePreparation): Promise<vo
         })
     );
     await dependencies.writePrLogVersion(nextPrLogVersion);
+
+    return true;
 }
 
 async function readCoreTargetPullRequests(dependencies: ReleasePreparation): Promise<{
@@ -168,6 +178,7 @@ async function prepareCoreRelease(dependencies: ReleasePreparation): Promise<voi
     const labeledCorePullRequests = await dependencies.resolvePullRequestLabels({
         githubRepo: dependencies.githubRepo,
         validLabels: dependencies.validLabels,
+        ignoredLabels: dependencies.ignoredLabels,
         pullRequests: coreTargetPullRequests.pullRequests,
         targetName: coreReleaseTarget.packageName,
         targetScopedLabelPattern: undefined
@@ -194,6 +205,14 @@ async function prepareCoreRelease(dependencies: ReleasePreparation): Promise<voi
 }
 
 export async function prepareRelease(dependencies: ReleasePreparation): Promise<void> {
-    await preparePrLogRelease(dependencies);
+    if (!(await preparePrLogRelease(dependencies))) {
+        await dependencies.writeCoreReleaseMetadata({
+            type: 'no-release',
+            predictedVersion: '',
+            predictedTagName: ''
+        });
+        return;
+    }
+
     await prepareCoreRelease(dependencies);
 }

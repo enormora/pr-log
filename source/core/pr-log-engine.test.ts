@@ -190,6 +190,7 @@ test('resolves pull request labels', async () => {
         await engine.resolvePullRequestLabels({
             githubRepo,
             validLabels: defaultValidLabels,
+            ignoredLabels: [],
             pullRequests: [{ id: pullRequestId, title: 'Fix bug' }],
             targetName: undefined,
             targetScopedLabelPattern: undefined
@@ -207,6 +208,7 @@ test('resolves target scoped pull request labels', async () => {
         await engine.resolvePullRequestLabels({
             githubRepo,
             validLabels: defaultValidLabels,
+            ignoredLabels: [],
             pullRequests: [{ id: pullRequestId, title: 'Fix bug' }],
             targetName: 'pkg-a',
             targetScopedLabelPattern: undefined

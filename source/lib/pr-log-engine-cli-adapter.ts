@@ -26,13 +26,14 @@ export function createMergedPullRequestReader(
     prLogEngine: MergedPullRequestReaderEngine,
     options: MergedPullRequestReaderOptions
 ): GetMergedPullRequests {
-    return async function getMergedPullRequests(githubRepo, validLabels) {
+    return async function getMergedPullRequests(githubRepo, validLabels, ignoredLabels) {
         const baseRef = await prLogEngine.resolveLatestSemverChangelogBaseRef();
         const pullRequests = await prLogEngine.collectMergedPullRequests({ githubRepo, baseRef: baseRef.ref });
 
         return prLogEngine.resolvePullRequestLabels({
             githubRepo,
             validLabels,
+            ignoredLabels,
             pullRequests,
             targetName: options.targetName,
             targetScopedLabelPattern: options.targetScopedLabelPattern

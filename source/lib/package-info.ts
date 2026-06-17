@@ -1,4 +1,4 @@
-import { isPlainObject, isString } from '@sindresorhus/is';
+import { isArray, isPlainObject, isString } from '@sindresorhus/is';
 import { getGithubRepo } from './get-github-repo.ts';
 
 type PackageInfo = Record<string, unknown>;
@@ -28,4 +28,30 @@ export function getValidLabels(
     }
 
     return defaultValidLabels;
+}
+
+function readStringArrayConfig(packageInfo: PackageInfo, fieldName: string): readonly string[] {
+    const prLogConfig = packageInfo['pr-log'];
+
+    if (!isPlainObject(prLogConfig) || prLogConfig[fieldName] === undefined) {
+        return [];
+    }
+
+    const value = prLogConfig[fieldName];
+
+    if (!isArray(value)) {
+        throw new TypeError(`pr-log.${fieldName} must be an array of strings`);
+    }
+
+    return value.map((entry) => {
+        if (!isString(entry)) {
+            throw new TypeError(`pr-log.${fieldName} must be an array of strings`);
+        }
+
+        return entry;
+    });
+}
+
+export function getIgnoredLabels(packageInfo: PackageInfo): readonly string[] {
+    return readStringArrayConfig(packageInfo, 'ignoredLabels');
 }

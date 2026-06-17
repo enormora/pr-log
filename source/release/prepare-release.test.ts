@@ -46,8 +46,52 @@ function createChangedFilesByPullRequest(hasCoreChange: boolean): ReadonlyMap<nu
     return new Map([[corePullRequestId, ['packages/pr-log/README.md']]]);
 }
 
+function createMergedPullRequestCollector(options: {
+    readonly hasCoreChange: boolean;
+    readonly ignoredPrLogRelease: boolean;
+}) {
+    return async function collectMergedPullRequests(input: { readonly baseRef: string }) {
+        if (input.baseRef === 'pr-log@1.0.0') {
+            if (options.ignoredPrLogRelease) {
+                return [{ id: cliPullRequestId, title: 'Prepare release' }];
+            }
+
+            return [{ id: cliPullRequestId, title: 'Fix CLI' }];
+        }
+
+        if (options.hasCoreChange) {
+            return [
+                { id: corePullRequestId, title: 'Fix core' },
+                { id: unrelatedPullRequestId, title: 'Fix unrelated docs' }
+            ];
+        }
+
+        return [{ id: corePullRequestId, title: 'Fix docs' }];
+    };
+}
+
+function createPullRequestLabelResolver(options: {
+    readonly ignoredPrLogRelease: boolean;
+    readonly resolvedTargets: (string | undefined)[];
+}) {
+    return async function resolvePullRequestLabels(
+        input: Parameters<ReleasePreparation['resolvePullRequestLabels']>[0]
+    ) {
+        options.resolvedTargets.push(input.targetName);
+
+        if (options.ignoredPrLogRelease) {
+            return [];
+        }
+
+        return input.pullRequests.map((pullRequest) => {
+            return { ...pullRequest, label: 'bug' };
+        });
+    };
+}
+
 function createReleasePreparation(options: {
     readonly hasCoreChange: boolean;
+    readonly ignoredPrLogRelease: boolean;
     readonly writes: string[];
     readonly metadata: CoreReleaseMetadata[];
     readonly resolvedTargets: (string | undefined)[];
@@ -56,29 +100,12 @@ function createReleasePreparation(options: {
         packageInfo: {},
         githubRepo: 'owner/repository',
         validLabels: new Map([['bug', 'Bug Fixes']]),
+        ignoredLabels: ['release'],
         currentDate: new Date('2026-06-15T00:00:00.000Z'),
         tags: ['pr-log@1.0.0', '@pr-log/core@0.0.1'],
         trackedFiles: ['source/core/pr-log-engine.ts'],
-        async collectMergedPullRequests(input) {
-            if (input.baseRef === 'pr-log@1.0.0') {
-                return [{ id: cliPullRequestId, title: 'Fix CLI' }];
-            }
-
-            if (options.hasCoreChange) {
-                return [
-                    { id: corePullRequestId, title: 'Fix core' },
-                    { id: unrelatedPullRequestId, title: 'Fix unrelated docs' }
-                ];
-            }
-
-            return [{ id: corePullRequestId, title: 'Fix docs' }];
-        },
-        async resolvePullRequestLabels(input) {
-            options.resolvedTargets.push(input.targetName);
-            return input.pullRequests.map((pullRequest) => {
-                return { ...pullRequest, label: 'bug' };
-            });
-        },
+        collectMergedPullRequests: createMergedPullRequestCollector(options),
+        resolvePullRequestLabels: createPullRequestLabelResolver(options),
         async readPullRequestChangedFiles() {
             return createChangedFilesByPullRequest(options.hasCoreChange);
         },
@@ -213,7 +240,15 @@ test('prepareRelease() writes pr-log metadata without a core release when core f
     const metadata: CoreReleaseMetadata[] = [];
     const resolvedTargets: (string | undefined)[] = [];
 
-    await prepareRelease(createReleasePreparation({ hasCoreChange: false, writes, metadata, resolvedTargets }));
+    await prepareRelease(
+        createReleasePreparation({
+            hasCoreChange: false,
+            ignoredPrLogRelease: false,
+            writes,
+            metadata,
+            resolvedTargets
+        })
+    );
 
     assert.deepStrictEqual(writes, [`${cliReleaseTarget.changelogPath}:1.0.1:Fix CLI`, 'version:1.0.1']);
     assert.deepStrictEqual(metadata, [
@@ -230,7 +265,9 @@ test('prepareRelease() writes core changelog and metadata when core files change
     const metadata: CoreReleaseMetadata[] = [];
     const resolvedTargets: (string | undefined)[] = [];
 
-    await prepareRelease(createReleasePreparation({ hasCoreChange: true, writes, metadata, resolvedTargets }));
+    await prepareRelease(
+        createReleasePreparation({ hasCoreChange: true, ignoredPrLogRelease: false, writes, metadata, resolvedTargets })
+    );
 
     assert.deepStrictEqual(resolvedTargets, [undefined, coreReleaseTarget.packageName]);
     assert.deepStrictEqual(writes, [
@@ -243,6 +280,26 @@ test('prepareRelease() writes core changelog and metadata when core files change
             type: 'predicted-release',
             predictedVersion: '0.0.2',
             predictedTagName: '@pr-log/core@0.0.2'
+        }
+    ]);
+});
+
+test('prepareRelease() produces no new release content when only ignored release pull requests changed', async () => {
+    const writes: string[] = [];
+    const metadata: CoreReleaseMetadata[] = [];
+    const resolvedTargets: (string | undefined)[] = [];
+
+    await prepareRelease(
+        createReleasePreparation({ hasCoreChange: true, ignoredPrLogRelease: true, writes, metadata, resolvedTargets })
+    );
+
+    assert.deepStrictEqual(resolvedTargets, [undefined]);
+    assert.deepStrictEqual(writes, []);
+    assert.deepStrictEqual(metadata, [
+        {
+            type: 'no-release',
+            predictedVersion: '',
+            predictedTagName: ''
         }
     ]);
 });
