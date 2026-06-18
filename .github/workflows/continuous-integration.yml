@@ -120,6 +120,7 @@ jobs:
                   const releaseBranch = 'release/pr-log';
                   const releaseTitle = 'Prepare release';
                   const releaseBody = 'Updates changelogs for the next `pr-log` release.';
+                  const requiredReleaseStatusContexts = ['Node v22', 'Node v24', 'Node v26'];
                   const changedFiles = runGit(['diff', '--name-only'])
                       .split('\n')
                       .filter((filePath) => {
@@ -180,15 +181,143 @@ jobs:
                       );
                   }
 
-                  async function createReleasePullRequestProofStatus(commitSha) {
+                  async function listReleaseWorkflowRuns() {
+                      return githubApi(
+                          `/repos/${repository}/actions/workflows/continuous-integration.yml/runs?branch=${encodeURIComponent(releaseBranch)}&event=workflow_dispatch&per_page=20`
+                      );
+                  }
+
+                  async function readWorkflowRun(id) {
+                      return githubApi(`/repos/${repository}/actions/runs/${id}`);
+                  }
+
+                  async function listWorkflowRunJobs(id) {
+                      const jobs = [];
+
+                      for (let page = 1; ; page += 1) {
+                          const response = await githubApi(`/repos/${repository}/actions/runs/${id}/jobs?per_page=100&page=${page}`);
+
+                          jobs.push(...response.jobs);
+
+                          if (response.jobs.length < 100) {
+                              return jobs;
+                          }
+                      }
+                  }
+
+                  async function wait(milliseconds) {
+                      await new Promise((resolve) => {
+                          setTimeout(resolve, milliseconds);
+                      });
+                  }
+
+                  async function waitForReleaseWorkflowRun(commitSha) {
+                      for (let attempt = 1; attempt <= 30; attempt += 1) {
+                          const response = await listReleaseWorkflowRuns();
+                          const workflowRun = response.workflow_runs.find((run) => {
+                              return run.head_sha === commitSha;
+                          });
+
+                          if (workflowRun !== undefined) {
+                              return workflowRun;
+                          }
+
+                          await wait(10_000);
+                      }
+
+                      throw new Error(`Release workflow run was not created for ${commitSha}`);
+                  }
+
+                  async function waitForReleaseWorkflowCompletion(id) {
+                      for (let attempt = 1; attempt <= 90; attempt += 1) {
+                          const workflowRun = await readWorkflowRun(id);
+
+                          if (workflowRun.status === 'completed') {
+                              return workflowRun;
+                          }
+
+                          await wait(10_000);
+                      }
+
+                      throw new Error(`Release workflow run ${id} did not complete`);
+                  }
+
+                  function statusState(conclusion) {
+                      if (conclusion === 'success') {
+                          return 'success';
+                      }
+
+                      return 'failure';
+                  }
+
+                  async function createReleaseStatus(commitSha, context, state, description, targetUrl) {
+                      const body = {
+                          state,
+                          context,
+                          description
+                      };
+
+                      if (targetUrl !== '') {
+                          body.target_url = targetUrl;
+                      }
+
                       await githubApi(`/repos/${repository}/statuses/${commitSha}`, {
                           method: 'POST',
-                          body: JSON.stringify({
-                              state: 'success',
-                              context: 'Release PR status proof',
-                              description: 'Created by release PR maintenance to verify PR status attachment.'
-                          })
+                          body: JSON.stringify(body)
                       });
+                  }
+
+                  async function createPendingReleaseStatuses(commitSha) {
+                      await Promise.all(
+                          requiredReleaseStatusContexts.map((context) => {
+                              return createReleaseStatus(commitSha, context, 'pending', 'Waiting for dispatched release CI.', '');
+                          })
+                      );
+                  }
+
+                  async function mirrorReleaseWorkflowStatuses(commitSha, workflowRun) {
+                      const completedRun = await waitForReleaseWorkflowCompletion(workflowRun.id);
+                      const jobs = await listWorkflowRunJobs(completedRun.id);
+                      const failedContexts = [];
+
+                      await Promise.all(
+                          requiredReleaseStatusContexts.map((context) => {
+                              const job = jobs.find((candidate) => {
+                                  return candidate.name === context;
+                              });
+
+                              if (job === undefined) {
+                                  failedContexts.push(context);
+                                  return createReleaseStatus(
+                                      commitSha,
+                                      context,
+                                      'failure',
+                                      `Missing dispatched release CI job: ${context}.`,
+                                      completedRun.html_url
+                                  );
+                              }
+
+                              if (job.conclusion !== 'success') {
+                                  failedContexts.push(context);
+                              }
+
+                              return createReleaseStatus(
+                                  commitSha,
+                                  context,
+                                  statusState(job.conclusion),
+                                  `Dispatched release CI job ${job.conclusion}.`,
+                                  job.html_url
+                              );
+                          })
+                      );
+
+                      if (failedContexts.length > 0) {
+                          throw new Error(`Release workflow required job(s) failed: ${failedContexts.join(', ')}`);
+                      }
+
+                      if (completedRun.conclusion !== 'success') {
+                          throw new Error(`Release workflow run ${completedRun.id} concluded with ${completedRun.conclusion}`);
+                      }
                   }
 
                   async function closeReleasePullRequests() {
@@ -285,11 +414,12 @@ jobs:
                           method: 'PUT',
                           body: JSON.stringify({ labels: ['release'] })
                       });
+                      await createPendingReleaseStatuses(commitSha);
                       await githubApi(`/repos/${repository}/actions/workflows/continuous-integration.yml/dispatches`, {
                           method: 'POST',
                           body: JSON.stringify({ ref: releaseBranch })
                       });
-                      await createReleasePullRequestProofStatus(commitSha);
+                      await mirrorReleaseWorkflowStatuses(commitSha, await waitForReleaseWorkflowRun(commitSha));
 
                       console.log(`Release PR #${pullRequest.number} points at ${commitSha}`);
                   }
