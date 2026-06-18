@@ -145,7 +145,8 @@ jobs:
                           throw new Error(`GitHub API request failed: ${response.status} ${response.statusText}\n${body}`);
                       }
 
-                      return response.json();
+                      const body = await response.text();
+                      return body === '' ? undefined : JSON.parse(body);
                   }
 
                   async function githubApiOrUndefined(path, options = {}) {
@@ -168,7 +169,8 @@ jobs:
                           throw new Error(`GitHub API request failed: ${response.status} ${response.statusText}\n${body}`);
                       }
 
-                      return response.json();
+                      const body = await response.text();
+                      return body === '' ? undefined : JSON.parse(body);
                   }
 
                   async function listOpenReleasePullRequests() {
@@ -331,7 +333,8 @@ jobs:
                           throw new Error(`GitHub API request failed: ${response.status} ${response.statusText}\n${body}`);
                       }
 
-                      return response.json();
+                      const body = await response.text();
+                      return body === '' ? undefined : JSON.parse(body);
                   }
 
                   function hasReleaseLabel(pullRequest) {
@@ -454,7 +457,8 @@ jobs:
                           throw new Error(`GitHub API request failed: ${response.status} ${response.statusText}\n${body}`);
                       }
 
-                      return response.json();
+                      const body = await response.text();
+                      return body === '' ? undefined : JSON.parse(body);
                   }
 
                   const headSha = runGit(['rev-parse', 'HEAD']);
