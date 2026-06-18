@@ -79,10 +79,10 @@ jobs:
             cancel-in-progress: false
         permissions:
             actions: write
-            checks: write
             contents: write
             issues: write
             pull-requests: write
+            statuses: write
         steps:
             - uses: actions/checkout@v6
               with:
@@ -180,18 +180,13 @@ jobs:
                       );
                   }
 
-                  async function createReleasePullRequestProofCheck(commitSha) {
-                      await githubApi(`/repos/${repository}/check-runs`, {
+                  async function createReleasePullRequestProofStatus(commitSha) {
+                      await githubApi(`/repos/${repository}/statuses/${commitSha}`, {
                           method: 'POST',
                           body: JSON.stringify({
-                              name: 'Release PR workflow proof',
-                              head_sha: commitSha,
-                              status: 'completed',
-                              conclusion: 'success',
-                              output: {
-                                  title: 'Release PR workflow proof',
-                                  summary: 'Created by release PR maintenance to verify whether explicit check runs attach to the release PR.'
-                              }
+                              state: 'success',
+                              context: 'Release PR status proof',
+                              description: 'Created by release PR maintenance to verify PR status attachment.'
                           })
                       });
                   }
@@ -294,7 +289,7 @@ jobs:
                           method: 'POST',
                           body: JSON.stringify({ ref: releaseBranch })
                       });
-                      await createReleasePullRequestProofCheck(commitSha);
+                      await createReleasePullRequestProofStatus(commitSha);
 
                       console.log(`Release PR #${pullRequest.number} points at ${commitSha}`);
                   }
