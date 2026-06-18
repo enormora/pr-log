@@ -187,6 +187,12 @@ jobs:
                       );
                   }
 
+                  async function listReleasePullRequestWorkflowRuns() {
+                      return githubApi(
+                          `/repos/${repository}/actions/runs?branch=${encodeURIComponent(releaseBranch)}&event=pull_request&per_page=100`
+                      );
+                  }
+
                   async function readWorkflowRun(id) {
                       return githubApi(`/repos/${repository}/actions/runs/${id}`);
                   }
@@ -320,6 +326,28 @@ jobs:
                       }
                   }
 
+                  async function deleteAwaitingReleasePullRequestWorkflowRuns(commitSha) {
+                      const response = await listReleasePullRequestWorkflowRuns();
+                      const awaitingRuns = response.workflow_runs.filter((run) => {
+                          return (
+                              run.head_branch === releaseBranch &&
+                              run.head_sha === commitSha &&
+                              run.event === 'pull_request' &&
+                              run.conclusion === 'action_required'
+                          );
+                      });
+
+                      await Promise.all(
+                          awaitingRuns.map((run) => {
+                              return githubApi(`/repos/${repository}/actions/runs/${run.id}`, {
+                                  method: 'DELETE'
+                              });
+                          })
+                      );
+
+                      console.log(`Deleted ${awaitingRuns.length} awaiting release pull request workflow run(s)`);
+                  }
+
                   async function closeReleasePullRequests() {
                       const pullRequests = await listOpenReleasePullRequests();
 
@@ -420,6 +448,7 @@ jobs:
                           body: JSON.stringify({ ref: releaseBranch })
                       });
                       await mirrorReleaseWorkflowStatuses(commitSha, await waitForReleaseWorkflowRun(commitSha));
+                      await deleteAwaitingReleasePullRequestWorkflowRuns(commitSha);
 
                       console.log(`Release PR #${pullRequest.number} points at ${commitSha}`);
                   }
