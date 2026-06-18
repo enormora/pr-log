@@ -179,6 +179,30 @@ jobs:
                       );
                   }
 
+                  async function approveReleasePullRequestWorkflowRuns(commitSha) {
+                      const response = await githubApi(
+                          `/repos/${repository}/actions/runs?branch=${encodeURIComponent(releaseBranch)}&event=pull_request&per_page=100`
+                      );
+                      const gatedRuns = response.workflow_runs.filter((run) => {
+                          return (
+                              run.head_branch === releaseBranch &&
+                              run.head_sha === commitSha &&
+                              run.event === 'pull_request' &&
+                              run.conclusion === 'action_required'
+                          );
+                      });
+
+                      await Promise.all(
+                          gatedRuns.map((run) => {
+                              return githubApi(`/repos/${repository}/actions/runs/${run.id}/approve`, {
+                                  method: 'POST'
+                              });
+                          })
+                      );
+
+                      console.log(`Approved ${gatedRuns.length} release pull request workflow run(s)`);
+                  }
+
                   async function closeReleasePullRequests() {
                       const pullRequests = await listOpenReleasePullRequests();
 
@@ -277,6 +301,7 @@ jobs:
                           method: 'POST',
                           body: JSON.stringify({ ref: releaseBranch })
                       });
+                      await approveReleasePullRequestWorkflowRuns(commitSha);
 
                       console.log(`Release PR #${pullRequest.number} points at ${commitSha}`);
                   }
