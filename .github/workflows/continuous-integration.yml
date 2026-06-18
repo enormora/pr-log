@@ -248,12 +248,24 @@ jobs:
                       return commit.sha;
                   }
 
-                  async function createOrUpdatePullRequest(commitSha) {
-                      const openPullRequests = await listOpenReleasePullRequests();
-                      const existingPullRequest = openPullRequests[0];
-                      const pullRequest =
-                          existingPullRequest ??
-                          (await githubApi(`/repos/${repository}/pulls`, {
+                  function isActionsPullRequestPermissionError(error) {
+                      return (
+                          error instanceof Error &&
+                          error.message.includes('403 Forbidden') &&
+                          error.message.includes('GitHub Actions is not permitted to create or approve pull requests')
+                      );
+                  }
+
+                  async function dispatchReleaseBranchCi() {
+                      await githubApi(`/repos/${repository}/actions/workflows/continuous-integration.yml/dispatches`, {
+                          method: 'POST',
+                          body: JSON.stringify({ ref: releaseBranch })
+                      });
+                  }
+
+                  async function createReleasePullRequest() {
+                      try {
+                          return await githubApi(`/repos/${repository}/pulls`, {
                               method: 'POST',
                               body: JSON.stringify({
                                   title: releaseTitle,
@@ -261,7 +273,24 @@ jobs:
                                   base: 'main',
                                   body: releaseBody
                               })
-                          }));
+                          });
+                      } catch (error) {
+                          if (isActionsPullRequestPermissionError(error)) {
+                              throw new Error(
+                                  'Release PR creation is blocked by repository settings. Enable GitHub Actions pull request creation for this repository, or release PR automation cannot work.'
+                              );
+                          }
+
+                          throw error;
+                      }
+                  }
+
+                  async function createOrUpdatePullRequest(commitSha) {
+                      const openPullRequests = await listOpenReleasePullRequests();
+                      const existingPullRequest = openPullRequests[0];
+                      const pullRequest = existingPullRequest ?? (await createReleasePullRequest());
+
+                      await dispatchReleaseBranchCi();
 
                       await githubApi(`/repos/${repository}/pulls/${pullRequest.number}`, {
                           method: 'PATCH',
@@ -270,10 +299,6 @@ jobs:
                       await githubApi(`/repos/${repository}/issues/${pullRequest.number}/labels`, {
                           method: 'PUT',
                           body: JSON.stringify({ labels: ['release'] })
-                      });
-                      await githubApi(`/repos/${repository}/actions/workflows/continuous-integration.yml/dispatches`, {
-                          method: 'POST',
-                          body: JSON.stringify({ ref: releaseBranch })
                       });
 
                       console.log(`Release PR #${pullRequest.number} points at ${commitSha}`);
