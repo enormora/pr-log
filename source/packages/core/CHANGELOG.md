@@ -23,6 +23,31 @@
 * Fix `@pr-log/core` minimum version ([#566](https://github.com/lo1tuma/pr-log/pull/566))
 * Add manual `pr-log` publish workflow ([#565](https://github.com/lo1tuma/pr-log/pull/565))
 
+## 0.0.2 (June 18, 2026)
+
+### Features
+
+* Add `pr-log.ignoredLabels` changelog filtering ([#568](https://github.com/lo1tuma/pr-log/pull/568))
+
+### Enhancements
+
+* Add `PrLogEngine.updateChangelog()` ([#564](https://github.com/lo1tuma/pr-log/pull/564))
+
+### Build-Related
+
+* Delete gated `release/pr-log` workflow runs ([#581](https://github.com/lo1tuma/pr-log/pull/581))
+* Mirror `release/pr-log` CI into commit statuses ([#580](https://github.com/lo1tuma/pr-log/pull/580))
+* Add `release/pr-log` status proof ([#579](https://github.com/lo1tuma/pr-log/pull/579))
+* Add `release/pr-log` check-run proof ([#578](https://github.com/lo1tuma/pr-log/pull/578))
+* Remove `release/pr-log` workflow approval attempt ([#577](https://github.com/lo1tuma/pr-log/pull/577))
+* Wait for `release/pr-log` workflow runs ([#576](https://github.com/lo1tuma/pr-log/pull/576))
+* Approve `release/pr-log` workflow runs ([#575](https://github.com/lo1tuma/pr-log/pull/575))
+* Handle empty GitHub API responses in release workflow ([#573](https://github.com/lo1tuma/pr-log/pull/573))
+* Replace direct release push with `release/pr-log` automation ([#570](https://github.com/lo1tuma/pr-log/pull/570))
+* Add `Release PR policy` checks ([#569](https://github.com/lo1tuma/pr-log/pull/569))
+* Fix `@pr-log/core` minimum version ([#566](https://github.com/lo1tuma/pr-log/pull/566))
+* Add manual `pr-log` publish workflow ([#565](https://github.com/lo1tuma/pr-log/pull/565))
+
 ## 0.0.1 (June 11, 2026)
 
 ### Features
