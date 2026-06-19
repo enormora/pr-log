@@ -1,3 +1,32 @@
+## 6.3.0 (June 19, 2026)
+
+### Features
+
+* Add `pr-log.ignoredLabels` changelog filtering ([#568](https://github.com/enormora/pr-log/pull/568))
+
+### Enhancements
+
+* Add `PrLogEngine.updateChangelog()` ([#564](https://github.com/enormora/pr-log/pull/564))
+
+### Build-Related
+
+* Publish manual release retries from main ([#587](https://github.com/enormora/pr-log/pull/587))
+* Fix package repository URL ([#585](https://github.com/enormora/pr-log/pull/585))
+* Fix release PR merge publishing ([#583](https://github.com/enormora/pr-log/pull/583))
+* Delete gated `release/pr-log` workflow runs ([#581](https://github.com/enormora/pr-log/pull/581))
+* Mirror `release/pr-log` CI into commit statuses ([#580](https://github.com/enormora/pr-log/pull/580))
+* Add `release/pr-log` status proof ([#579](https://github.com/enormora/pr-log/pull/579))
+* Add `release/pr-log` check-run proof ([#578](https://github.com/enormora/pr-log/pull/578))
+* Remove `release/pr-log` workflow approval attempt ([#577](https://github.com/enormora/pr-log/pull/577))
+* Wait for `release/pr-log` workflow runs ([#576](https://github.com/enormora/pr-log/pull/576))
+* Approve `release/pr-log` workflow runs ([#575](https://github.com/enormora/pr-log/pull/575))
+* Handle empty GitHub API responses in release workflow ([#573](https://github.com/enormora/pr-log/pull/573))
+* Replace direct release push with `release/pr-log` automation ([#570](https://github.com/enormora/pr-log/pull/570))
+* Add `Release PR policy` checks ([#569](https://github.com/enormora/pr-log/pull/569))
+* Trim `Prepare release` validation ([#567](https://github.com/enormora/pr-log/pull/567))
+* Fix `@pr-log/core` minimum version ([#566](https://github.com/enormora/pr-log/pull/566))
+* Add manual `pr-log` publish workflow ([#565](https://github.com/enormora/pr-log/pull/565))
+
 ## 6.3.0 (June 18, 2026)
 
 ### Features
