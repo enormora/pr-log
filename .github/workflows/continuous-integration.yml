@@ -590,6 +590,25 @@ jobs:
               with:
                   node-version: 24
 
+            - name: Align package repository URL
+              if: steps.publish-target.outputs.should_publish == 'true'
+              env:
+                  GITHUB_REPOSITORY: ${{ github.repository }}
+              run: |
+                  node --input-type=module <<'NODE'
+                  import fs from 'node:fs/promises';
+
+                  const packagePath = 'package.json';
+                  const packageInfo = JSON.parse(await fs.readFile(packagePath, { encoding: 'utf8' }));
+
+                  packageInfo.repository = {
+                      type: 'git',
+                      url: `https://github.com/${process.env.GITHUB_REPOSITORY}.git`
+                  };
+
+                  await fs.writeFile(packagePath, `${JSON.stringify(packageInfo, null, 4)}\n`, { encoding: 'utf8' });
+                  NODE
+
             - name: Install dependencies
               if: steps.publish-target.outputs.should_publish == 'true'
               run: npm clean-install --ignore-scripts
