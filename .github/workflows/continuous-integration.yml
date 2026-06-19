@@ -118,6 +118,7 @@ jobs:
                   const repository = process.env.GITHUB_REPOSITORY;
                   const [owner] = repository.split('/');
                   const releaseBranch = 'release/pr-log';
+                  const releaseLabel = 'release';
                   const releaseTitle = 'Prepare release';
                   const releaseBody = 'Updates changelogs for the next `pr-log` release.';
                   const requiredReleaseStatusContexts = ['Node v22', 'Node v24', 'Node v26'];
@@ -179,6 +180,24 @@ jobs:
                       return githubApi(
                           `/repos/${repository}/pulls?state=open&head=${encodeURIComponent(`${owner}:${releaseBranch}`)}&base=main`
                       );
+                  }
+
+                  function hasReleaseLabel(pullRequest) {
+                      return pullRequest.labels.some((label) => {
+                          return label.name === releaseLabel;
+                      });
+                  }
+
+                  async function isMergedReleasePullRequestCommit(commitSha) {
+                      const pullRequests = await githubApi(`/repos/${repository}/commits/${commitSha}/pulls`);
+
+                      return pullRequests.some((pullRequest) => {
+                          return (
+                              pullRequest.merged_at !== null &&
+                              pullRequest.merge_commit_sha === commitSha &&
+                              hasReleaseLabel(pullRequest)
+                          );
+                      });
                   }
 
                   async function listReleaseWorkflowRuns() {
@@ -453,7 +472,11 @@ jobs:
                       console.log(`Release PR #${pullRequest.number} points at ${commitSha}`);
                   }
 
-                  if (changedFiles.length === 0) {
+                  if (await isMergedReleasePullRequestCommit(process.env.GITHUB_SHA)) {
+                      await closeReleasePullRequests();
+                      await deleteReleaseBranch();
+                      console.log('Merged release pull request does not need a replacement release PR');
+                  } else if (changedFiles.length === 0) {
                       await closeReleasePullRequests();
                       await deleteReleaseBranch();
                       console.log('No release content remains');
@@ -577,6 +600,7 @@ jobs:
               env:
                   GH_TOKEN: ${{ github.token }}
                   RELEASE_COMMIT_SHA: ${{ steps.publish-target.outputs.release_commit_sha }}
+                  RELEASE_PULL_REQUEST_NUMBER: ${{ steps.publish-target.outputs.release_pull_request_number }}
               run: |
                   node --input-type=module <<'NODE'
                   import fs from 'node:fs/promises';
@@ -641,18 +665,35 @@ jobs:
 
                   const subject = runGit(['log', '-1', '--format=%s']);
 
-                  if (subject !== 'Prepare release') {
-                      throw new Error(`Unexpected release commit subject: ${subject}`);
+                  if (!subject.startsWith(`Merge pull request #${process.env.RELEASE_PULL_REQUEST_NUMBER} from `)) {
+                      throw new Error(`Unexpected merged release commit subject: ${subject}`);
                   }
 
                   const commit = await githubApi(`/repos/${process.env.GITHUB_REPOSITORY}/commits/${headSha}`);
 
                   if (commit.commit.verification.verified !== true) {
-                      throw new Error(`Release commit is not verified: ${commit.commit.verification.reason}`);
+                      throw new Error(`Merged release commit is not verified: ${commit.commit.verification.reason}`);
                   }
 
-                  const parent = runGit(['rev-parse', 'HEAD^']);
-                  const changedFiles = runGit(['diff', '--name-only', parent, 'HEAD'])
+                  const firstParent = runGit(['rev-parse', 'HEAD^1']);
+                  const preparedReleaseCommitSha = runGit(['rev-parse', 'HEAD^2']);
+                  const preparedReleaseSubject = runGit(['log', '-1', '--format=%s', preparedReleaseCommitSha]);
+
+                  if (preparedReleaseSubject !== 'Prepare release') {
+                      throw new Error(`Unexpected prepared release commit subject: ${preparedReleaseSubject}`);
+                  }
+
+                  const preparedReleaseCommit = await githubApi(
+                      `/repos/${process.env.GITHUB_REPOSITORY}/commits/${preparedReleaseCommitSha}`
+                  );
+
+                  if (preparedReleaseCommit.commit.verification.verified !== true) {
+                      throw new Error(
+                          `Prepared release commit is not verified: ${preparedReleaseCommit.commit.verification.reason}`
+                      );
+                  }
+
+                  const changedFiles = runGit(['diff', '--name-only', firstParent, 'HEAD'])
                       .split('\n')
                       .filter((filePath) => {
                           return filePath !== '';
