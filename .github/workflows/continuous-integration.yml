@@ -502,6 +502,7 @@ jobs:
                   GH_TOKEN: ${{ github.token }}
                   GITHUB_REPOSITORY: ${{ github.repository }}
                   GITHUB_EVENT_NAME: ${{ github.event_name }}
+                  GITHUB_REF_NAME: ${{ github.ref_name }}
                   GITHUB_SHA: ${{ github.sha }}
                   RELEASE_PULL_REQUEST_NUMBER: ${{ inputs.release_pull_request_number }}
               run: |
@@ -539,6 +540,10 @@ jobs:
                   }
 
                   if (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch') {
+                      if (process.env.GITHUB_REF_NAME !== 'main') {
+                          throw new Error('Manual release publish retries must run from main');
+                      }
+
                       const pullRequest = await githubApi(
                           `/repos/${process.env.GITHUB_REPOSITORY}/pulls/${process.env.RELEASE_PULL_REQUEST_NUMBER}`
                       );
@@ -549,6 +554,7 @@ jobs:
 
                       await writeOutput('should_publish', 'true');
                       await writeOutput('release_commit_sha', pullRequest.merge_commit_sha);
+                      await writeOutput('publish_commit_sha', process.env.GITHUB_SHA);
                       await writeOutput('release_pull_request_number', String(pullRequest.number));
                   } else {
                       const pullRequests = await githubApi(
@@ -573,6 +579,7 @@ jobs:
 
                       await writeOutput('should_publish', 'true');
                       await writeOutput('release_commit_sha', process.env.GITHUB_SHA);
+                      await writeOutput('publish_commit_sha', process.env.GITHUB_SHA);
                       await writeOutput('release_pull_request_number', String(releasePullRequests[0].number));
                   }
                   NODE
@@ -580,7 +587,7 @@ jobs:
             - uses: actions/checkout@v6
               if: steps.publish-target.outputs.should_publish == 'true'
               with:
-                  ref: ${{ steps.publish-target.outputs.release_commit_sha }}
+                  ref: ${{ steps.publish-target.outputs.publish_commit_sha }}
                   fetch-depth: 0
                   persist-credentials: true
 
@@ -599,6 +606,9 @@ jobs:
               if: steps.publish-target.outputs.should_publish == 'true'
               env:
                   GH_TOKEN: ${{ github.token }}
+                  GITHUB_EVENT_NAME: ${{ github.event_name }}
+                  GITHUB_REPOSITORY: ${{ github.repository }}
+                  PUBLISH_COMMIT_SHA: ${{ steps.publish-target.outputs.publish_commit_sha }}
                   RELEASE_COMMIT_SHA: ${{ steps.publish-target.outputs.release_commit_sha }}
                   RELEASE_PULL_REQUEST_NUMBER: ${{ steps.publish-target.outputs.release_pull_request_number }}
               run: |
@@ -612,6 +622,10 @@ jobs:
 
                   function runGit(args) {
                       return execFileSync('git', args, { encoding: 'utf8' }).trim();
+                  }
+
+                  function readFileAtCommit(commitSha, filePath) {
+                      return runGit(['show', `${commitSha}:${filePath}`]);
                   }
 
                   function readChangelogVersion(changelog, changelogPath) {
@@ -659,24 +673,34 @@ jobs:
 
                   const headSha = runGit(['rev-parse', 'HEAD']);
 
-                  if (headSha !== process.env.RELEASE_COMMIT_SHA) {
+                  if (headSha !== process.env.PUBLISH_COMMIT_SHA) {
+                      throw new Error(`HEAD ${headSha} does not match publish commit ${process.env.PUBLISH_COMMIT_SHA}`);
+                  }
+
+                  if (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch') {
+                      try {
+                          runGit(['merge-base', '--is-ancestor', process.env.RELEASE_COMMIT_SHA, headSha]);
+                      } catch {
+                          throw new Error(`Release commit ${process.env.RELEASE_COMMIT_SHA} is not an ancestor of ${headSha}`);
+                      }
+                  } else if (headSha !== process.env.RELEASE_COMMIT_SHA) {
                       throw new Error(`HEAD ${headSha} does not match release commit ${process.env.RELEASE_COMMIT_SHA}`);
                   }
 
-                  const subject = runGit(['log', '-1', '--format=%s']);
+                  const subject = runGit(['log', '-1', '--format=%s', process.env.RELEASE_COMMIT_SHA]);
 
                   if (!subject.startsWith(`Merge pull request #${process.env.RELEASE_PULL_REQUEST_NUMBER} from `)) {
                       throw new Error(`Unexpected merged release commit subject: ${subject}`);
                   }
 
-                  const commit = await githubApi(`/repos/${process.env.GITHUB_REPOSITORY}/commits/${headSha}`);
+                  const commit = await githubApi(`/repos/${process.env.GITHUB_REPOSITORY}/commits/${process.env.RELEASE_COMMIT_SHA}`);
 
                   if (commit.commit.verification.verified !== true) {
                       throw new Error(`Merged release commit is not verified: ${commit.commit.verification.reason}`);
                   }
 
-                  const firstParent = runGit(['rev-parse', 'HEAD^1']);
-                  const preparedReleaseCommitSha = runGit(['rev-parse', 'HEAD^2']);
+                  const firstParent = runGit(['rev-parse', `${process.env.RELEASE_COMMIT_SHA}^1`]);
+                  const preparedReleaseCommitSha = runGit(['rev-parse', `${process.env.RELEASE_COMMIT_SHA}^2`]);
                   const preparedReleaseSubject = runGit(['log', '-1', '--format=%s', preparedReleaseCommitSha]);
 
                   if (preparedReleaseSubject !== 'Prepare release') {
@@ -693,7 +717,7 @@ jobs:
                       );
                   }
 
-                  const changedFiles = runGit(['diff', '--name-only', firstParent, 'HEAD'])
+                  const changedFiles = runGit(['diff', '--name-only', firstParent, process.env.RELEASE_COMMIT_SHA])
                       .split('\n')
                       .filter((filePath) => {
                           return filePath !== '';
@@ -715,16 +739,32 @@ jobs:
                       }
                   }
 
-                  const cliChangelogContent = await fs.readFile(cliChangelog, { encoding: 'utf8' });
+                  const cliChangelogContent = readFileAtCommit(process.env.RELEASE_COMMIT_SHA, cliChangelog);
                   const prLogVersion = readChangelogVersion(cliChangelogContent, cliChangelog);
                   const prLogTag = `pr-log@${prLogVersion}`;
                   let predictedCoreVersion = '';
                   let predictedCoreTag = '';
 
                   if (hasCoreRelease) {
-                      const coreChangelogContent = await fs.readFile(coreChangelog, { encoding: 'utf8' });
+                      const coreChangelogContent = readFileAtCommit(process.env.RELEASE_COMMIT_SHA, coreChangelog);
                       predictedCoreVersion = readChangelogVersion(coreChangelogContent, coreChangelog);
                       predictedCoreTag = `@pr-log/core@${predictedCoreVersion}`;
+                  }
+
+                  const publishCliChangelogContent = await fs.readFile(cliChangelog, { encoding: 'utf8' });
+                  const publishPrLogVersion = readChangelogVersion(publishCliChangelogContent, cliChangelog);
+
+                  if (publishPrLogVersion !== prLogVersion) {
+                      throw new Error(`Publish commit has pr-log ${publishPrLogVersion}, expected ${prLogVersion}`);
+                  }
+
+                  if (hasCoreRelease) {
+                      const publishCoreChangelogContent = await fs.readFile(coreChangelog, { encoding: 'utf8' });
+                      const publishCoreVersion = readChangelogVersion(publishCoreChangelogContent, coreChangelog);
+
+                      if (publishCoreVersion !== predictedCoreVersion) {
+                          throw new Error(`Publish commit has @pr-log/core ${publishCoreVersion}, expected ${predictedCoreVersion}`);
+                      }
                   }
 
                   assertTagDoesNotExist(prLogTag);
