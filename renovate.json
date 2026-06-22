@@ -3,21 +3,16 @@
     "commitMessagePrefix": "⬆️ ",
     "labels": ["renovate", "upgrade"],
     "rebaseStalePrs": true,
+    "automerge": true,
+    "automergeType": "branch",
     "dependencyDashboard": false,
     "lockFileMaintenance": {
-        "enabled": true,
-        "automerge": true
+        "enabled": true
     },
     "packageRules": [
         {
             "matchPackagePatterns": ["^@enormora/eslint-config", "^eslint$"],
             "groupName": "eslint"
-        },
-        {
-            "depTypeList": ["dependencies", "devDependencies"],
-            "updateTypes": ["minor", "patch"],
-            "automerge": true,
-            "automergeType": "branch"
         }
     ]
 }
