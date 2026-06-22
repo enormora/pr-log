@@ -28,6 +28,12 @@ prepare-packtory-source: compile
     cp -R target/build/source target/packtory/source
     perl -pi -e 's/from ([\x22\x27])(\.[^\x22\x27]+)\.ts\1/from $1$2.js$1/g' $(find target/packtory/source -name '*.d.ts')
 
+prepare-release: prepare-packtory-source
+    packtory release --write-changelog --commit --no-dry-run
+
+publish-release: prepare-packtory-source
+    packtory release --publish --tag --push --github-release --no-dry-run
+
 publish: prepare-packtory-source
     packtory publish --no-dry-run
 
