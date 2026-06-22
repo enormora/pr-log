@@ -1,12 +1,19 @@
 // @ts-check
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { execaCommand } from 'execa';
+import { createPrLogEngine, defaultValidLabels } from './source/packages/core/core.entry-point.ts';
+import { getGithubRepoFromPackageInfo, getIgnoredLabels, getValidLabels } from './source/lib/package-info.ts';
+import { splitByString } from './source/lib/split.ts';
+import { resolvePrLogReleaseVersion } from './source/release/pr-log-release-version.ts';
 
 const projectFolder = process.cwd();
 const sourcesFolder = path.join(projectFolder, 'target/packtory/source');
 const licensePath = path.join(projectFolder, 'LICENSE');
 const coreReadmePath = path.join(projectFolder, 'packages/core/README.md');
 const cliReadmePath = path.join(projectFolder, 'packages/pr-log/README.md');
+const labelLookupIntervalMilliseconds = 250;
+const maximumRateLimitRetryCount = 3;
 
 async function readPackageInfo() {
     const packageJsonContent = await fs.readFile(path.join(projectFolder, 'package.json'), { encoding: 'utf8' });
@@ -42,6 +49,44 @@ function registrySettings() {
     };
 }
 
+function splitLines(value) {
+    return splitByString(value, '\n').filter((line) => {
+        return line !== '';
+    });
+}
+
+async function listTags() {
+    const { stdout } = await execaCommand('git tag --list');
+    return splitLines(stdout);
+}
+
+async function readPrLogVersion(packageInfo) {
+    const environment = globalThis.process.env;
+    const githubRepo = getGithubRepoFromPackageInfo(packageInfo);
+    const validLabels = getValidLabels(packageInfo, defaultValidLabels);
+    const ignoredLabels = getIgnoredLabels(packageInfo);
+    const prLogEngine = createPrLogEngine({
+        githubToken: environment.GH_TOKEN ?? environment.GITHUB_TOKEN,
+        workingDirectory: projectFolder,
+        labelLookupIntervalMilliseconds,
+        maximumRateLimitRetryCount
+    });
+
+    return resolvePrLogReleaseVersion({
+        tags: await listTags(),
+        packageInfo,
+        githubRepo,
+        validLabels,
+        ignoredLabels,
+        collectMergedPullRequests(input) {
+            return prLogEngine.collectMergedPullRequests(input);
+        },
+        resolvePullRequestLabels(input) {
+            return prLogEngine.resolvePullRequestLabels(input);
+        }
+    });
+}
+
 function corePackage(sharedAttributes) {
     return {
         name: '@pr-log/core',
@@ -61,14 +106,7 @@ function corePackage(sharedAttributes) {
     };
 }
 
-function cliPackage(packageInfo, sharedAttributes) {
-    const environment = globalThis.process.env;
-    const version = environment.PR_LOG_RELEASE_VERSION;
-
-    if (version === undefined || version === '') {
-        throw new Error('PR_LOG_RELEASE_VERSION must be set to publish pr-log');
-    }
-
+function cliPackage(packageInfo, sharedAttributes, version) {
     return {
         name: 'pr-log',
         versioning: { automatic: false, version },
@@ -94,9 +132,23 @@ function cliPackage(packageInfo, sharedAttributes) {
 export async function buildConfig() {
     const packageInfo = await readPackageInfo();
     const sharedAttributes = sharedPackageAttributes(packageInfo);
+    const prLogVersion = await readPrLogVersion(packageInfo);
 
     return {
         registrySettings: registrySettings(),
+        changelog: {
+            packageTagFormat: '{packageName}@{version}',
+            outputs: [
+                {
+                    kind: 'package-file',
+                    paths: {
+                        '@pr-log/core': 'source/packages/core/CHANGELOG.md',
+                        'pr-log': 'source/packages/command-line-interface/CHANGELOG.md'
+                    }
+                },
+                { kind: 'github-release' }
+            ]
+        },
         commonPackageSettings: commonPackageSettings(packageInfo),
         checks: {
             areTheTypesWrong: { enabled: true, profile: 'esm-only' },
@@ -108,6 +160,6 @@ export async function buildConfig() {
             uniqueTargetPaths: { enabled: true },
             noSideEffects: { enabled: false }
         },
-        packages: [corePackage(sharedAttributes), cliPackage(packageInfo, sharedAttributes)]
+        packages: [corePackage(sharedAttributes), cliPackage(packageInfo, sharedAttributes, prLogVersion)]
     };
 }

@@ -22,6 +22,8 @@ jobs:
                 node-version: [22, 24, 26]
         steps:
             - uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
             - name: Use Node.js
               uses: actions/setup-node@v6
               with:
@@ -34,34 +36,10 @@ jobs:
               run: npx just compile
             - name: Run tests
               run: npx just test
-            - name: Read package check release version
-              id: package-check-release-version
-              if: >
-                  matrix.node-version == 24 &&
-                  (
-                      (github.event_name == 'pull_request' && github.head_ref == 'release/pr-log') ||
-                      (github.event_name == 'workflow_dispatch' && github.ref_name == 'release/pr-log')
-                  )
-              run: |
-                  node --input-type=module <<'NODE'
-                  import fs from 'node:fs/promises';
-                  import semver from 'semver';
-
-                  const changelogPath = 'source/packages/command-line-interface/CHANGELOG.md';
-                  const changelog = await fs.readFile(changelogPath, { encoding: 'utf8' });
-                  const match = /^## (?<version>\S+) \(/u.exec(changelog);
-                  const version = match?.groups?.version;
-
-                  if (version === undefined || semver.valid(version) === null) {
-                      throw new Error(`${changelogPath} does not start with a valid release version`);
-                  }
-
-                  await fs.appendFile(process.env.GITHUB_OUTPUT, `pr_log_version=${version}\n`, { encoding: 'utf8' });
-                  NODE
             - name: Check packages
               if: matrix.node-version == 24
               env:
-                  PR_LOG_RELEASE_VERSION: ${{ steps.package-check-release-version.outputs.pr_log_version || '9.9.9' }}
+                  GH_TOKEN: ${{ github.token }}
               run: npx just publish-dry-run
             - name: Coveralls
               uses: coverallsapp/github-action@v2
@@ -98,392 +76,224 @@ jobs:
             - name: Install dependencies
               run: npm clean-install --ignore-scripts
 
-            - name: Compile TypeScript
-              run: npx just compile
+            - name: Configure release author
+              run: |
+                  git config user.name 'github-actions[bot]'
+                  git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
-            - name: Prepare release
-              env:
-                  GH_TOKEN: ${{ github.token }}
-              run: bash source/release/prepare-release.sh
-
-            - name: Maintain release pull request
+            - name: Close completed release pull request
+              id: completed-release
               env:
                   GH_TOKEN: ${{ github.token }}
                   GITHUB_REPOSITORY: ${{ github.repository }}
               run: |
-                  node --input-type=module <<'NODE'
-                  import fs from 'node:fs/promises';
-                  import { execFileSync } from 'node:child_process';
+                  set -euo pipefail
 
-                  const repository = process.env.GITHUB_REPOSITORY;
-                  const [owner] = repository.split('/');
-                  const releaseBranch = 'release/pr-log';
-                  const releaseLabel = 'release';
-                  const releaseTitle = 'Prepare release';
-                  const releaseBody = 'Updates changelogs for the next `pr-log` release.';
-                  const requiredReleaseStatusContexts = ['Node v22', 'Node v24', 'Node v26'];
-                  const changedFiles = runGit(['diff', '--name-only'])
-                      .split('\n')
-                      .filter((filePath) => {
-                          return filePath !== '';
-                      });
+                  close_release_state() {
+                      gh pr list \
+                          --repo "$GITHUB_REPOSITORY" \
+                          --head release/pr-log \
+                          --base main \
+                          --state open \
+                          --json number \
+                          --jq '.[].number' |
+                          while read -r pr_number; do
+                              gh pr close "$pr_number" --repo "$GITHUB_REPOSITORY"
+                          done
 
-                  function runGit(args) {
-                      return execFileSync('git', args, { encoding: 'utf8' }).trim();
+                      git push origin --delete release/pr-log 2>/dev/null || true
                   }
 
-                  async function githubApi(path, options = {}) {
-                      const response = await fetch(`https://api.github.com${path}`, {
-                          ...options,
-                          headers: {
-                              Accept: 'application/vnd.github+json',
-                              Authorization: `Bearer ${process.env.GH_TOKEN}`,
-                              'X-GitHub-Api-Version': '2022-11-28',
-                              ...options.headers
-                          }
-                      });
+                  if gh api -H "Accept: application/vnd.github+json" \
+                      "/repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" |
+                      jq -e --arg sha "$GITHUB_SHA" \
+                          'any(.[]; .merged_at != null and .merge_commit_sha == $sha and any(.labels[]?; .name == "release"))' \
+                          >/dev/null; then
+                      close_release_state
+                      echo 'skip=true' >> "$GITHUB_OUTPUT"
+                      echo 'Merged release pull request does not need a replacement release PR'
+                  else
+                      echo 'skip=false' >> "$GITHUB_OUTPUT"
+                  fi
 
-                      if (!response.ok) {
-                          const body = await response.text();
-                          throw new Error(`GitHub API request failed: ${response.status} ${response.statusText}\n${body}`);
-                      }
+            - name: Prepare release
+              if: steps.completed-release.outputs.skip != 'true'
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: npx just prepare-release
 
-                      const body = await response.text();
-                      return body === '' ? undefined : JSON.parse(body);
+            - name: Maintain release pull request
+              if: steps.completed-release.outputs.skip != 'true'
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  GITHUB_REPOSITORY: ${{ github.repository }}
+              run: |
+                  set -euo pipefail
+
+                  release_branch='release/pr-log'
+                  release_label='release'
+                  release_title='Prepare release'
+                  release_body='Updates changelogs for the next `pr-log` release.'
+                  required_contexts=('Node v22' 'Node v24' 'Node v26')
+
+                  close_release_state() {
+                      gh pr list \
+                          --repo "$GITHUB_REPOSITORY" \
+                          --head "$release_branch" \
+                          --base main \
+                          --state open \
+                          --json number \
+                          --jq '.[].number' |
+                          while read -r pr_number; do
+                              gh pr close "$pr_number" --repo "$GITHUB_REPOSITORY"
+                          done
+
+                      git push origin --delete "$release_branch" 2>/dev/null || true
                   }
 
-                  async function githubApiOrUndefined(path, options = {}) {
-                      const response = await fetch(`https://api.github.com${path}`, {
-                          ...options,
-                          headers: {
-                              Accept: 'application/vnd.github+json',
-                              Authorization: `Bearer ${process.env.GH_TOKEN}`,
-                              'X-GitHub-Api-Version': '2022-11-28',
-                              ...options.headers
-                          }
-                      });
+                  create_status() {
+                      local commit_sha=$1
+                      local context=$2
+                      local state=$3
+                      local description=$4
+                      local target_url=${5:-}
 
-                      if (response.status === 404 || response.status === 422) {
-                          return undefined;
-                      }
-
-                      if (!response.ok) {
-                          const body = await response.text();
-                          throw new Error(`GitHub API request failed: ${response.status} ${response.statusText}\n${body}`);
-                      }
-
-                      const body = await response.text();
-                      return body === '' ? undefined : JSON.parse(body);
+                      if [ -n "$target_url" ]; then
+                          gh api "/repos/$GITHUB_REPOSITORY/statuses/$commit_sha" \
+                              -f state="$state" \
+                              -f context="$context" \
+                              -f description="$description" \
+                              -f target_url="$target_url" >/dev/null
+                      else
+                          gh api "/repos/$GITHUB_REPOSITORY/statuses/$commit_sha" \
+                              -f state="$state" \
+                              -f context="$context" \
+                              -f description="$description" >/dev/null
+                      fi
                   }
 
-                  async function listOpenReleasePullRequests() {
-                      return githubApi(
-                          `/repos/${repository}/pulls?state=open&head=${encodeURIComponent(`${owner}:${releaseBranch}`)}&base=main`
-                      );
-                  }
+                  release_commit=$(git rev-parse HEAD)
 
-                  function hasReleaseLabel(pullRequest) {
-                      return pullRequest.labels.some((label) => {
-                          return label.name === releaseLabel;
-                      });
-                  }
+                  if [ "$release_commit" = "$GITHUB_SHA" ]; then
+                      close_release_state
+                      echo 'No release content remains'
+                      exit 0
+                  fi
 
-                  async function isMergedReleasePullRequestCommit(commitSha) {
-                      const pullRequests = await githubApi(`/repos/${repository}/commits/${commitSha}/pulls`);
+                  git fetch origin "refs/heads/$release_branch:refs/remotes/origin/$release_branch" || true
 
-                      return pullRequests.some((pullRequest) => {
-                          return (
-                              pullRequest.merged_at !== null &&
-                              pullRequest.merge_commit_sha === commitSha &&
-                              hasReleaseLabel(pullRequest)
-                          );
-                      });
-                  }
+                  if remote_release_sha=$(git rev-parse --verify "refs/remotes/origin/$release_branch" 2>/dev/null); then
+                      lease="--force-with-lease=refs/heads/$release_branch:$remote_release_sha"
+                  else
+                      lease="--force-with-lease=refs/heads/$release_branch:"
+                  fi
 
-                  async function listReleaseWorkflowRuns() {
-                      return githubApi(
-                          `/repos/${repository}/actions/workflows/continuous-integration.yml/runs?branch=${encodeURIComponent(releaseBranch)}&event=workflow_dispatch&per_page=20`
-                      );
-                  }
+                  git push "$lease" origin "HEAD:refs/heads/$release_branch"
 
-                  async function listReleasePullRequestWorkflowRuns() {
-                      return githubApi(
-                          `/repos/${repository}/actions/runs?branch=${encodeURIComponent(releaseBranch)}&event=pull_request&per_page=100`
-                      );
-                  }
+                  pr_number=$(gh pr list \
+                      --repo "$GITHUB_REPOSITORY" \
+                      --head "$release_branch" \
+                      --base main \
+                      --state open \
+                      --json number \
+                      --jq '.[0].number // ""')
 
-                  async function readWorkflowRun(id) {
-                      return githubApi(`/repos/${repository}/actions/runs/${id}`);
-                  }
+                  if [ -z "$pr_number" ]; then
+                      gh pr create \
+                          --repo "$GITHUB_REPOSITORY" \
+                          --title "$release_title" \
+                          --body "$release_body" \
+                          --head "$release_branch" \
+                          --base main \
+                          --label "$release_label" >/dev/null
+                      pr_number=$(gh pr list \
+                          --repo "$GITHUB_REPOSITORY" \
+                          --head "$release_branch" \
+                          --base main \
+                          --state open \
+                          --json number \
+                          --jq '.[0].number')
+                  else
+                      gh pr edit "$pr_number" \
+                          --repo "$GITHUB_REPOSITORY" \
+                          --title "$release_title" \
+                          --body "$release_body"
+                  fi
 
-                  async function listWorkflowRunJobs(id) {
-                      const jobs = [];
+                  gh api -X PUT "/repos/$GITHUB_REPOSITORY/issues/$pr_number/labels" -f labels[]="$release_label" >/dev/null
 
-                      for (let page = 1; ; page += 1) {
-                          const response = await githubApi(`/repos/${repository}/actions/runs/${id}/jobs?per_page=100&page=${page}`);
+                  for context in "${required_contexts[@]}"; do
+                      create_status "$release_commit" "$context" pending 'Waiting for dispatched release CI.'
+                  done
 
-                          jobs.push(...response.jobs);
+                  gh workflow run continuous-integration.yml --repo "$GITHUB_REPOSITORY" --ref "$release_branch"
 
-                          if (response.jobs.length < 100) {
-                              return jobs;
-                          }
-                      }
-                  }
+                  run_id=''
+                  for attempt in $(seq 1 30); do
+                      run_id=$(gh run list \
+                          --repo "$GITHUB_REPOSITORY" \
+                          --workflow continuous-integration.yml \
+                          --branch "$release_branch" \
+                          --event workflow_dispatch \
+                          --json databaseId,headSha \
+                          --jq ".[] | select(.headSha == \"$release_commit\") | .databaseId" |
+                          head -n 1)
 
-                  async function wait(milliseconds) {
-                      await new Promise((resolve) => {
-                          setTimeout(resolve, milliseconds);
-                      });
-                  }
+                      if [ -n "$run_id" ]; then
+                          break
+                      fi
 
-                  async function waitForReleaseWorkflowRun(commitSha) {
-                      for (let attempt = 1; attempt <= 30; attempt += 1) {
-                          const response = await listReleaseWorkflowRuns();
-                          const workflowRun = response.workflow_runs.find((run) => {
-                              return run.head_sha === commitSha;
-                          });
+                      sleep 10
+                  done
 
-                          if (workflowRun !== undefined) {
-                              return workflowRun;
-                          }
+                  if [ -z "$run_id" ]; then
+                      echo "Release workflow run was not created for $release_commit"
+                      exit 1
+                  fi
 
-                          await wait(10_000);
-                      }
+                  watch_status=0
+                  gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status || watch_status=$?
 
-                      throw new Error(`Release workflow run was not created for ${commitSha}`);
-                  }
+                  run_json=$(gh run view "$run_id" --repo "$GITHUB_REPOSITORY" --json conclusion,jobs,url)
+                  failed=0
 
-                  async function waitForReleaseWorkflowCompletion(id) {
-                      for (let attempt = 1; attempt <= 90; attempt += 1) {
-                          const workflowRun = await readWorkflowRun(id);
+                  for context in "${required_contexts[@]}"; do
+                      job_json=$(printf '%s' "$run_json" |
+                          jq -c --arg context "$context" '.jobs[]? | select(.name == $context)' |
+                          head -n 1)
 
-                          if (workflowRun.status === 'completed') {
-                              return workflowRun;
-                          }
+                      if [ -z "$job_json" ]; then
+                          create_status "$release_commit" "$context" failure "Missing dispatched release CI job: $context."
+                          failed=1
+                          continue
+                      fi
 
-                          await wait(10_000);
-                      }
+                      conclusion=$(printf '%s' "$job_json" | jq -r '.conclusion // "failure"')
+                      target_url=$(printf '%s' "$job_json" | jq -r '.url // ""')
 
-                      throw new Error(`Release workflow run ${id} did not complete`);
-                  }
+                      if [ "$conclusion" = 'success' ]; then
+                          create_status "$release_commit" "$context" success 'Dispatched release CI job success.' "$target_url"
+                      else
+                          create_status "$release_commit" "$context" failure "Dispatched release CI job $conclusion." "$target_url"
+                          failed=1
+                      fi
+                  done
 
-                  function statusState(conclusion) {
-                      if (conclusion === 'success') {
-                          return 'success';
-                      }
+                  gh run list \
+                      --repo "$GITHUB_REPOSITORY" \
+                      --branch "$release_branch" \
+                      --event pull_request \
+                      --json conclusion,databaseId,headSha \
+                      --jq ".[] | select(.headSha == \"$release_commit\" and .conclusion == \"action_required\") | .databaseId" |
+                      while read -r awaiting_run_id; do
+                          gh api -X DELETE "/repos/$GITHUB_REPOSITORY/actions/runs/$awaiting_run_id" >/dev/null
+                      done
 
-                      return 'failure';
-                  }
+                  if [ "$failed" -ne 0 ] || [ "$watch_status" -ne 0 ]; then
+                      exit 1
+                  fi
 
-                  async function createReleaseStatus(commitSha, context, state, description, targetUrl) {
-                      const body = {
-                          state,
-                          context,
-                          description
-                      };
-
-                      if (targetUrl !== '') {
-                          body.target_url = targetUrl;
-                      }
-
-                      await githubApi(`/repos/${repository}/statuses/${commitSha}`, {
-                          method: 'POST',
-                          body: JSON.stringify(body)
-                      });
-                  }
-
-                  async function createPendingReleaseStatuses(commitSha) {
-                      await Promise.all(
-                          requiredReleaseStatusContexts.map((context) => {
-                              return createReleaseStatus(commitSha, context, 'pending', 'Waiting for dispatched release CI.', '');
-                          })
-                      );
-                  }
-
-                  async function mirrorReleaseWorkflowStatuses(commitSha, workflowRun) {
-                      const completedRun = await waitForReleaseWorkflowCompletion(workflowRun.id);
-                      const jobs = await listWorkflowRunJobs(completedRun.id);
-                      const failedContexts = [];
-
-                      await Promise.all(
-                          requiredReleaseStatusContexts.map((context) => {
-                              const job = jobs.find((candidate) => {
-                                  return candidate.name === context;
-                              });
-
-                              if (job === undefined) {
-                                  failedContexts.push(context);
-                                  return createReleaseStatus(
-                                      commitSha,
-                                      context,
-                                      'failure',
-                                      `Missing dispatched release CI job: ${context}.`,
-                                      completedRun.html_url
-                                  );
-                              }
-
-                              if (job.conclusion !== 'success') {
-                                  failedContexts.push(context);
-                              }
-
-                              return createReleaseStatus(
-                                  commitSha,
-                                  context,
-                                  statusState(job.conclusion),
-                                  `Dispatched release CI job ${job.conclusion}.`,
-                                  job.html_url
-                              );
-                          })
-                      );
-
-                      if (failedContexts.length > 0) {
-                          throw new Error(`Release workflow required job(s) failed: ${failedContexts.join(', ')}`);
-                      }
-
-                      if (completedRun.conclusion !== 'success') {
-                          throw new Error(`Release workflow run ${completedRun.id} concluded with ${completedRun.conclusion}`);
-                      }
-                  }
-
-                  async function deleteAwaitingReleasePullRequestWorkflowRuns(commitSha) {
-                      const response = await listReleasePullRequestWorkflowRuns();
-                      const awaitingRuns = response.workflow_runs.filter((run) => {
-                          return (
-                              run.head_branch === releaseBranch &&
-                              run.head_sha === commitSha &&
-                              run.event === 'pull_request' &&
-                              run.conclusion === 'action_required'
-                          );
-                      });
-
-                      await Promise.all(
-                          awaitingRuns.map((run) => {
-                              return githubApi(`/repos/${repository}/actions/runs/${run.id}`, {
-                                  method: 'DELETE'
-                              });
-                          })
-                      );
-
-                      console.log(`Deleted ${awaitingRuns.length} awaiting release pull request workflow run(s)`);
-                  }
-
-                  async function closeReleasePullRequests() {
-                      const pullRequests = await listOpenReleasePullRequests();
-
-                      await Promise.all(
-                          pullRequests.map((pullRequest) => {
-                              return githubApi(`/repos/${repository}/pulls/${pullRequest.number}`, {
-                                  method: 'PATCH',
-                                  body: JSON.stringify({ state: 'closed' })
-                              });
-                          })
-                      );
-                  }
-
-                  async function deleteReleaseBranch() {
-                      await githubApiOrUndefined(`/repos/${repository}/git/refs/heads/${releaseBranch}`, {
-                          method: 'DELETE'
-                      });
-                  }
-
-                  async function upsertReleaseBranch(commitSha) {
-                      const existingRef = await githubApiOrUndefined(`/repos/${repository}/git/ref/heads/${releaseBranch}`);
-
-                      if (existingRef === undefined) {
-                          await githubApi(`/repos/${repository}/git/refs`, {
-                              method: 'POST',
-                              body: JSON.stringify({ ref: `refs/heads/${releaseBranch}`, sha: commitSha })
-                          });
-                          return;
-                      }
-
-                      await githubApi(`/repos/${repository}/git/refs/heads/${releaseBranch}`, {
-                          method: 'PATCH',
-                          body: JSON.stringify({ sha: commitSha, force: true })
-                      });
-                  }
-
-                  async function createReleaseCommit() {
-                      const mainHead = runGit(['rev-parse', 'HEAD']);
-                      const mainRef = await githubApi(`/repos/${repository}/git/ref/heads/main`);
-
-                      if (mainRef.object.sha !== mainHead) {
-                          throw new Error(`main moved while preparing the release: expected ${mainHead}, found ${mainRef.object.sha}`);
-                      }
-
-                      const parentCommit = await githubApi(`/repos/${repository}/git/commits/${mainHead}`);
-                      const treeEntries = [];
-
-                      for (const changedFile of changedFiles) {
-                          const content = await fs.readFile(changedFile, { encoding: 'utf8' });
-                          const blob = await githubApi(`/repos/${repository}/git/blobs`, {
-                              method: 'POST',
-                              body: JSON.stringify({ content, encoding: 'utf-8' })
-                          });
-
-                          treeEntries.push({ path: changedFile, mode: '100644', type: 'blob', sha: blob.sha });
-                      }
-
-                      const tree = await githubApi(`/repos/${repository}/git/trees`, {
-                          method: 'POST',
-                          body: JSON.stringify({ base_tree: parentCommit.tree.sha, tree: treeEntries })
-                      });
-                      const commit = await githubApi(`/repos/${repository}/git/commits`, {
-                          method: 'POST',
-                          body: JSON.stringify({ message: releaseTitle, tree: tree.sha, parents: [mainHead] })
-                      });
-
-                      await upsertReleaseBranch(commit.sha);
-
-                      return commit.sha;
-                  }
-
-                  async function createOrUpdatePullRequest(commitSha) {
-                      const openPullRequests = await listOpenReleasePullRequests();
-                      const existingPullRequest = openPullRequests[0];
-                      const pullRequest =
-                          existingPullRequest ??
-                          (await githubApi(`/repos/${repository}/pulls`, {
-                              method: 'POST',
-                              body: JSON.stringify({
-                                  title: releaseTitle,
-                                  head: releaseBranch,
-                                  base: 'main',
-                                  body: releaseBody
-                              })
-                          }));
-
-                      await githubApi(`/repos/${repository}/pulls/${pullRequest.number}`, {
-                          method: 'PATCH',
-                          body: JSON.stringify({ title: releaseTitle, body: releaseBody })
-                      });
-                      await githubApi(`/repos/${repository}/issues/${pullRequest.number}/labels`, {
-                          method: 'PUT',
-                          body: JSON.stringify({ labels: ['release'] })
-                      });
-                      await createPendingReleaseStatuses(commitSha);
-                      await githubApi(`/repos/${repository}/actions/workflows/continuous-integration.yml/dispatches`, {
-                          method: 'POST',
-                          body: JSON.stringify({ ref: releaseBranch })
-                      });
-                      await mirrorReleaseWorkflowStatuses(commitSha, await waitForReleaseWorkflowRun(commitSha));
-                      await deleteAwaitingReleasePullRequestWorkflowRuns(commitSha);
-
-                      console.log(`Release PR #${pullRequest.number} points at ${commitSha}`);
-                  }
-
-                  if (await isMergedReleasePullRequestCommit(process.env.GITHUB_SHA)) {
-                      await closeReleasePullRequests();
-                      await deleteReleaseBranch();
-                      console.log('Merged release pull request does not need a replacement release PR');
-                  } else if (changedFiles.length === 0) {
-                      await closeReleasePullRequests();
-                      await deleteReleaseBranch();
-                      console.log('No release content remains');
-                  } else {
-                      await createOrUpdatePullRequest(await createReleaseCommit());
-                  }
-                  NODE
+                  echo "Release PR #$pr_number points at $release_commit"
 
     publish-release:
         needs: build
@@ -506,83 +316,57 @@ jobs:
                   GITHUB_SHA: ${{ github.sha }}
                   RELEASE_PULL_REQUEST_NUMBER: ${{ inputs.release_pull_request_number }}
               run: |
-                  node --input-type=module <<'NODE'
-                  import fs from 'node:fs/promises';
+                  set -euo pipefail
 
-                  const releaseLabel = 'release';
-
-                  async function writeOutput(name, value) {
-                      await fs.appendFile(process.env.GITHUB_OUTPUT, `${name}=${value}\n`, { encoding: 'utf8' });
+                  write_output() {
+                      printf '%s=%s\n' "$1" "$2" >> "$GITHUB_OUTPUT"
                   }
 
-                  async function githubApi(path) {
-                      const response = await fetch(`https://api.github.com${path}`, {
-                          headers: {
-                              Accept: 'application/vnd.github+json',
-                              Authorization: `Bearer ${process.env.GH_TOKEN}`,
-                              'X-GitHub-Api-Version': '2022-11-28'
-                          }
-                      });
+                  if [ "$GITHUB_EVENT_NAME" = 'workflow_dispatch' ]; then
+                      if [ "$GITHUB_REF_NAME" != 'main' ]; then
+                          echo 'Manual release publish retries must run from main'
+                          exit 1
+                      fi
 
-                      if (!response.ok) {
-                          const body = await response.text();
-                          throw new Error(`GitHub API request failed: ${response.status} ${response.statusText}\n${body}`);
-                      }
+                      pull_request=$(gh api "/repos/$GITHUB_REPOSITORY/pulls/$RELEASE_PULL_REQUEST_NUMBER")
 
-                      const body = await response.text();
-                      return body === '' ? undefined : JSON.parse(body);
-                  }
+                      if ! printf '%s' "$pull_request" |
+                          jq -e '.merged_at != null and any(.labels[]?; .name == "release")' >/dev/null; then
+                          echo "Pull request #$RELEASE_PULL_REQUEST_NUMBER is not a merged release PR"
+                          exit 1
+                      fi
 
-                  function hasReleaseLabel(pullRequest) {
-                      return pullRequest.labels.some((label) => {
-                          return label.name === releaseLabel;
-                      });
-                  }
+                      write_output should_publish true
+                      write_output release_commit_sha "$(printf '%s' "$pull_request" | jq -r '.merge_commit_sha')"
+                      write_output publish_commit_sha "$(printf '%s' "$pull_request" | jq -r '.merge_commit_sha')"
+                      write_output release_pull_request_number "$(printf '%s' "$pull_request" | jq -r '.number')"
+                      exit 0
+                  fi
 
-                  if (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch') {
-                      if (process.env.GITHUB_REF_NAME !== 'main') {
-                          throw new Error('Manual release publish retries must run from main');
-                      }
+                  pull_requests=$(gh api -H "Accept: application/vnd.github+json" \
+                      "/repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls")
+                  release_pull_request_count=$(printf '%s' "$pull_requests" |
+                      jq --arg sha "$GITHUB_SHA" \
+                          '[.[] | select(.merged_at != null and .merge_commit_sha == $sha and any(.labels[]?; .name == "release"))] | length')
 
-                      const pullRequest = await githubApi(
-                          `/repos/${process.env.GITHUB_REPOSITORY}/pulls/${process.env.RELEASE_PULL_REQUEST_NUMBER}`
-                      );
+                  if [ "$release_pull_request_count" -eq 0 ]; then
+                      write_output should_publish false
+                      exit 0
+                  fi
 
-                      if (pullRequest.merged_at === null || !hasReleaseLabel(pullRequest)) {
-                          throw new Error(`Pull request #${pullRequest.number} is not a merged release PR`);
-                      }
+                  if [ "$release_pull_request_count" -ne 1 ]; then
+                      echo "Commit $GITHUB_SHA is associated with multiple release PRs"
+                      exit 1
+                  fi
 
-                      await writeOutput('should_publish', 'true');
-                      await writeOutput('release_commit_sha', pullRequest.merge_commit_sha);
-                      await writeOutput('publish_commit_sha', process.env.GITHUB_SHA);
-                      await writeOutput('release_pull_request_number', String(pullRequest.number));
-                  } else {
-                      const pullRequests = await githubApi(
-                          `/repos/${process.env.GITHUB_REPOSITORY}/commits/${process.env.GITHUB_SHA}/pulls`
-                      );
-                      const releasePullRequests = pullRequests.filter((pullRequest) => {
-                          return (
-                              pullRequest.merged_at !== null &&
-                              pullRequest.merge_commit_sha === process.env.GITHUB_SHA &&
-                              hasReleaseLabel(pullRequest)
-                          );
-                      });
+                  release_pull_request_number=$(printf '%s' "$pull_requests" |
+                      jq -r --arg sha "$GITHUB_SHA" \
+                          '.[] | select(.merged_at != null and .merge_commit_sha == $sha and any(.labels[]?; .name == "release")) | .number')
 
-                      if (releasePullRequests.length === 0) {
-                          await writeOutput('should_publish', 'false');
-                          process.exit(0);
-                      }
-
-                      if (releasePullRequests.length > 1) {
-                          throw new Error(`Commit ${process.env.GITHUB_SHA} is associated with multiple release PRs`);
-                      }
-
-                      await writeOutput('should_publish', 'true');
-                      await writeOutput('release_commit_sha', process.env.GITHUB_SHA);
-                      await writeOutput('publish_commit_sha', process.env.GITHUB_SHA);
-                      await writeOutput('release_pull_request_number', String(releasePullRequests[0].number));
-                  }
-                  NODE
+                  write_output should_publish true
+                  write_output release_commit_sha "$GITHUB_SHA"
+                  write_output publish_commit_sha "$GITHUB_SHA"
+                  write_output release_pull_request_number "$release_pull_request_number"
 
             - uses: actions/checkout@v6
               if: steps.publish-target.outputs.should_publish == 'true'
@@ -602,188 +386,56 @@ jobs:
               run: npm clean-install --ignore-scripts
 
             - name: Validate release commit
-              id: release-metadata
               if: steps.publish-target.outputs.should_publish == 'true'
               env:
-                  GH_TOKEN: ${{ github.token }}
-                  GITHUB_EVENT_NAME: ${{ github.event_name }}
-                  GITHUB_REPOSITORY: ${{ github.repository }}
                   PUBLISH_COMMIT_SHA: ${{ steps.publish-target.outputs.publish_commit_sha }}
                   RELEASE_COMMIT_SHA: ${{ steps.publish-target.outputs.release_commit_sha }}
                   RELEASE_PULL_REQUEST_NUMBER: ${{ steps.publish-target.outputs.release_pull_request_number }}
               run: |
-                  node --input-type=module <<'NODE'
-                  import fs from 'node:fs/promises';
-                  import { execFileSync } from 'node:child_process';
-                  import semver from 'semver';
+                  set -euo pipefail
 
-                  const cliChangelog = 'source/packages/command-line-interface/CHANGELOG.md';
-                  const coreChangelog = 'source/packages/core/CHANGELOG.md';
+                  cli_changelog='source/packages/command-line-interface/CHANGELOG.md'
+                  core_changelog='source/packages/core/CHANGELOG.md'
+                  head_sha=$(git rev-parse HEAD)
 
-                  function runGit(args) {
-                      return execFileSync('git', args, { encoding: 'utf8' }).trim();
-                  }
+                  if [ "$head_sha" != "$PUBLISH_COMMIT_SHA" ]; then
+                      echo "HEAD $head_sha does not match publish commit $PUBLISH_COMMIT_SHA"
+                      exit 1
+                  fi
 
-                  function readFileAtCommit(commitSha, filePath) {
-                      return runGit(['show', `${commitSha}:${filePath}`]);
-                  }
+                  subject=$(git log -1 --format=%s "$RELEASE_COMMIT_SHA")
 
-                  function readChangelogVersion(changelog, changelogPath) {
-                      const match = /^## (?<version>\S+) \(/u.exec(changelog);
-                      const version = match?.groups?.version;
+                  if [[ "$subject" != "Merge pull request #$RELEASE_PULL_REQUEST_NUMBER from "* ]]; then
+                      echo "Unexpected merged release commit subject: $subject"
+                      exit 1
+                  fi
 
-                      if (version === undefined || semver.valid(version) === null) {
-                          throw new Error(`${changelogPath} does not start with a valid release version`);
-                      }
+                  prepared_release_commit_sha=$(git rev-parse "$RELEASE_COMMIT_SHA^2")
+                  prepared_release_subject=$(git log -1 --format=%s "$prepared_release_commit_sha")
 
-                      return version;
-                  }
+                  if [ "$prepared_release_subject" != 'Release packages' ]; then
+                      echo "Unexpected prepared release commit subject: $prepared_release_subject"
+                      exit 1
+                  fi
 
-                  function assertTagDoesNotExist(tagName) {
-                      try {
-                          runGit(['rev-parse', '--verify', `refs/tags/${tagName}`]);
-                      } catch {
-                          return;
-                      }
+                  changed_files=$(git diff --name-only "$RELEASE_COMMIT_SHA^1" "$RELEASE_COMMIT_SHA")
 
-                      throw new Error(`Release tag already exists: ${tagName}`);
-                  }
+                  if [ -z "$changed_files" ]; then
+                      echo 'Release commit must change changelog files'
+                      exit 1
+                  fi
 
-                  async function writeOutput(name, value) {
-                      await fs.appendFile(process.env.GITHUB_OUTPUT, `${name}=${value}\n`, { encoding: 'utf8' });
-                  }
-
-                  async function githubApi(path) {
-                      const response = await fetch(`https://api.github.com${path}`, {
-                          headers: {
-                              Accept: 'application/vnd.github+json',
-                              Authorization: `Bearer ${process.env.GH_TOKEN}`,
-                              'X-GitHub-Api-Version': '2022-11-28'
-                          }
-                      });
-
-                      if (!response.ok) {
-                          const body = await response.text();
-                          throw new Error(`GitHub API request failed: ${response.status} ${response.statusText}\n${body}`);
-                      }
-
-                      const body = await response.text();
-                      return body === '' ? undefined : JSON.parse(body);
-                  }
-
-                  const headSha = runGit(['rev-parse', 'HEAD']);
-
-                  if (headSha !== process.env.PUBLISH_COMMIT_SHA) {
-                      throw new Error(`HEAD ${headSha} does not match publish commit ${process.env.PUBLISH_COMMIT_SHA}`);
-                  }
-
-                  if (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch') {
-                      try {
-                          runGit(['merge-base', '--is-ancestor', process.env.RELEASE_COMMIT_SHA, headSha]);
-                      } catch {
-                          throw new Error(`Release commit ${process.env.RELEASE_COMMIT_SHA} is not an ancestor of ${headSha}`);
-                      }
-                  } else if (headSha !== process.env.RELEASE_COMMIT_SHA) {
-                      throw new Error(`HEAD ${headSha} does not match release commit ${process.env.RELEASE_COMMIT_SHA}`);
-                  }
-
-                  const subject = runGit(['log', '-1', '--format=%s', process.env.RELEASE_COMMIT_SHA]);
-
-                  if (!subject.startsWith(`Merge pull request #${process.env.RELEASE_PULL_REQUEST_NUMBER} from `)) {
-                      throw new Error(`Unexpected merged release commit subject: ${subject}`);
-                  }
-
-                  const commit = await githubApi(`/repos/${process.env.GITHUB_REPOSITORY}/commits/${process.env.RELEASE_COMMIT_SHA}`);
-
-                  if (commit.commit.verification.verified !== true) {
-                      throw new Error(`Merged release commit is not verified: ${commit.commit.verification.reason}`);
-                  }
-
-                  const firstParent = runGit(['rev-parse', `${process.env.RELEASE_COMMIT_SHA}^1`]);
-                  const preparedReleaseCommitSha = runGit(['rev-parse', `${process.env.RELEASE_COMMIT_SHA}^2`]);
-                  const preparedReleaseSubject = runGit(['log', '-1', '--format=%s', preparedReleaseCommitSha]);
-
-                  if (preparedReleaseSubject !== 'Prepare release') {
-                      throw new Error(`Unexpected prepared release commit subject: ${preparedReleaseSubject}`);
-                  }
-
-                  const preparedReleaseCommit = await githubApi(
-                      `/repos/${process.env.GITHUB_REPOSITORY}/commits/${preparedReleaseCommitSha}`
-                  );
-
-                  if (preparedReleaseCommit.commit.verification.verified !== true) {
-                      throw new Error(
-                          `Prepared release commit is not verified: ${preparedReleaseCommit.commit.verification.reason}`
-                      );
-                  }
-
-                  const changedFiles = runGit(['diff', '--name-only', firstParent, process.env.RELEASE_COMMIT_SHA])
-                      .split('\n')
-                      .filter((filePath) => {
-                          return filePath !== '';
-                      });
-                  const hasCoreRelease = changedFiles.includes(coreChangelog);
-                  const allowedFiles = new Set([cliChangelog]);
-
-                  if (hasCoreRelease) {
-                      allowedFiles.add(coreChangelog);
-                  }
-
-                  if (!changedFiles.includes(cliChangelog)) {
-                      throw new Error(`${cliChangelog} must be changed`);
-                  }
-
-                  for (const changedFile of changedFiles) {
-                      if (!allowedFiles.has(changedFile)) {
-                          throw new Error(`Unexpected release file change: ${changedFile}`);
-                      }
-                  }
-
-                  const cliChangelogContent = readFileAtCommit(process.env.RELEASE_COMMIT_SHA, cliChangelog);
-                  const prLogVersion = readChangelogVersion(cliChangelogContent, cliChangelog);
-                  const prLogTag = `pr-log@${prLogVersion}`;
-                  let predictedCoreVersion = '';
-                  let predictedCoreTag = '';
-
-                  if (hasCoreRelease) {
-                      const coreChangelogContent = readFileAtCommit(process.env.RELEASE_COMMIT_SHA, coreChangelog);
-                      predictedCoreVersion = readChangelogVersion(coreChangelogContent, coreChangelog);
-                      predictedCoreTag = `@pr-log/core@${predictedCoreVersion}`;
-                  }
-
-                  const publishCliChangelogContent = await fs.readFile(cliChangelog, { encoding: 'utf8' });
-                  const publishPrLogVersion = readChangelogVersion(publishCliChangelogContent, cliChangelog);
-
-                  if (publishPrLogVersion !== prLogVersion) {
-                      throw new Error(`Publish commit has pr-log ${publishPrLogVersion}, expected ${prLogVersion}`);
-                  }
-
-                  if (hasCoreRelease) {
-                      const publishCoreChangelogContent = await fs.readFile(coreChangelog, { encoding: 'utf8' });
-                      const publishCoreVersion = readChangelogVersion(publishCoreChangelogContent, coreChangelog);
-
-                      if (publishCoreVersion !== predictedCoreVersion) {
-                          throw new Error(`Publish commit has @pr-log/core ${publishCoreVersion}, expected ${predictedCoreVersion}`);
-                      }
-                  }
-
-                  assertTagDoesNotExist(prLogTag);
-
-                  if (hasCoreRelease) {
-                      assertTagDoesNotExist(predictedCoreTag);
-                  }
-
-                  await writeOutput('pr_log_version', prLogVersion);
-                  await writeOutput('pr_log_tag', prLogTag);
-                  await writeOutput('core_release_needed', hasCoreRelease ? 'true' : 'false');
-                  await writeOutput('predicted_core_version', predictedCoreVersion);
-                  await writeOutput('predicted_core_tag', predictedCoreTag);
-                  NODE
+                  while read -r changed_file; do
+                      if [ "$changed_file" != "$cli_changelog" ] && [ "$changed_file" != "$core_changelog" ]; then
+                          echo "Unexpected release file change: $changed_file"
+                          exit 1
+                      fi
+                  done <<< "$changed_files"
 
             - name: Check packages
               if: steps.publish-target.outputs.should_publish == 'true'
               env:
-                  PR_LOG_RELEASE_VERSION: ${{ steps.release-metadata.outputs.pr_log_version }}
+                  GH_TOKEN: ${{ github.token }}
               run: npx just publish-dry-run
 
             - name: Audit npm signatures and attestations
@@ -809,11 +461,13 @@ jobs:
             - name: Publish packages
               if: steps.publish-target.outputs.should_publish == 'true'
               env:
-                  PR_LOG_RELEASE_VERSION: ${{ steps.release-metadata.outputs.pr_log_version }}
+                  GH_TOKEN: ${{ github.token }}
               run: |
                   mkdir -p target/release
+                  git config remote.origin.push 'refs/tags/*:refs/tags/*'
+
                   set +e
-                  PR_LOG_RELEASE_VERSION="$PR_LOG_RELEASE_VERSION" npx just publish 2>&1 | tee target/release/publish.log
+                  npx just publish-release 2>&1 | tee target/release/publish.log
                   status=${PIPESTATUS[0]}
                   set -e
 
@@ -823,71 +477,11 @@ jobs:
 
                   if grep -Eiq 'attestation|oidc|provenance|rekor|sigstore|tlog' target/release/publish.log; then
                       sleep 30
-                      PR_LOG_RELEASE_VERSION="$PR_LOG_RELEASE_VERSION" npx just publish
+                      npx just publish-release
                       exit 0
                   fi
 
                   exit "$status"
-
-            - name: Validate core package version
-              if: >
-                  steps.publish-target.outputs.should_publish == 'true' &&
-                  steps.release-metadata.outputs.core_release_needed == 'true'
-              env:
-                  PREDICTED_CORE_VERSION: ${{ steps.release-metadata.outputs.predicted_core_version }}
-              run: |
-                  node --input-type=module <<'NODE'
-                  import { execFileSync } from 'node:child_process';
-
-                  function readPublishedCoreVersion() {
-                      try {
-                          const output = execFileSync('npm', ['view', '@pr-log/core', 'version', '--json'], {
-                              encoding: 'utf8'
-                          }).trim();
-
-                          return JSON.parse(output);
-                      } catch {
-                          return undefined;
-                      }
-                  }
-
-                  for (let attempt = 1; attempt <= 12; attempt += 1) {
-                      const publishedCoreVersion = readPublishedCoreVersion();
-
-                      if (publishedCoreVersion === process.env.PREDICTED_CORE_VERSION) {
-                          process.exit(0);
-                      }
-
-                      if (attempt === 12) {
-                          throw new Error(
-                              `Packtory published @pr-log/core ${publishedCoreVersion}, expected ${process.env.PREDICTED_CORE_VERSION}`
-                          );
-                      }
-
-                      await new Promise((resolve) => {
-                          setTimeout(resolve, 10_000);
-                      });
-                  }
-                  NODE
-
-            - name: Push release tags
-              if: steps.publish-target.outputs.should_publish == 'true'
-              env:
-                  PR_LOG_TAG: ${{ steps.release-metadata.outputs.pr_log_tag }}
-                  CORE_RELEASE_NEEDED: ${{ steps.release-metadata.outputs.core_release_needed }}
-                  PREDICTED_CORE_TAG: ${{ steps.release-metadata.outputs.predicted_core_tag }}
-              run: |
-                  git tag "$PR_LOG_TAG"
-
-                  if [ "$CORE_RELEASE_NEEDED" = "true" ]; then
-                      git tag "$PREDICTED_CORE_TAG"
-                  fi
-
-                  git push origin "$PR_LOG_TAG"
-
-                  if [ "$CORE_RELEASE_NEEDED" = "true" ]; then
-                      git push origin "$PREDICTED_CORE_TAG"
-                  fi
 
     coverage:
         needs: build

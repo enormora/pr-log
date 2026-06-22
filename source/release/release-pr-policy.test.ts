@@ -10,7 +10,7 @@ const validReleasePullRequest: PullRequestPolicyInput = {
     author: 'github-actions[bot]',
     headRef: 'release/pr-log',
     title: 'Prepare release',
-    subject: 'Prepare release',
+    subject: 'Release packages',
     parentShas: ['main-sha'],
     expectedBaseSha: 'main-sha',
     changedFiles: ['source/packages/command-line-interface/CHANGELOG.md']

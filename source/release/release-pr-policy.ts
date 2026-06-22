@@ -11,6 +11,7 @@ const changelogLabels = new Set([
 const releaseLabel = 'release';
 const releaseBranch = 'release/pr-log';
 const releaseTitle = 'Prepare release';
+const releaseCommitSubject = 'Release packages';
 const allowedReleaseFiles = new Set([
     'source/packages/command-line-interface/CHANGELOG.md',
     'source/packages/core/CHANGELOG.md'
@@ -56,7 +57,7 @@ function validateReleasePullRequestIdentity(input: PullRequestPolicyInput): void
     requirePolicy(input.author === 'github-actions[bot]', 'Release PRs must be authored by github-actions[bot]');
     requirePolicy(input.headRef === releaseBranch, `Release PRs must use ${releaseBranch}`);
     requirePolicy(input.title === releaseTitle, `Release PR title must be ${releaseTitle}`);
-    requirePolicy(input.subject === releaseTitle, `Release PR commit subject must be ${releaseTitle}`);
+    requirePolicy(input.subject === releaseCommitSubject, `Release PR commit subject must be ${releaseCommitSubject}`);
     requirePolicy(input.parentShas.length === 1, 'Release PR head must have exactly one parent');
     requirePolicy(input.parentShas[0] === input.expectedBaseSha, 'Release PR head must be based on expected main');
 }
