@@ -60,7 +60,7 @@ async function listTags() {
     return splitLines(stdout);
 }
 
-async function readPrLogVersion(packageInfo) {
+async function readPrLogVersion(packageInfo, versionInput) {
     const environment = globalThis.process.env;
     const githubRepo = getGithubRepoFromPackageInfo(packageInfo);
     const validLabels = getValidLabels(packageInfo, defaultValidLabels);
@@ -74,12 +74,21 @@ async function readPrLogVersion(packageInfo) {
 
     return resolvePrLogReleaseVersion({
         tags: await listTags(),
+        currentVersion: versionInput.currentVersion,
         packageInfo,
         githubRepo,
         validLabels,
         ignoredLabels,
+        targetSourceFiles: versionInput.targetSourceFiles,
+        ignoredAttributionPaths: versionInput.ignoredAttributionPaths,
         collectMergedPullRequests(input) {
             return prLogEngine.collectMergedPullRequests(input);
+        },
+        readPullRequestChangedFiles(input) {
+            return prLogEngine.readPullRequestChangedFiles(input);
+        },
+        filterPullRequestsByTargetFiles(input) {
+            return prLogEngine.filterPullRequestsByTargetFiles(input);
         },
         resolvePullRequestLabels(input) {
             return prLogEngine.resolvePullRequestLabels(input);
@@ -106,10 +115,15 @@ function corePackage(sharedAttributes) {
     };
 }
 
-function cliPackage(packageInfo, sharedAttributes, version) {
+function cliPackage(packageInfo, sharedAttributes) {
     return {
         name: 'pr-log',
-        versioning: { automatic: false, version },
+        versioning: {
+            automatic: false,
+            provideVersion(input) {
+                return readPrLogVersion(packageInfo, input);
+            }
+        },
         additionalFiles: [{ sourceFilePath: cliReadmePath, targetFilePath: 'README.md' }],
         roots: {
             cli: {
@@ -132,7 +146,6 @@ function cliPackage(packageInfo, sharedAttributes, version) {
 export async function buildConfig() {
     const packageInfo = await readPackageInfo();
     const sharedAttributes = sharedPackageAttributes(packageInfo);
-    const prLogVersion = await readPrLogVersion(packageInfo);
 
     return {
         registrySettings: registrySettings(),
@@ -160,6 +173,6 @@ export async function buildConfig() {
             uniqueTargetPaths: { enabled: true },
             noSideEffects: { enabled: false }
         },
-        packages: [corePackage(sharedAttributes), cliPackage(packageInfo, sharedAttributes, prLogVersion)]
+        packages: [corePackage(sharedAttributes), cliPackage(packageInfo, sharedAttributes)]
     };
 }
