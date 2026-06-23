@@ -6,6 +6,9 @@
     "automerge": true,
     "automergeType": "branch",
     "dependencyDashboard": false,
+    "constraints": {
+        "npm": "10.9.8"
+    },
     "lockFileMaintenance": {
         "enabled": true
     },
