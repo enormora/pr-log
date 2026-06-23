@@ -7,7 +7,7 @@
     "automergeType": "branch",
     "dependencyDashboard": false,
     "constraints": {
-        "npm": "10.9.8"
+        "npm": "11.17.0"
     },
     "lockFileMaintenance": {
         "enabled": true
