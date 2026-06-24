@@ -21,7 +21,7 @@ jobs:
             matrix:
                 node-version: [22, 24, 26]
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
               with:
                   fetch-depth: 0
             - name: Use Node.js
@@ -62,7 +62,7 @@ jobs:
             pull-requests: write
             statuses: write
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
               with:
                   ref: main
                   fetch-depth: 0
@@ -368,7 +368,7 @@ jobs:
                   write_output publish_commit_sha "$GITHUB_SHA"
                   write_output release_pull_request_number "$release_pull_request_number"
 
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
               if: steps.publish-target.outputs.should_publish == 'true'
               with:
                   ref: ${{ steps.publish-target.outputs.publish_commit_sha }}
