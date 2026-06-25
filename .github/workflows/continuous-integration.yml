@@ -13,19 +13,28 @@ on:
                 required: false
                 type: string
 
+permissions: {}
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
     build:
         runs-on: ubuntu-latest
         name: Node v${{ matrix.node-version }}
+        permissions:
+            contents: read # required for actions/checkout to read the workflow source
         strategy:
             matrix:
                 node-version: [22, 24, 26]
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
               with:
                   fetch-depth: 0
+                  persist-credentials: false
             - name: Use Node.js
-              uses: actions/setup-node@v6
+              uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
               with:
                   node-version: ${{ matrix.node-version }}
             - name: Install dependencies
@@ -42,34 +51,62 @@ jobs:
                   GH_TOKEN: ${{ github.token }}
               run: npx just publish-dry-run
             - name: Coveralls
-              uses: coverallsapp/github-action@v2
+              uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2.3.7
               with:
                   github-token: ${{ secrets.GITHUB_TOKEN }}
                   path-to-lcov: ./target/coverage/lcov.info
                   parallel: true
 
+    workflow-security:
+        runs-on: ubuntu-latest
+        name: Workflow security analysis
+        permissions:
+            contents: read # required for actions/checkout to read the workflow source
+            security-events: write # required by zizmor-action to upload SARIF to code scanning
+        steps:
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+              with:
+                  persist-credentials: false
+            - name: Run zizmor
+              id: zizmor
+              uses: zizmorcore/zizmor-action@192e21d79ab29983730a13d1382995c2307fbcaa # v0.5.7
+              with:
+                  version: 1.26.1
+                  persona: pedantic
+                  min-severity: informational
+                  min-confidence: low
+                  config: .github/zizmor.yml
+            - name: Fail if zizmor reported findings
+              env:
+                  SARIF_FILE: ${{ steps.zizmor.outputs.output-file }}
+              run: |
+                  count="$(jq '[.runs[].results[]] | length' "$SARIF_FILE")"
+                  echo "zizmor findings: $count"
+                  test "$count" -eq 0
+
     maintain-release-pr:
         needs: build
         runs-on: ubuntu-latest
+        name: Maintain release PR
         if: github.event_name == 'push'
         concurrency:
             group: release-pr-maintenance
             cancel-in-progress: false
         permissions:
-            actions: write
-            contents: write
-            issues: write
-            pull-requests: write
-            statuses: write
+            actions: write # required to dispatch release PR CI and delete gated PR runs
+            contents: write # required to push and delete the release branch
+            issues: write # required to replace release PR labels
+            pull-requests: write # required to create, update, and close release PRs
+            statuses: write # required to mirror dispatched release PR CI results
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
               with:
                   ref: main
                   fetch-depth: 0
                   persist-credentials: true
 
             - name: Use Node.js
-              uses: actions/setup-node@v6
+              uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
               with:
                   node-version: 24
 
@@ -298,13 +335,14 @@ jobs:
     publish-release:
         needs: build
         runs-on: ubuntu-latest
+        name: Publish release
         if: >
             github.event_name == 'push' ||
             (github.event_name == 'workflow_dispatch' && inputs.release_pull_request_number != '')
         permissions:
-            contents: write
-            id-token: write
-            pull-requests: read
+            contents: write # required to push release tags and create GitHub releases
+            id-token: write # required by npm trusted publishing to mint the OIDC token
+            pull-requests: read # required to validate release PR identity before publishing
         steps:
             - name: Resolve release publish target
               id: publish-target
@@ -322,6 +360,16 @@ jobs:
                       printf '%s=%s\n' "$1" "$2" >> "$GITHUB_OUTPUT"
                   }
 
+                  is_release_pull_request='
+                      .merged_at != null and
+                      ([.labels[]?.name] == ["release"]) and
+                      .user.login == "github-actions[bot]" and
+                      .head.ref == "release/pr-log" and
+                      .head.repo.full_name == $repo and
+                      .base.ref == "main" and
+                      .title == "Prepare release"
+                  '
+
                   if [ "$GITHUB_EVENT_NAME" = 'workflow_dispatch' ]; then
                       if [ "$GITHUB_REF_NAME" != 'main' ]; then
                           echo 'Manual release publish retries must run from main'
@@ -331,7 +379,7 @@ jobs:
                       pull_request=$(gh api "/repos/$GITHUB_REPOSITORY/pulls/$RELEASE_PULL_REQUEST_NUMBER")
 
                       if ! printf '%s' "$pull_request" |
-                          jq -e '.merged_at != null and any(.labels[]?; .name == "release")' >/dev/null; then
+                          jq -e --arg repo "$GITHUB_REPOSITORY" "$is_release_pull_request" >/dev/null; then
                           echo "Pull request #$RELEASE_PULL_REQUEST_NUMBER is not a merged release PR"
                           exit 1
                       fi
@@ -346,8 +394,8 @@ jobs:
                   pull_requests=$(gh api -H "Accept: application/vnd.github+json" \
                       "/repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls")
                   release_pull_request_count=$(printf '%s' "$pull_requests" |
-                      jq --arg sha "$GITHUB_SHA" \
-                          '[.[] | select(.merged_at != null and .merge_commit_sha == $sha and any(.labels[]?; .name == "release"))] | length')
+                      jq --arg sha "$GITHUB_SHA" --arg repo "$GITHUB_REPOSITORY" \
+                          "[.[] | select(.merge_commit_sha == \$sha and ($is_release_pull_request))] | length")
 
                   if [ "$release_pull_request_count" -eq 0 ]; then
                       write_output should_publish false
@@ -360,15 +408,15 @@ jobs:
                   fi
 
                   release_pull_request_number=$(printf '%s' "$pull_requests" |
-                      jq -r --arg sha "$GITHUB_SHA" \
-                          '.[] | select(.merged_at != null and .merge_commit_sha == $sha and any(.labels[]?; .name == "release")) | .number')
+                      jq -r --arg sha "$GITHUB_SHA" --arg repo "$GITHUB_REPOSITORY" \
+                          ".[] | select(.merge_commit_sha == \$sha and ($is_release_pull_request)) | .number")
 
                   write_output should_publish true
                   write_output release_commit_sha "$GITHUB_SHA"
                   write_output publish_commit_sha "$GITHUB_SHA"
                   write_output release_pull_request_number "$release_pull_request_number"
 
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
               if: steps.publish-target.outputs.should_publish == 'true'
               with:
                   ref: ${{ steps.publish-target.outputs.publish_commit_sha }}
@@ -377,7 +425,7 @@ jobs:
 
             - name: Use Node.js
               if: steps.publish-target.outputs.should_publish == 'true'
-              uses: actions/setup-node@v6
+              uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
               with:
                   node-version: 24
 
@@ -486,9 +534,12 @@ jobs:
     coverage:
         needs: build
         runs-on: ubuntu-latest
+        name: Coveralls Finished
+        permissions:
+            contents: read # required by coverallsapp/github-action
         steps:
             - name: Coveralls Finished
-              uses: coverallsapp/github-action@v2
+              uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2.3.7
               with:
                   github-token: ${{ secrets.GITHUB_TOKEN }}
                   parallel-finished: true
