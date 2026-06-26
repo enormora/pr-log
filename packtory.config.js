@@ -27,7 +27,7 @@ function commonPackageSettings(packageInfo) {
     return {
         sourcesFolder,
         mainPackageJson: { type: 'module', dependencies: packageInfo.dependencies },
-        additionalFiles: [{ sourceFilePath: licensePath, targetFilePath: 'LICENSE' }],
+        additionalFiles: [ { sourceFilePath: licensePath, targetFilePath: 'LICENSE' } ],
         deadCodeElimination: { enabled: true },
         publishSettings: {
             access: 'public',
@@ -46,7 +46,7 @@ function corePackage(sharedAttributes) {
     return {
         name: '@pr-log/core',
         versioning: { automatic: true, minimumVersion: '0.0.1' },
-        additionalFiles: [{ sourceFilePath: coreReadmePath, targetFilePath: 'README.md' }],
+        additionalFiles: [ { sourceFilePath: coreReadmePath, targetFilePath: 'README.md' } ],
         roots: {
             main: {
                 js: 'packages/core/core.entry-point.js',
@@ -56,7 +56,7 @@ function corePackage(sharedAttributes) {
         additionalPackageJsonAttributes: {
             ...sharedAttributes,
             description: 'Library API for changelog generation from GitHub pull requests',
-            keywords: ['pr-log', 'changelog', 'github', 'pull-request', 'release-plan']
+            keywords: [ 'pr-log', 'changelog', 'github', 'pull-request', 'release-plan' ]
         }
     };
 }
@@ -68,21 +68,21 @@ function cliPackage(packageInfo, sharedAttributes) {
             automatic: false,
             source: 'pull-request-labels'
         },
-        additionalFiles: [{ sourceFilePath: cliReadmePath, targetFilePath: 'README.md' }],
+        additionalFiles: [ { sourceFilePath: cliReadmePath, targetFilePath: 'README.md' } ],
         roots: {
             cli: {
                 js: 'packages/command-line-interface/bin.entry-point.js'
             }
         },
         packageInterface: {
-            bins: [{ root: 'cli', name: 'pr-log' }]
+            bins: [ { root: 'cli', name: 'pr-log' } ]
         },
         additionalPackageJsonAttributes: {
             ...sharedAttributes,
             description: packageInfo.description,
             keywords: packageInfo.keywords
         },
-        bundleDependencies: ['@pr-log/core']
+        bundleDependencies: [ '@pr-log/core' ]
     };
 }
 
@@ -93,7 +93,7 @@ function releasePullRequestSettings() {
         githubActionsCi: {
             trigger: 'workflow-dispatch',
             workflowFile: 'continuous-integration.yml',
-            requiredStatusContexts: ['Node v22', 'Node v24', 'Node v26']
+            requiredStatusContexts: [ 'Node v22', 'Node v24', 'Node v26' ]
         }
     };
 }
@@ -121,8 +121,8 @@ export async function buildConfig() {
         commonPackageSettings: commonPackageSettings(packageInfo),
         checks: {
             areTheTypesWrong: { enabled: true, profile: 'esm-only' },
-            noDuplicatedFiles: { enabled: true, allowList: [licensePath] },
-            requiredFiles: { enabled: true, files: ['LICENSE', 'README.md'] },
+            noDuplicatedFiles: { enabled: true, allowList: [ licensePath ] },
+            requiredFiles: { enabled: true, files: [ 'LICENSE', 'README.md' ] },
             maxBundleSize: { enabled: true },
             noUnusedBundleDependencies: { enabled: true },
             noDevDependencyImports: { enabled: true },
@@ -130,6 +130,6 @@ export async function buildConfig() {
             noSideEffects: { enabled: false }
         },
         releasePullRequest: releasePullRequestSettings(),
-        packages: [corePackage(sharedAttributes), cliPackage(packageInfo, sharedAttributes)]
+        packages: [ corePackage(sharedAttributes), cliPackage(packageInfo, sharedAttributes) ]
     };
 }

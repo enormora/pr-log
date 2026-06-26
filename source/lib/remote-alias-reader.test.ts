@@ -2,14 +2,14 @@ import assert from 'node:assert';
 import { fake } from 'sinon';
 import { createRemoteAliasReader, type RemoteAliasReaderDependencies } from './remote-alias-reader.ts';
 
-test('createRemoteAliasReader() reads aliases through the git command runner', async () => {
+test('createRemoteAliasReader() reads aliases through the git command runner', async function () {
     const dependencies: RemoteAliasReaderDependencies = {
         gitCommandRunner: {
             getShortStatus: fake.resolves(''),
             getCurrentBranchName: fake.resolves('main'),
             fetchRemote: fake.resolves(undefined),
             getSymmetricDifferencesBetweenBranches: fake.resolves([]),
-            getRemoteAliases: fake.resolves([{ alias: 'origin', url: 'git@example.com/repo/a.git' }]),
+            getRemoteAliases: fake.resolves([ { alias: 'origin', url: 'git@example.com/repo/a.git' } ]),
             listTags: fake.resolves([]),
             hasRef: fake.resolves(false),
             getMergeCommitLogs: fake.resolves([]),
@@ -20,5 +20,5 @@ test('createRemoteAliasReader() reads aliases through the git command runner', a
 
     const result = await remoteAliasReader.getRemoteAliases();
 
-    assert.deepStrictEqual(result, [{ alias: 'origin', url: 'git@example.com/repo/a.git' }]);
+    assert.deepStrictEqual(result, [ { alias: 'origin', url: 'git@example.com/repo/a.git' } ]);
 });

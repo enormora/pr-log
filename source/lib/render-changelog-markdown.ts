@@ -1,9 +1,10 @@
-import Maybe, { type Just } from 'true-myth/maybe';
+import { nothing } from 'true-myth/maybe';
 import { createChangelogFactory, formatChangelogDate } from './create-changelog.ts';
 import type { PullRequestWithLabel } from './resolve-pull-request-labels.ts';
+import { createVersionNumber } from './version-number.ts';
 
 type RenderChangelogMarkdownInputBase = {
-    readonly packageInfo: Record<string, unknown>;
+    readonly packageInfo: Readonly<Record<string, unknown>>;
     readonly currentDate: Readonly<Date>;
     readonly validLabels: ReadonlyMap<string, string>;
     readonly mergedPullRequests: readonly PullRequestWithLabel[];
@@ -42,7 +43,7 @@ type UnreleasedTargetChangelogSection = TargetChangelogSectionBase & {
 export type TargetChangelogSection = ReleasedTargetChangelogSection | UnreleasedTargetChangelogSection;
 
 export type RenderGroupedTargetChangelogMarkdownInput = {
-    readonly packageInfo: Record<string, unknown>;
+    readonly packageInfo: Readonly<Record<string, unknown>>;
     readonly currentDate: Readonly<Date>;
     readonly validLabels: ReadonlyMap<string, string>;
     readonly githubRepo: string;
@@ -59,7 +60,7 @@ export type UpdateChangelogMarkdownInput = {
 export function renderChangelogMarkdown(input: RenderChangelogMarkdownInput): string {
     const createChangelog = createChangelogFactory({
         packageInfo: input.packageInfo,
-        getCurrentDate: () => {
+        getCurrentDate() {
             return input.currentDate;
         }
     });
@@ -70,7 +71,7 @@ export function renderChangelogMarkdown(input: RenderChangelogMarkdownInput): st
             mergedPullRequests: input.mergedPullRequests,
             githubRepo: input.githubRepo,
             unreleased: true,
-            versionNumber: Maybe.nothing()
+            versionNumber: nothing()
         });
     }
 
@@ -79,7 +80,7 @@ export function renderChangelogMarkdown(input: RenderChangelogMarkdownInput): st
         mergedPullRequests: input.mergedPullRequests,
         githubRepo: input.githubRepo,
         unreleased: false,
-        versionNumber: Maybe.just(input.versionNumber) as Just<string>
+        versionNumber: createVersionNumber(input.versionNumber)
     });
 }
 
@@ -117,8 +118,9 @@ function renderTargetSection(input: RenderGroupedTargetChangelogMarkdownInput, t
 }
 
 export function renderGroupedTargetChangelogMarkdown(input: RenderGroupedTargetChangelogMarkdownInput): string {
-    const sections = input.targets
-        .map((target) => {
+    const sections = input
+        .targets
+        .map(function (target) {
             return renderTargetSection(input, target);
         })
         .join('');

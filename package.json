@@ -8,11 +8,8 @@
         "target/build/source/",
         "!target/build/source/**/*.test.js",
         "!target/build/source/**/*.d.ts",
-        "!target/build/source/**/*.map",
-        "LICENSE",
-        "README.md"
+        "!target/build/source/**/*.map"
     ],
-    "scripts": {},
     "author": "Mathias Schreck <schreck.mathias@gmail.com>",
     "license": "MIT",
     "dependencies": {
@@ -30,10 +27,10 @@
         "true-myth": "9.4.0"
     },
     "devDependencies": {
-        "@enormora/eslint-config-base": "0.0.31",
-        "@enormora/eslint-config-mocha": "0.0.26",
-        "@enormora/eslint-config-node": "0.0.26",
-        "@enormora/eslint-config-typescript": "0.0.36",
+        "@enormora/eslint-config-base": "0.0.43",
+        "@enormora/eslint-config-mocha": "0.0.40",
+        "@enormora/eslint-config-node": "0.0.34",
+        "@enormora/eslint-config-typescript": "0.0.50",
         "@packtory/cli": "0.0.46",
         "@types/common-tags": "1.8.4",
         "@types/mocha": "10.0.10",
@@ -42,10 +39,9 @@
         "@types/semver": "7.7.1",
         "@types/sinon": "21.0.1",
         "c8": "11.0.0",
-        "eslint": "10.4.0",
+        "eslint": "10.4.1",
         "fishery": "2.4.0",
         "mocha": "11.7.6",
-        "prettier": "3.8.3",
         "rust-just": "1.51.0",
         "sinon": "22.0.0",
         "typescript": "6.0.3"
@@ -68,8 +64,14 @@
         "history.md"
     ],
     "contributors": [
-        "Alexander Schmidt <alexanderschmidt1@gmail.com>",
-        "Christian Rackerseder <git@echooff.de>"
+        {
+            "name": "Alexander Schmidt",
+            "email": "alexanderschmidt1@gmail.com"
+        },
+        {
+            "name": "Christian Rackerseder",
+            "email": "git@echooff.de"
+        }
     ],
     "engines": {
         "node": "^24.0.0 || ^26.0.0"

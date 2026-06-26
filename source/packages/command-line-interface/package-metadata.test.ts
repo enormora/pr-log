@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { createPackageMetadata, readPackageMetadata } from './package-metadata.ts';
 
-test('createPackageMetadata() reads string package fields', () => {
+test('createPackageMetadata() reads string package fields', function () {
     const packageMetadata = createPackageMetadata({
         name: 'pr-log',
         description: 'Changelog generator',
@@ -15,7 +15,7 @@ test('createPackageMetadata() reads string package fields', () => {
     });
 });
 
-test('createPackageMetadata() ignores non-string package fields', () => {
+test('createPackageMetadata() ignores non-string package fields', function () {
     const packageMetadata = createPackageMetadata({
         name: 1,
         description: false,
@@ -29,7 +29,7 @@ test('createPackageMetadata() ignores non-string package fields', () => {
     });
 });
 
-test('readPackageMetadata() reads the first available package manifest', async () => {
+test('readPackageMetadata() reads the first available package manifest', async function () {
     const packageMetadata = await readPackageMetadata({
         packageJsonUrls: [
             new URL('file:///project/package/package.json'),
@@ -51,7 +51,7 @@ test('readPackageMetadata() reads the first available package manifest', async (
     });
 });
 
-test('readPackageMetadata() falls back when a package manifest is missing', async () => {
+test('readPackageMetadata() falls back when a package manifest is missing', async function () {
     const packageMetadata = await readPackageMetadata({
         packageJsonUrls: [
             new URL('file:///project/package/package.json'),
@@ -73,10 +73,10 @@ test('readPackageMetadata() falls back when a package manifest is missing', asyn
     });
 });
 
-test('readPackageMetadata() rejects non-missing read errors', async () => {
+test('readPackageMetadata() rejects non-missing read errors', async function () {
     await assert.rejects(
         readPackageMetadata({
-            packageJsonUrls: [new URL('file:///project/package/package.json')],
+            packageJsonUrls: [ new URL('file:///project/package/package.json') ],
             async readJsonFile() {
                 throw new Error('failed');
             }
@@ -85,10 +85,10 @@ test('readPackageMetadata() rejects non-missing read errors', async () => {
     );
 });
 
-test('readPackageMetadata() rejects when all package manifests are missing', async () => {
+test('readPackageMetadata() rejects when all package manifests are missing', async function () {
     await assert.rejects(
         readPackageMetadata({
-            packageJsonUrls: [new URL('file:///project/package/package.json')],
+            packageJsonUrls: [ new URL('file:///project/package/package.json') ],
             async readJsonFile() {
                 throw Object.assign(new Error('not found'), { code: 'ENOENT' });
             }

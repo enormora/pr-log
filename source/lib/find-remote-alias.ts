@@ -7,7 +7,7 @@ export type RemoteAlias = {
 };
 
 export type RemoteAliasReader = {
-    getRemoteAliases(): Promise<readonly RemoteAlias[]>;
+    getRemoteAliases: () => Promise<readonly RemoteAlias[]>;
 };
 
 function isSameGitUrl(gitUrlA: string, gitUrlB: string): boolean {
@@ -36,7 +36,7 @@ export function findRemoteAliasFactory(dependencies: FindRemoteAliasDependencies
         const gitRemote = getGitUrl(githubRepo);
 
         const remotes = await remoteAliasReader.getRemoteAliases();
-        const matchedRemote = remotes.find((remote) => {
+        const matchedRemote = remotes.find(function (remote) {
             return isSameGitUrl(gitRemote, remote.url);
         });
 

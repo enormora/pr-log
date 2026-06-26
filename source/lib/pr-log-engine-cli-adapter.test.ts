@@ -7,7 +7,7 @@ import {
     createMergedPullRequestReader
 } from './pr-log-engine-cli-adapter.ts';
 
-const validLabels = new Map([['bug', 'Bug Fixes']]);
+const validLabels = new Map([ [ 'bug', 'Bug Fixes' ] ]);
 
 type FactoryResult = {
     readonly prLogEngine: Pick<
@@ -23,9 +23,9 @@ type FactoryResult = {
 };
 
 function createPrLogEngine(): FactoryResult {
-    const collectMergedPullRequests = fake.resolves([{ id: 1, title: 'Fix bug' }]);
+    const collectMergedPullRequests = fake.resolves([ { id: 1, title: 'Fix bug' } ]);
     const renderChangelog = fake.returns('rendered changelog');
-    const resolvePullRequestLabels = fake.resolves([{ id: 1, title: 'Fix bug', label: 'bug' }]);
+    const resolvePullRequestLabels = fake.resolves([ { id: 1, title: 'Fix bug', label: 'bug' } ]);
 
     return {
         prLogEngine: {
@@ -40,14 +40,14 @@ function createPrLogEngine(): FactoryResult {
     };
 }
 
-test('createLatestVersionTagReader() returns the latest resolved base ref', async () => {
+test('createLatestVersionTagReader() returns the latest resolved base ref', async function () {
     const { prLogEngine } = createPrLogEngine();
     const getLatestVersionTag = createLatestVersionTagReader(prLogEngine);
 
     assert.strictEqual(await getLatestVersionTag(), '1.0.0');
 });
 
-test('createMergedPullRequestReader() collects pull requests from the latest base ref', async () => {
+test('createMergedPullRequestReader() collects pull requests from the latest base ref', async function () {
     const { prLogEngine, collectMergedPullRequests, resolvePullRequestLabels } = createPrLogEngine();
     const getMergedPullRequests = createMergedPullRequestReader(prLogEngine, {
         targetName: undefined,
@@ -56,7 +56,7 @@ test('createMergedPullRequestReader() collects pull requests from the latest bas
 
     const result = await getMergedPullRequests('owner/repository', validLabels, []);
 
-    assert.deepStrictEqual(result, [{ id: 1, title: 'Fix bug', label: 'bug' }]);
+    assert.deepStrictEqual(result, [ { id: 1, title: 'Fix bug', label: 'bug' } ]);
     assert.deepStrictEqual(collectMergedPullRequests.firstCall.args, [
         { githubRepo: 'owner/repository', baseRef: '1.0.0' }
     ]);
@@ -65,14 +65,14 @@ test('createMergedPullRequestReader() collects pull requests from the latest bas
             githubRepo: 'owner/repository',
             validLabels,
             ignoredLabels: [],
-            pullRequests: [{ id: 1, title: 'Fix bug' }],
+            pullRequests: [ { id: 1, title: 'Fix bug' } ],
             targetName: undefined,
             targetScopedLabelPattern: undefined
         }
     ]);
 });
 
-test('createChangelogMarkdownRenderer() renders through the pr-log engine', () => {
+test('createChangelogMarkdownRenderer() renders through the pr-log engine', function () {
     const { prLogEngine, renderChangelog } = createPrLogEngine();
     const renderChangelogMarkdown = createChangelogMarkdownRenderer(prLogEngine);
     const input = {
@@ -86,5 +86,5 @@ test('createChangelogMarkdownRenderer() renders through the pr-log engine', () =
     };
 
     assert.strictEqual(renderChangelogMarkdown(input), 'rendered changelog');
-    assert.deepStrictEqual(renderChangelog.firstCall.args, [input]);
+    assert.deepStrictEqual(renderChangelog.firstCall.args, [ input ]);
 });

@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { renderGroupedTargetChangelogMarkdown, updateChangelogMarkdown } from './render-changelog-markdown.ts';
 import { defaultValidLabels } from './valid-labels.ts';
 
-test('updates an empty changelog', () => {
+test('updates an empty changelog', function () {
     const changelog = updateChangelogMarkdown({
         existingChangelogMarkdown: '',
         generatedChangelogMarkdown: '## 1.0.0\n\n### Bug Fixes\n\n* Fix bug\n'
@@ -11,7 +11,7 @@ test('updates an empty changelog', () => {
     assert.strictEqual(changelog, '## 1.0.0\n\n### Bug Fixes\n\n* Fix bug\n\n');
 });
 
-test('preserves existing changelog history', () => {
+test('preserves existing changelog history', function () {
     const existingChangelogMarkdown = '## 0.9.0\n\n### Features\n\n* Add old feature\n';
 
     const changelog = updateChangelogMarkdown({
@@ -25,7 +25,7 @@ test('preserves existing changelog history', () => {
     );
 });
 
-test('prepends repeated generated changelog sections', () => {
+test('prepends repeated generated changelog sections', function () {
     const generatedChangelogMarkdown = '## 1.0.0\n\n### Bug Fixes\n\n* Fix bug\n';
     const firstChangelog = updateChangelogMarkdown({
         existingChangelogMarkdown: '',
@@ -43,7 +43,7 @@ test('prepends repeated generated changelog sections', () => {
     );
 });
 
-test('updates a changelog with grouped target sections', () => {
+test('updates a changelog with grouped target sections', function () {
     const generatedChangelogMarkdown = renderGroupedTargetChangelogMarkdown({
         packageInfo: {},
         currentDate: new Date(0),
@@ -53,13 +53,13 @@ test('updates a changelog with grouped target sections', () => {
                 targetName: 'pkg-a',
                 unreleased: false,
                 versionNumber: '1.0.0',
-                mergedPullRequests: [{ id: 1, title: 'Fix bug', label: 'bug' }]
+                mergedPullRequests: [ { id: 1, title: 'Fix bug', label: 'bug' } ]
             },
             {
                 targetName: 'pkg-b',
                 unreleased: false,
                 versionNumber: '2.0.0',
-                mergedPullRequests: [{ id: 2, title: 'Add feature', label: 'feature' }]
+                mergedPullRequests: [ { id: 2, title: 'Add feature', label: 'feature' } ]
             }
         ],
         githubRepo: 'owner/repo'

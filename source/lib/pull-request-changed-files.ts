@@ -1,7 +1,7 @@
 import type { PullRequest } from './collect-merged-pull-requests.ts';
 
 export type PullRequestChangedFilesReader = {
-    getChangedFiles(githubRepo: string, pullRequestId: number): Promise<readonly string[]>;
+    getChangedFiles: (githubRepo: string, pullRequestId: number) => Promise<readonly string[]>;
 };
 
 export type FetchPullRequestChangedFilesInput = {

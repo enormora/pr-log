@@ -12,11 +12,11 @@ export type FirstParentCommitLogEntry = {
 };
 
 export type GitRangeReader = {
-    getFirstParentCommitLogs(baseRef: string): Promise<readonly FirstParentCommitLogEntry[]>;
+    getFirstParentCommitLogs: (baseRef: string) => Promise<readonly FirstParentCommitLogEntry[]>;
 };
 
 export type PullRequestTitleReader = {
-    getTitle(githubRepo: string, pullRequestId: number): Promise<string>;
+    getTitle: (githubRepo: string, pullRequestId: number) => Promise<string>;
 };
 
 export type CollectMergedPullRequestsInput = {
@@ -82,14 +82,14 @@ function collectActiveFirstParentCommitLogs(
     firstParentCommitLogs: readonly FirstParentCommitLogEntry[]
 ): readonly FirstParentCommitLogEntry[] {
     const firstParentCommitHashes = new Set(
-        firstParentCommitLogs.map((firstParentCommitLog) => {
+        firstParentCommitLogs.map(function (firstParentCommitLog) {
             return firstParentCommitLog.hash;
         })
     );
     const revertedCommitHashes = new Set<string>();
 
     return firstParentCommitLogs.reduce<readonly FirstParentCommitLogEntry[]>(
-        (activeCommitLogs, firstParentCommitLog) => {
+        function (activeCommitLogs, firstParentCommitLog) {
             if (revertedCommitHashes.has(firstParentCommitLog.hash)) {
                 return activeCommitLogs;
             }
@@ -100,7 +100,7 @@ function collectActiveFirstParentCommitLogs(
                 return activeCommitLogs;
             }
 
-            return [...activeCommitLogs, firstParentCommitLog];
+            return [ ...activeCommitLogs, firstParentCommitLog ];
         },
         []
     );
@@ -137,9 +137,8 @@ async function createPullRequest(
         return { id: pullRequestCommit.id, title: `Revert "${title}"` };
     }
 
-    const title =
-        pullRequestCommit.title ??
-        (await input.pullRequestTitleReader.getTitle(input.githubRepo, pullRequestCommit.id));
+    const title = pullRequestCommit.title ??
+        await input.pullRequestTitleReader.getTitle(input.githubRepo, pullRequestCommit.id);
 
     return { id: pullRequestCommit.id, title };
 }
@@ -154,7 +153,7 @@ export async function collectMergedPullRequests(
     const firstParentCommitLogs = await input.git.getFirstParentCommitLogs(input.baseRef);
     const activeFirstParentCommitLogs = collectActiveFirstParentCommitLogs(firstParentCommitLogs);
     const pullRequests = await Promise.all(
-        activeFirstParentCommitLogs.map(async (log) => {
+        activeFirstParentCommitLogs.map(async function (log) {
             return createPullRequest(input, log);
         })
     );

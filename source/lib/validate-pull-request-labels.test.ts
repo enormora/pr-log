@@ -5,9 +5,9 @@ import { defaultValidLabels } from './valid-labels.ts';
 
 const pullRequestId = 123;
 
-test('validates pull request labels with package configuration', async () => {
-    const validLabels = new Map([['custom', 'Custom Changes']]);
-    const configuredValidLabels = [['custom', 'Custom Changes']];
+test('validates pull request labels with package configuration', async function () {
+    const validLabels = new Map([ [ 'custom', 'Custom Changes' ] ]);
+    const configuredValidLabels = [ [ 'custom', 'Custom Changes' ] ];
     const resolvePullRequestLabels = fake.resolves([]);
     const validator = createPullRequestLabelValidator({
         defaultValidLabels,
@@ -15,7 +15,7 @@ test('validates pull request labels with package configuration', async () => {
             repository: { url: 'https://github.com/owner/repo.git' },
             'pr-log': {
                 validLabels: configuredValidLabels,
-                ignoredLabels: ['release']
+                ignoredLabels: [ 'release' ]
             }
         },
         resolvePullRequestLabels
@@ -27,15 +27,15 @@ test('validates pull request labels with package configuration', async () => {
         {
             githubRepo: 'owner/repo',
             validLabels,
-            ignoredLabels: ['release'],
-            pullRequests: [{ id: pullRequestId, title: '' }],
+            ignoredLabels: [ 'release' ],
+            pullRequests: [ { id: pullRequestId, title: '' } ],
             targetName: undefined,
             targetScopedLabelPattern: undefined
         }
     ]);
 });
 
-test('reports pull request label validation failures', async () => {
+test('reports pull request label validation failures', async function () {
     const error = new Error('Pull Request #123 has no label of bug');
     const validator = createPullRequestLabelValidator({
         defaultValidLabels,

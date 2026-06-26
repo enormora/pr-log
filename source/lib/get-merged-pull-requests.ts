@@ -34,13 +34,13 @@ export type GetMergedPullRequests = (
 type PullRequestData = Readonly<Awaited<ReturnType<Octokit['pulls']['get']>>['data']>;
 
 function determineRepoDetails(githubRepo: string): Readonly<[owner: string, repo: string]> {
-    const [owner, repo] = githubRepo.split('/');
+    const [ owner, repo ] = githubRepo.split('/');
 
     if (owner === undefined || repo === undefined) {
         throw new TypeError('Could not find a repository');
     }
 
-    return [owner, repo];
+    return [ owner, repo ];
 }
 
 async function fetchPullRequestTitle(
@@ -48,7 +48,7 @@ async function fetchPullRequestTitle(
     githubRepo: string,
     pullRequestId: number
 ): Promise<string> {
-    const [owner, repo] = determineRepoDetails(githubRepo);
+    const [ owner, repo ] = determineRepoDetails(githubRepo);
     const { data: pullRequest } = await githubClient.pulls.get({
         owner,
         repo,

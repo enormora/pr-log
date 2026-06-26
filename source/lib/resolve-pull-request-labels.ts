@@ -5,7 +5,7 @@ export type PullRequestWithLabel = PullRequest & {
 };
 
 export type PullRequestLabelReader = {
-    getLabels(githubRepo: string, pullRequestId: number): Promise<readonly string[]>;
+    getLabels: (githubRepo: string, pullRequestId: number) => Promise<readonly string[]>;
 };
 
 export type ResolvePullRequestLabelsInput = {
@@ -32,10 +32,10 @@ function resolvePullRequestLevelLabel(
     labels: readonly string[]
 ): string {
     const validLabelNames = new Set(validLabels.keys());
-    const matchingLabels = labels.filter((label) => {
+    const matchingLabels = labels.filter(function (label) {
         return validLabelNames.has(label);
     });
-    const [label] = matchingLabels;
+    const [ label ] = matchingLabels;
     const listOfLabels = formatLabelList(validLabels);
 
     if (matchingLabels.length > 1) {
@@ -50,28 +50,32 @@ function resolvePullRequestLevelLabel(
 }
 
 function escapeRegExp(value: string): string {
-    return value.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
+    return value.replaceAll(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 }
 
 function createTargetScopedLabelRegExp(targetName: string, pattern: string): Readonly<RegExp> {
     const escapedPattern = escapeRegExp(pattern);
     const source = escapedPattern
-        .replaceAll(escapeRegExp('{targetName}'), escapeRegExp(targetName))
-        .replaceAll(escapeRegExp('{label}'), '(?<label>.+)');
+        .split(escapeRegExp('{targetName}'))
+        .join(escapeRegExp(targetName))
+        .split(escapeRegExp('{label}'))
+        .join('(?<label>.+)');
 
     return new RegExp(`^${source}$`, 'u');
 }
 
-function resolveTargetScopedLabel(options: {
+type TargetScopedLabelInput = {
     readonly validLabels: ReadonlyMap<string, string>;
     readonly pullRequestId: number;
     readonly labels: readonly string[];
     readonly targetName: string;
     readonly targetScopedLabelPattern: string;
-}): string | undefined {
+};
+
+function resolveTargetScopedLabel(options: TargetScopedLabelInput): string | undefined {
     const { validLabels, pullRequestId, labels, targetName, targetScopedLabelPattern } = options;
     const targetScopedLabelRegExp = createTargetScopedLabelRegExp(targetName, targetScopedLabelPattern);
-    const targetScopedLabels = labels.flatMap((label) => {
+    const targetScopedLabels = labels.flatMap(function (label) {
         const match = targetScopedLabelRegExp.exec(label);
         const targetLabel = match?.groups?.label;
 
@@ -83,9 +87,9 @@ function resolveTargetScopedLabel(options: {
             throw new TypeError(`Pull Request #${pullRequestId} has unknown label "${label}"`);
         }
 
-        return [targetLabel];
+        return [ targetLabel ];
     });
-    const [targetScopedLabel] = targetScopedLabels;
+    const [ targetScopedLabel ] = targetScopedLabels;
 
     if (targetScopedLabels.length > 1) {
         throw new Error(`Pull Request #${pullRequestId} has multiple scoped labels for "${targetName}"`);
@@ -117,7 +121,7 @@ function resolveLabel(
 }
 
 function hasIgnoredLabel(labels: readonly string[], ignoredLabels: ReadonlySet<string>): boolean {
-    return labels.some((label) => {
+    return labels.some(function (label) {
         return ignoredLabels.has(label);
     });
 }
@@ -146,7 +150,7 @@ export async function resolvePullRequestLabels(
     const pullRequestsWithLabels: PullRequestWithLabel[] = [];
     const ignoredLabels = new Set(input.ignoredLabels);
 
-    for (const [pullRequestIndex, pullRequest] of input.pullRequests.entries()) {
+    for (const [ pullRequestIndex, pullRequest ] of input.pullRequests.entries()) {
         if (pullRequestIndex > 0 && input.labelLookupIntervalMilliseconds > 0) {
             await input.waitForMilliseconds(input.labelLookupIntervalMilliseconds);
         }

@@ -38,7 +38,7 @@ type GitHubErrorWithStatus = {
 type GitHubRateLimitErrorWithoutHeaders = {
     readonly message: string;
     readonly status: number;
-    readonly response: Record<string, never>;
+    readonly response: Readonly<Record<string, never>>;
 };
 
 const currentTimeMilliseconds = 1000;
@@ -49,36 +49,28 @@ const internalServerErrorStatus = 500;
 const expectedRequestAttemptCount = 2;
 const expectedRetryAfterDelayMilliseconds = retryAfterSeconds * millisecondsPerSecond;
 const expectedRateLimitResetDelayMilliseconds = 4000;
-const rateLimitResetSeconds =
-    (currentTimeMilliseconds + expectedRateLimitResetDelayMilliseconds) / millisecondsPerSecond;
+const rateLimitResetSeconds = (currentTimeMilliseconds + expectedRateLimitResetDelayMilliseconds) /
+    millisecondsPerSecond;
 
 function createGitHubRateLimitError(
     message: string,
     headers: Readonly<Record<string, number | string>>
 ): GitHubRateLimitError {
-    const error = new Error(message) as Error & {
-        status: number;
-        response: { headers: Readonly<Record<string, number | string>> };
-    };
-    error.status = 403;
-    error.response = { headers };
-
-    return error;
+    return Object.assign(new Error(message), {
+        status: 403,
+        response: { headers }
+    });
 }
 
 function createGitHubErrorWithStatus(status: number, message: string): GitHubErrorWithStatus {
-    const error = new Error(message) as Error & { status: number };
-    error.status = status;
-
-    return error;
+    return Object.assign(new Error(message), { status });
 }
 
 function createGitHubRateLimitErrorWithoutHeaders(message: string): GitHubRateLimitErrorWithoutHeaders {
-    const error = new Error(message) as Error & { status: number; response: Record<string, never> };
-    error.status = 403;
-    error.response = {};
-
-    return error;
+    return Object.assign(new Error(message), {
+        status: 403,
+        response: {}
+    });
 }
 
 function createDependencies(overrides: Overrides = {}): TestDependencies {
@@ -96,7 +88,7 @@ function createDependencies(overrides: Overrides = {}): TestDependencies {
 const anyRepo = 'any/repo';
 const anyPullRequestId = 123;
 
-test('throws when the given repo doesn’t have a "/"', async () => {
+test('throws when the given repo doesn’t have a "/"', async function () {
     const { githubClient, waitForMilliseconds, getCurrentDate, maximumRateLimitRetryCount } = createDependencies();
 
     await assert.rejects(
@@ -112,8 +104,8 @@ test('throws when the given repo doesn’t have a "/"', async () => {
     );
 });
 
-test('requests the labels for the correct repo and pull request', async () => {
-    const listLabelsOnIssue = fake.resolves({ data: [{ name: 'bug' }] });
+test('requests the labels for the correct repo and pull request', async function () {
+    const listLabelsOnIssue = fake.resolves({ data: [ { name: 'bug' } ] });
     const { githubClient, waitForMilliseconds, getCurrentDate, maximumRateLimitRetryCount } = createDependencies({
         listLabelsOnIssue
     });
@@ -126,11 +118,11 @@ test('requests the labels for the correct repo and pull request', async () => {
     });
 
     assert.strictEqual(listLabelsOnIssue.callCount, 1);
-    assert.deepStrictEqual(listLabelsOnIssue.firstCall.args, [{ owner: 'any', repo: 'repo', issue_number: 123 }]);
+    assert.deepStrictEqual(listLabelsOnIssue.firstCall.args, [ { owner: 'any', repo: 'repo', issue_number: 123 } ]);
 });
 
-test('fulfills with the correct label name', async () => {
-    const listLabelsOnIssue = fake.resolves({ data: [{ name: 'bug' }] });
+test('fulfills with the correct label name', async function () {
+    const listLabelsOnIssue = fake.resolves({ data: [ { name: 'bug' } ] });
     const { githubClient, waitForMilliseconds, getCurrentDate, maximumRateLimitRetryCount } = createDependencies({
         listLabelsOnIssue
     });
@@ -148,8 +140,8 @@ test('fulfills with the correct label name', async () => {
     );
 });
 
-test('fulfills with all label names', async () => {
-    const listLabelsOnIssue = fake.resolves({ data: [{ name: 'bug' }, { name: 'docs' }] });
+test('fulfills with all label names', async function () {
+    const listLabelsOnIssue = fake.resolves({ data: [ { name: 'bug' }, { name: 'docs' } ] });
     const { githubClient, waitForMilliseconds, getCurrentDate, maximumRateLimitRetryCount } = createDependencies({
         listLabelsOnIssue
     });
@@ -161,26 +153,26 @@ test('fulfills with all label names', async () => {
             getCurrentDate,
             maximumRateLimitRetryCount
         }),
-        ['bug', 'docs']
+        [ 'bug', 'docs' ]
     );
 });
 
-test('creates a GitHub pull request label reader', async () => {
-    const listLabelsOnIssue = fake.resolves({ data: [{ name: 'bug' }] });
+test('creates a GitHub pull request label reader', async function () {
+    const listLabelsOnIssue = fake.resolves({ data: [ { name: 'bug' } ] });
     const dependencies = createDependencies({ listLabelsOnIssue });
     const pullRequestLabelReader = createGitHubPullRequestLabelReader(dependencies);
 
-    assert.deepStrictEqual(await pullRequestLabelReader.getLabels(anyRepo, anyPullRequestId), ['bug']);
+    assert.deepStrictEqual(await pullRequestLabelReader.getLabels(anyRepo, anyPullRequestId), [ 'bug' ]);
 });
 
-test('uses custom labels when provided', async () => {
-    const listLabelsOnIssue = fake.resolves({ data: [{ name: 'addons' }] });
+test('uses custom labels when provided', async function () {
+    const listLabelsOnIssue = fake.resolves({ data: [ { name: 'addons' } ] });
     const { githubClient, waitForMilliseconds, getCurrentDate, maximumRateLimitRetryCount } = createDependencies({
         listLabelsOnIssue
     });
 
     const expectedLabelName = 'addons';
-    const customValidLabels = new Map([['addons', 'Addons']]);
+    const customValidLabels = new Map([ [ 'addons', 'Addons' ] ]);
 
     assert.strictEqual(
         await getPullRequestLabel(anyRepo, customValidLabels, anyPullRequestId, {
@@ -193,7 +185,7 @@ test('uses custom labels when provided', async () => {
     );
 });
 
-test('rejects if the pull request doesn’t have one valid label', async () => {
+test('rejects if the pull request doesn’t have one valid label', async function () {
     const { githubClient, waitForMilliseconds, getCurrentDate, maximumRateLimitRetryCount } = createDependencies();
 
     const expectedErrorMessage = oneLine`Pull Request #123 has no label of breaking, bug,
@@ -212,8 +204,8 @@ test('rejects if the pull request doesn’t have one valid label', async () => {
     );
 });
 
-test('rejects if the pull request has more than one valid label', async () => {
-    const listLabelsOnIssue = fake.resolves({ data: [{ name: 'bug' }, { name: 'documentation' }] });
+test('rejects if the pull request has more than one valid label', async function () {
+    const listLabelsOnIssue = fake.resolves({ data: [ { name: 'bug' }, { name: 'documentation' } ] });
     const { githubClient, waitForMilliseconds, getCurrentDate, maximumRateLimitRetryCount } = createDependencies({
         listLabelsOnIssue
     });
@@ -233,7 +225,7 @@ test('rejects if the pull request has more than one valid label', async () => {
     );
 });
 
-test('retries using the retry-after header', async () => {
+test('retries using the retry-after header', async function () {
     const listLabelsOnIssue = stub()
         .onFirstCall()
         .rejects(
@@ -241,7 +233,7 @@ test('retries using the retry-after header', async () => {
                 'retry-after': retryAfterSeconds
             })
         );
-    listLabelsOnIssue.onSecondCall().resolves({ data: [{ name: 'bug' }] });
+    listLabelsOnIssue.onSecondCall().resolves({ data: [ { name: 'bug' } ] });
     const { githubClient, waitForMilliseconds, getCurrentDate, maximumRateLimitRetryCount } = createDependencies({
         listLabelsOnIssue
     });
@@ -256,10 +248,10 @@ test('retries using the retry-after header', async () => {
     assert.strictEqual(labelName, 'bug');
     assert.strictEqual(listLabelsOnIssue.callCount, expectedRequestAttemptCount);
     assert.strictEqual(waitForMilliseconds.callCount, 1);
-    assert.deepStrictEqual(waitForMilliseconds.firstCall.args, [expectedRetryAfterDelayMilliseconds]);
+    assert.deepStrictEqual(waitForMilliseconds.firstCall.args, [ expectedRetryAfterDelayMilliseconds ]);
 });
 
-test('retries using the rate limit reset header when retry-after is missing', async () => {
+test('retries using the rate limit reset header when retry-after is missing', async function () {
     const listLabelsOnIssue = stub()
         .onFirstCall()
         .rejects(
@@ -267,7 +259,7 @@ test('retries using the rate limit reset header when retry-after is missing', as
                 'x-ratelimit-reset': rateLimitResetSeconds
             })
         );
-    listLabelsOnIssue.onSecondCall().resolves({ data: [{ name: 'bug' }] });
+    listLabelsOnIssue.onSecondCall().resolves({ data: [ { name: 'bug' } ] });
     const { githubClient, waitForMilliseconds, getCurrentDate, maximumRateLimitRetryCount } = createDependencies({
         listLabelsOnIssue
     });
@@ -282,10 +274,10 @@ test('retries using the rate limit reset header when retry-after is missing', as
     assert.strictEqual(labelName, 'bug');
     assert.strictEqual(listLabelsOnIssue.callCount, expectedRequestAttemptCount);
     assert.strictEqual(waitForMilliseconds.callCount, 1);
-    assert.deepStrictEqual(waitForMilliseconds.firstCall.args, [expectedRateLimitResetDelayMilliseconds]);
+    assert.deepStrictEqual(waitForMilliseconds.firstCall.args, [ expectedRateLimitResetDelayMilliseconds ]);
 });
 
-test('rejects immediately when a non-error value was thrown', async () => {
+test('rejects immediately when a non-error value was thrown', async function () {
     const rejectedValue = { boom: true };
     const listLabelsOnIssue = stub().rejects(rejectedValue);
     const { githubClient, waitForMilliseconds, getCurrentDate, maximumRateLimitRetryCount } = createDependencies({
@@ -293,7 +285,7 @@ test('rejects immediately when a non-error value was thrown', async () => {
     });
 
     await assert.rejects(
-        async () => {
+        async function () {
             await getPullRequestLabel(anyRepo, defaultValidLabels, anyPullRequestId, {
                 githubClient,
                 waitForMilliseconds,
@@ -301,7 +293,7 @@ test('rejects immediately when a non-error value was thrown', async () => {
                 maximumRateLimitRetryCount
             });
         },
-        (error: unknown) => {
+        function (error: unknown) {
             assert.deepStrictEqual(error, rejectedValue);
             return true;
         }
@@ -310,7 +302,7 @@ test('rejects immediately when a non-error value was thrown', async () => {
     assert.strictEqual(waitForMilliseconds.callCount, 0);
 });
 
-test('rejects immediately when the error is not a rate limit error', async () => {
+test('rejects immediately when the error is not a rate limit error', async function () {
     const listLabelsOnIssue = stub().rejects(
         createGitHubErrorWithStatus(internalServerErrorStatus, 'Internal Server Error')
     );
@@ -333,7 +325,7 @@ test('rejects immediately when the error is not a rate limit error', async () =>
     assert.strictEqual(waitForMilliseconds.callCount, 0);
 });
 
-test('rejects immediately when a rate limit error does not include retry headers', async () => {
+test('rejects immediately when a rate limit error does not include retry headers', async function () {
     const listLabelsOnIssue = stub().rejects(createGitHubRateLimitError('API rate limit exceeded.', {}));
     const { githubClient, waitForMilliseconds, getCurrentDate, maximumRateLimitRetryCount } = createDependencies({
         listLabelsOnIssue
@@ -354,7 +346,7 @@ test('rejects immediately when a rate limit error does not include retry headers
     assert.strictEqual(waitForMilliseconds.callCount, 0);
 });
 
-test('rejects immediately when a rate limit error does not include a headers object', async () => {
+test('rejects immediately when a rate limit error does not include a headers object', async function () {
     const listLabelsOnIssue = stub().rejects(createGitHubRateLimitErrorWithoutHeaders('API rate limit exceeded.'));
     const { githubClient, waitForMilliseconds, getCurrentDate, maximumRateLimitRetryCount } = createDependencies({
         listLabelsOnIssue
@@ -375,7 +367,7 @@ test('rejects immediately when a rate limit error does not include a headers obj
     assert.strictEqual(waitForMilliseconds.callCount, 0);
 });
 
-test('rejects immediately when retry headers are not numeric', async () => {
+test('rejects immediately when retry headers are not numeric', async function () {
     const listLabelsOnIssue = stub().rejects(
         createGitHubRateLimitError('API rate limit exceeded.', { 'retry-after': 'not-a-number' })
     );
@@ -398,7 +390,7 @@ test('rejects immediately when retry headers are not numeric', async () => {
     assert.strictEqual(waitForMilliseconds.callCount, 0);
 });
 
-test('rejects immediately when the retry budget is exhausted', async () => {
+test('rejects immediately when the retry budget is exhausted', async function () {
     const listLabelsOnIssue = stub().rejects(
         createGitHubRateLimitError('You have exceeded a secondary rate limit.', {
             'retry-after': retryAfterSeconds

@@ -1,14 +1,27 @@
-import type { Octokit } from '@octokit/rest';
 import { isError, isFiniteNumber, isString } from '@sindresorhus/is';
-import Maybe from 'true-myth/maybe';
+import { of } from 'true-myth/maybe';
 import { splitByString } from './split.ts';
 import type { PullRequestLabelReader } from './resolve-pull-request-labels.ts';
 
 export type GitHubPullRequestLabelReaderDependencies = {
-    readonly githubClient: Octokit;
+    readonly githubClient: GitHubPullRequestLabelClient;
     readonly waitForMilliseconds: (durationMilliseconds: number) => Promise<void>;
     readonly getCurrentDate: () => Readonly<Date>;
     readonly maximumRateLimitRetryCount: number;
+};
+
+export type GitHubPullRequestLabelClient = {
+    readonly issues: {
+        readonly listLabelsOnIssue: (options: GitHubPullRequestLabelRequest) => Promise<{
+            readonly data: readonly Label[];
+        }>;
+    };
+};
+
+type GitHubPullRequestLabelRequest = {
+    readonly owner: string;
+    readonly repo: string;
+    readonly issue_number: number;
 };
 
 export type GetPullRequestLabel = typeof getPullRequestLabel;
@@ -27,23 +40,25 @@ const forbiddenStatusCode = 403;
 const tooManyRequestsStatusCode = 429;
 
 function determineRepoDetails(githubRepo: string): Readonly<[owner: string, repo: string]> {
-    const [owner, repo] = splitByString(githubRepo, '/');
+    const [ owner, repo ] = splitByString(githubRepo, '/');
 
     if (repo === undefined) {
         throw new TypeError('Could not find a repository');
     }
 
-    return [owner, repo];
+    return [ owner, repo ];
 }
 
-type Label = Readonly<Awaited<ReturnType<Octokit['issues']['listLabelsOnIssue']>>['data'][number]>;
+type Label = {
+    readonly name: string;
+};
 
 async function fetchLabels(
-    githubClient: Readonly<Octokit>,
+    githubClient: GitHubPullRequestLabelClient,
     githubRepo: string,
     pullRequestId: number
-): Promise<Label[]> {
-    const [owner, repo] = determineRepoDetails(githubRepo);
+): Promise<readonly Label[]> {
+    const [ owner, repo ] = determineRepoDetails(githubRepo);
     const params = { owner, repo, issue_number: pullRequestId };
     const { data: labels } = await githubClient.issues.listLabelsOnIssue(params);
 
@@ -73,22 +88,22 @@ function parseDelaySeconds(value: string): number | undefined {
 }
 
 function determineRetryAfterDelayMilliseconds(headers: Headers): number | undefined {
-    return Maybe.of(getHeaderValue(headers, 'retry-after'))
-        .andThen((retryAfterValue) => {
-            return Maybe.of(parseDelaySeconds(retryAfterValue));
+    return of(getHeaderValue(headers, 'retry-after'))
+        .andThen(function (retryAfterValue) {
+            return of(parseDelaySeconds(retryAfterValue));
         })
-        .map((retryAfterSeconds) => {
+        .map(function (retryAfterSeconds) {
             return retryAfterSeconds * millisecondsPerSecond;
         })
         .unwrapOr(undefined);
 }
 
 function determineRateLimitResetDelayMilliseconds(headers: Headers, currentDate: Readonly<Date>): number | undefined {
-    return Maybe.of(getHeaderValue(headers, 'x-ratelimit-reset'))
-        .andThen((rateLimitResetValue) => {
-            return Maybe.of(parseDelaySeconds(rateLimitResetValue));
+    return of(getHeaderValue(headers, 'x-ratelimit-reset'))
+        .andThen(function (rateLimitResetValue) {
+            return of(parseDelaySeconds(rateLimitResetValue));
         })
-        .map((rateLimitResetSeconds) => {
+        .map(function (rateLimitResetSeconds) {
             const delayMilliseconds = rateLimitResetSeconds * millisecondsPerSecond - currentDate.getTime();
             return Math.max(delayMilliseconds, noDelayMilliseconds);
         })
@@ -125,7 +140,7 @@ function getGitHubClientError(error: unknown): GitHubClientError | undefined {
         return undefined;
     }
 
-    return error as GitHubClientError;
+    return error;
 }
 
 type FetchLabelsWithRateLimitRetryOptions = {
@@ -157,7 +172,7 @@ async function waitForRateLimitResetIfRetryable(
 async function fetchLabelsWithRateLimitRetry(
     options: Readonly<FetchLabelsWithRateLimitRetryOptions>,
     retryCount: number
-): Promise<Label[]> {
+): Promise<readonly Label[]> {
     const { githubRepo, pullRequestId, dependencies } = options;
     const { githubClient } = dependencies;
 
@@ -191,14 +206,15 @@ export async function getPullRequestLabel(
     );
 
     const listOfLabels = validLabelNames.join(', ');
-    const filteredLabels = labels.filter((label) => {
+    const filteredLabels = labels.filter(function (label) {
         return validLabelNames.includes(label.name);
     });
-    const [firstLabel] = filteredLabels;
+    const [ firstLabel ] = filteredLabels;
 
     if (filteredLabels.length > 1) {
         throw new Error(`Pull Request #${pullRequestId} has multiple labels of ${listOfLabels}`);
-    } else if (firstLabel === undefined) {
+    }
+    if (firstLabel === undefined) {
         throw new TypeError(`Pull Request #${pullRequestId} has no label of ${listOfLabels}`);
     }
 
@@ -219,7 +235,7 @@ export async function getPullRequestLabels(
         0
     );
 
-    return labels.map((label) => {
+    return labels.map(function (label) {
         return label.name;
     });
 }

@@ -6,12 +6,12 @@ import {
 } from './render-changelog-markdown.ts';
 import { defaultValidLabels } from './valid-labels.ts';
 
-test('renders released changelog markdown', () => {
+test('renders released changelog markdown', function () {
     const changelog = renderChangelogMarkdown({
         packageInfo: {},
         currentDate: new Date(0),
         validLabels: defaultValidLabels,
-        mergedPullRequests: [{ id: 1, title: 'Fix bug', label: 'bug' }],
+        mergedPullRequests: [ { id: 1, title: 'Fix bug', label: 'bug' } ],
         githubRepo: 'owner/repo',
         unreleased: false,
         versionNumber: '1.2.3'
@@ -21,12 +21,12 @@ test('renders released changelog markdown', () => {
     assert.ok(changelog.includes('* Fix bug ([#1](https://github.com/owner/repo/pull/1))'));
 });
 
-test('renders unreleased changelog markdown without a title', () => {
+test('renders unreleased changelog markdown without a title', function () {
     const changelog = renderChangelogMarkdown({
         packageInfo: {},
         currentDate: new Date(0),
         validLabels: defaultValidLabels,
-        mergedPullRequests: [{ id: 1, title: 'Fix bug', label: 'bug' }],
+        mergedPullRequests: [ { id: 1, title: 'Fix bug', label: 'bug' } ],
         githubRepo: 'owner/repo',
         unreleased: true,
         versionNumber: undefined
@@ -36,13 +36,13 @@ test('renders unreleased changelog markdown without a title', () => {
     assert.ok(changelog.includes('* Fix bug ([#1](https://github.com/owner/repo/pull/1))'));
 });
 
-test('renders target changelog markdown', () => {
+test('renders target changelog markdown', function () {
     const changelog = renderTargetChangelogMarkdown({
         packageInfo: {},
         currentDate: new Date(0),
         validLabels: defaultValidLabels,
         targetName: 'pkg-a',
-        mergedPullRequests: [{ id: 1, title: 'Fix bug', label: 'bug' }],
+        mergedPullRequests: [ { id: 1, title: 'Fix bug', label: 'bug' } ],
         githubRepo: 'owner/repo',
         unreleased: true,
         versionNumber: undefined
@@ -52,7 +52,7 @@ test('renders target changelog markdown', () => {
     assert.ok(changelog.includes('* Fix bug ([#1](https://github.com/owner/repo/pull/1))'));
 });
 
-test('renders grouped target changelog markdown', () => {
+test('renders grouped target changelog markdown', function () {
     const changelog = renderGroupedTargetChangelogMarkdown({
         packageInfo: {},
         currentDate: new Date(0),
@@ -62,13 +62,13 @@ test('renders grouped target changelog markdown', () => {
                 targetName: 'pkg-a',
                 unreleased: false,
                 versionNumber: '1.2.3',
-                mergedPullRequests: [{ id: 1, title: 'Fix bug', label: 'bug' }]
+                mergedPullRequests: [ { id: 1, title: 'Fix bug', label: 'bug' } ]
             },
             {
                 targetName: 'pkg-b',
                 unreleased: false,
                 versionNumber: '2.0.0',
-                mergedPullRequests: [{ id: 2, title: 'Add feature', label: 'feature' }]
+                mergedPullRequests: [ { id: 2, title: 'Add feature', label: 'feature' } ]
             }
         ],
         githubRepo: 'owner/repo'
@@ -80,7 +80,7 @@ test('renders grouped target changelog markdown', () => {
     assert.ok(changelog.includes('### Features'));
 });
 
-test('does not render empty target sections', () => {
+test('does not render empty target sections', function () {
     const changelog = renderGroupedTargetChangelogMarkdown({
         packageInfo: {},
         currentDate: new Date(0),
@@ -91,7 +91,7 @@ test('does not render empty target sections', () => {
                 targetName: 'pkg-b',
                 unreleased: true,
                 versionNumber: undefined,
-                mergedPullRequests: [{ id: 2, title: 'Add feature', label: 'feature' }]
+                mergedPullRequests: [ { id: 2, title: 'Add feature', label: 'feature' } ]
             }
         ],
         githubRepo: 'owner/repo'
@@ -101,7 +101,7 @@ test('does not render empty target sections', () => {
     assert.ok(changelog.includes('## pkg-b'));
 });
 
-test('renders grouped target changelog markdown with custom date formatting', () => {
+test('renders grouped target changelog markdown with custom date formatting', function () {
     const changelog = renderGroupedTargetChangelogMarkdown({
         packageInfo: { 'pr-log': { dateFormat: 'dd.MM.yyyy' } },
         currentDate: new Date(0),
@@ -111,7 +111,7 @@ test('renders grouped target changelog markdown with custom date formatting', ()
                 targetName: 'pkg-a',
                 unreleased: false,
                 versionNumber: '1.2.3',
-                mergedPullRequests: [{ id: 1, title: 'Fix bug', label: 'bug' }]
+                mergedPullRequests: [ { id: 1, title: 'Fix bug', label: 'bug' } ]
             }
         ],
         githubRepo: 'owner/repo'

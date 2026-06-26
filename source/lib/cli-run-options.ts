@@ -1,7 +1,8 @@
-import Maybe, { type Just, type Nothing } from 'true-myth/maybe';
-import Result from 'true-myth/result';
+import { nothing, of, type Just, type Nothing } from 'true-myth/maybe';
+import { err, ok, type Result } from 'true-myth/result';
 import { isString } from '@sindresorhus/is';
 import { InvalidArgumentError } from 'commander';
+import { createVersionNumber } from './version-number.ts';
 
 type CliRunOptionsUnreleased = {
     readonly unreleased: true;
@@ -34,7 +35,7 @@ export type CliRunOptions = CliRunOptionsReleasedAuto | CliRunOptionsReleasedExp
 
 export type CreateCliRunOptions = {
     readonly versionNumber: string | undefined;
-    readonly commandOptions: Record<string, unknown>;
+    readonly commandOptions: Readonly<Record<string, unknown>>;
     readonly changelogPath: string;
 };
 
@@ -60,20 +61,20 @@ function createUnreleasedRunOptions(
     autoVersion: boolean
 ): Result<CliRunOptions, InvalidArgumentError> {
     if (autoVersion) {
-        return Result.err(
+        return err(
             new InvalidArgumentError('A version number must not be auto-derived when --unreleased was provided')
         );
     }
 
     if (isString(versionNumber)) {
-        return Result.err(new InvalidArgumentError('A version number is not allowed when --unreleased was provided'));
+        return err(new InvalidArgumentError('A version number is not allowed when --unreleased was provided'));
     }
 
-    return Result.ok({
+    return ok({
         ...commonRunOptions,
         unreleased: true,
         autoVersion: false,
-        versionNumber: Maybe.nothing()
+        versionNumber: nothing()
     });
 }
 
@@ -82,14 +83,14 @@ function createAutoVersionRunOptions(
     versionNumber: string | undefined
 ): Result<CliRunOptions, InvalidArgumentError> {
     if (isString(versionNumber)) {
-        return Result.err(new InvalidArgumentError('A version number is not allowed when --auto-version was provided'));
+        return err(new InvalidArgumentError('A version number is not allowed when --auto-version was provided'));
     }
 
-    return Result.ok({
+    return ok({
         ...commonRunOptions,
         unreleased: false,
         autoVersion: true,
-        versionNumber: Maybe.nothing()
+        versionNumber: nothing()
     });
 }
 
@@ -97,17 +98,17 @@ function createReleasedRunOptions(
     commonRunOptions: CommonRunOptions,
     versionNumber: string | undefined
 ): Result<CliRunOptions, InvalidArgumentError> {
-    return Maybe.of(versionNumber).match<Result<CliRunOptions, InvalidArgumentError>>({
+    return of(versionNumber).match<Result<CliRunOptions, InvalidArgumentError>>({
         Just(value) {
-            return Result.ok({
+            return ok({
                 ...commonRunOptions,
                 unreleased: false,
                 autoVersion: false,
-                versionNumber: Maybe.just(value) as Just<string>
+                versionNumber: createVersionNumber(value)
             });
         },
         Nothing() {
-            return Result.err(new InvalidArgumentError('Version number is missing'));
+            return err(new InvalidArgumentError('Version number is missing'));
         }
     });
 }

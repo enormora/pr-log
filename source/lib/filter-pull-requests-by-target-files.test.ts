@@ -10,50 +10,50 @@ const pullRequests: readonly PullRequest[] = [
 const unrelatedPullRequestId = 2;
 const changelogPullRequestId = 3;
 
-test('keeps pull requests that changed target source files', () => {
+test('keeps pull requests that changed target source files', function () {
     const changedFilesByPullRequest = new Map<number, readonly string[]>([
-        [1, ['source/index.ts']],
-        [unrelatedPullRequestId, ['test/index.test.ts']]
+        [ 1, [ 'source/index.ts' ] ],
+        [ unrelatedPullRequestId, [ 'test/index.test.ts' ] ]
     ]);
 
     const filteredPullRequests = filterPullRequestsByTargetFiles({
         targetName: 'target',
-        targetSourceFiles: ['source/index.ts'],
+        targetSourceFiles: [ 'source/index.ts' ],
         pullRequests,
         changedFilesByPullRequest,
         ignoredAttributionPaths: []
     });
 
-    assert.deepStrictEqual(filteredPullRequests, [{ id: 1, title: 'Fix target' }]);
+    assert.deepStrictEqual(filteredPullRequests, [ { id: 1, title: 'Fix target' } ]);
 });
 
-test('normalizes repository paths before matching target files', () => {
-    const changedFilesByPullRequest = new Map<number, readonly string[]>([[1, ['.\\source\\index.ts']]]);
+test('normalizes repository paths before matching target files', function () {
+    const changedFilesByPullRequest = new Map<number, readonly string[]>([ [ 1, [ '.\\source\\index.ts' ] ] ]);
 
     const filteredPullRequests = filterPullRequestsByTargetFiles({
         targetName: 'target',
-        targetSourceFiles: ['./source/index.ts'],
-        pullRequests: [{ id: 1, title: 'Fix target' }],
+        targetSourceFiles: [ './source/index.ts' ],
+        pullRequests: [ { id: 1, title: 'Fix target' } ],
         changedFilesByPullRequest,
         ignoredAttributionPaths: []
     });
 
-    assert.deepStrictEqual(filteredPullRequests, [{ id: 1, title: 'Fix target' }]);
+    assert.deepStrictEqual(filteredPullRequests, [ { id: 1, title: 'Fix target' } ]);
 });
 
-test('ignores supplied attribution paths', () => {
+test('ignores supplied attribution paths', function () {
     const changedFilesByPullRequest = new Map<number, readonly string[]>([
-        [1, ['source/index.ts']],
-        [changelogPullRequestId, ['CHANGELOG.md']]
+        [ 1, [ 'source/index.ts' ] ],
+        [ changelogPullRequestId, [ 'CHANGELOG.md' ] ]
     ]);
 
     const filteredPullRequests = filterPullRequestsByTargetFiles({
         targetName: 'target',
-        targetSourceFiles: ['source/index.ts', 'CHANGELOG.md'],
+        targetSourceFiles: [ 'source/index.ts', 'CHANGELOG.md' ],
         pullRequests,
         changedFilesByPullRequest,
-        ignoredAttributionPaths: ['CHANGELOG.md']
+        ignoredAttributionPaths: [ 'CHANGELOG.md' ]
     });
 
-    assert.deepStrictEqual(filteredPullRequests, [{ id: 1, title: 'Fix target' }]);
+    assert.deepStrictEqual(filteredPullRequests, [ { id: 1, title: 'Fix target' } ]);
 });

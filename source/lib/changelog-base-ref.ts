@@ -5,7 +5,7 @@ export type ChangelogBaseRef = {
 };
 
 export type GitRefReader = {
-    hasRef(ref: string): Promise<boolean>;
+    hasRef: (ref: string) => Promise<boolean>;
 };
 
 export type LatestSemverTagBaseRefInput = {
@@ -22,44 +22,52 @@ export type PackageChangelogBaseRefInput = {
 
 export type MissingChangelogBaseRefReason = 'explicit-base-ref' | 'package-version-tag' | 'previous-git-head';
 
-export type MissingChangelogBaseRefError = {
+export type MissingChangelogBaseRefError = Readonly<Error> & {
     readonly name: 'MissingChangelogBaseRefError';
-    readonly message: string;
     readonly packageName: string;
     readonly ref: string | undefined;
     readonly reason: MissingChangelogBaseRefReason;
-    readonly stack: string | undefined;
 };
 
-function throwMissingChangelogBaseRefError(options: {
+type MissingChangelogBaseRefErrorOptions = {
     readonly packageName: string;
     readonly ref: string | undefined;
     readonly reason: MissingChangelogBaseRefReason;
-}): never {
+};
+
+function createMissingChangelogBaseRefError(
+    message: string,
+    options: MissingChangelogBaseRefErrorOptions
+): Error {
+    return Object.defineProperties(new Error(message), {
+        name: { value: 'MissingChangelogBaseRefError' },
+        packageName: { value: options.packageName },
+        ref: { value: options.ref },
+        reason: { value: options.reason }
+    });
+}
+
+function throwMissingChangelogBaseRefError(options: MissingChangelogBaseRefErrorOptions): never {
     const { packageName, ref, reason } = options;
     const refDescription = ref === undefined ? 'No base ref could be determined' : `Base ref "${ref}" does not exist`;
-    const error: Error = Object.assign(new Error(`${refDescription} for package "${packageName}" using ${reason}`), {
-        name: 'MissingChangelogBaseRefError',
-        packageName,
-        ref,
-        reason
-    });
 
-    throw error;
+    throw createMissingChangelogBaseRefError(`${refDescription} for package "${packageName}" using ${reason}`, options);
 }
 
 export function resolveLatestSemverTagBaseRef(input: LatestSemverTagBaseRefInput): ChangelogBaseRef {
     return { ref: determineLatestVersionTag(input.tags) };
 }
 
-export function formatPackageVersionTag(options: {
+export type PackageVersionTagInput = {
     readonly packageName: string;
     readonly version: string;
     readonly packageTagFormat: string | undefined;
-}): string {
+};
+
+export function formatPackageVersionTag(options: PackageVersionTagInput): string {
     const tagFormat = options.packageTagFormat ?? '{packageName}@{version}';
 
-    return tagFormat.replaceAll('{packageName}', options.packageName).replaceAll('{version}', options.version);
+    return tagFormat.split('{packageName}').join(options.packageName).split('{version}').join(options.version);
 }
 
 async function requireExistingBaseRef(

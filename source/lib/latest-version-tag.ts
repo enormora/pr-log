@@ -2,7 +2,7 @@ import semver from 'semver';
 import { isUndefined } from '@sindresorhus/is';
 
 export function determineLatestVersionTag(tags: readonly string[]): string {
-    const versionTags = tags.filter((tag: string) => {
+    const versionTags = tags.filter(function (tag: string) {
         return semver.valid(tag) !== null && semver.prerelease(tag) === null;
     });
     const orderedVersionTags = versionTags.toSorted(semver.rcompare);

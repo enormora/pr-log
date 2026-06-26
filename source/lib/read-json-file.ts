@@ -1,3 +1,5 @@
+import { isPlainObject } from '@sindresorhus/is';
+
 export type JsonFileReader = (filePath: string) => Promise<Record<string, unknown>>;
 
 export type JsonFileReaderDependencies = {
@@ -9,6 +11,12 @@ export function createJsonFileReader(dependencies: JsonFileReaderDependencies): 
 
     return async function readJsonFile(filePath) {
         const fileContent = await readTextFile(filePath);
-        return JSON.parse(fileContent) as Record<string, unknown>;
+        const data: unknown = JSON.parse(fileContent);
+
+        if (!isPlainObject(data)) {
+            throw new TypeError(`JSON file "${filePath}" must contain an object`);
+        }
+
+        return data;
     };
 }

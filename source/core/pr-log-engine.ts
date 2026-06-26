@@ -1,4 +1,3 @@
-import type { Octokit } from '@octokit/rest';
 import { splitByString } from '../lib/split.ts';
 import {
     resolveChangelogBaseRef as resolveChangelogBaseRefValue,
@@ -17,7 +16,7 @@ import {
     type FilterPullRequestsByTargetFilesInput as FilterPullRequestsByTargetFilesInputValue
 } from '../lib/filter-pull-requests-by-target-files.ts';
 import type { GitCommandRunner } from '../lib/git-command-runner.ts';
-import type { GetPullRequestLabels } from '../lib/get-pull-request-label.ts';
+import type { GetPullRequestLabels, GitHubPullRequestLabelClient } from '../lib/get-pull-request-label.ts';
 import {
     fetchPullRequestChangedFiles as fetchPullRequestChangedFilesValue,
     type PullRequestChangedFilesReader
@@ -63,26 +62,42 @@ export type ResolvePullRequestLabelsOptions = {
 };
 
 export type PrLogEngine = {
-    resolveLatestSemverChangelogBaseRef(): Promise<ChangelogBaseRefValue>;
-    resolveChangelogBaseRef(input: PackageChangelogBaseRefInputValue): Promise<ChangelogBaseRefValue>;
-    collectMergedPullRequests(input: CollectMergedPullRequestsOptions): Promise<readonly PullRequestValue[]>;
-    readPullRequestChangedFiles(
+    resolveLatestSemverChangelogBaseRef: () => Promise<ChangelogBaseRefValue>;
+    resolveChangelogBaseRef: (input: PackageChangelogBaseRefInputValue) => Promise<ChangelogBaseRefValue>;
+    collectMergedPullRequests: (input: CollectMergedPullRequestsOptions) => Promise<readonly PullRequestValue[]>;
+    readPullRequestChangedFiles: (
         input: ReadPullRequestChangedFilesOptions
-    ): Promise<ReadonlyMap<number, readonly string[]>>;
-    readPullRequestLabels(input: ReadPullRequestLabelsOptions): Promise<ReadonlyMap<number, readonly string[]>>;
-    filterPullRequestsByTargetFiles(input: FilterPullRequestsByTargetFilesInputValue): readonly PullRequestValue[];
-    resolvePullRequestLabels(input: ResolvePullRequestLabelsOptions): Promise<readonly PullRequestWithLabelValue[]>;
-    renderChangelog(input: RenderChangelogMarkdownInputValue): string;
-    renderTargetChangelog(input: RenderTargetChangelogMarkdownInputValue): string;
-    renderGroupedTargetChangelog(input: RenderGroupedTargetChangelogMarkdownInputValue): string;
-    updateChangelog(input: UpdateChangelogMarkdownInputValue): string;
+    ) => Promise<ReadonlyMap<number, readonly string[]>>;
+    readPullRequestLabels: (input: ReadPullRequestLabelsOptions) => Promise<ReadonlyMap<number, readonly string[]>>;
+    filterPullRequestsByTargetFiles: (input: FilterPullRequestsByTargetFilesInputValue) => readonly PullRequestValue[];
+    resolvePullRequestLabels: (input: ResolvePullRequestLabelsOptions) => Promise<readonly PullRequestWithLabelValue[]>;
+    renderChangelog: (input: RenderChangelogMarkdownInputValue) => string;
+    renderTargetChangelog: (input: RenderTargetChangelogMarkdownInputValue) => string;
+    renderGroupedTargetChangelog: (input: RenderGroupedTargetChangelogMarkdownInputValue) => string;
+    updateChangelog: (input: UpdateChangelogMarkdownInputValue) => string;
 };
 
-type PullRequestData = Readonly<Awaited<ReturnType<Octokit['pulls']['get']>>['data']>;
+export type PullRequestTitleGitHubClient = {
+    readonly pulls: {
+        readonly get: (options: PullRequestTitleRequest) => Promise<PullRequestTitleResponse>;
+    };
+};
+
+type PullRequestTitleRequest = {
+    readonly owner: string;
+    readonly repo: string;
+    readonly pull_number: number;
+};
+
+type PullRequestTitleResponse = {
+    readonly data: {
+        readonly title: string;
+    };
+};
 
 export type PrLogEngineDependencies = {
     readonly gitCommandRunner: GitCommandRunner;
-    readonly githubClient: Octokit;
+    readonly githubClient: GitHubPullRequestLabelClient & PullRequestTitleGitHubClient;
     readonly pullRequestChangedFilesReader: PullRequestChangedFilesReader;
     readonly getPullRequestLabels: GetPullRequestLabels;
     readonly waitForMilliseconds: (durationMilliseconds: number) => Promise<void>;
@@ -92,31 +107,31 @@ export type PrLogEngineDependencies = {
 };
 
 function determineRepoDetails(githubRepo: string): Readonly<[owner: string, repo: string]> {
-    const [owner, repo] = splitByString(githubRepo, '/');
+    const [ owner, repo ] = splitByString(githubRepo, '/');
 
     if (repo === undefined) {
         throw new TypeError('Could not find a repository');
     }
 
-    return [owner, repo];
+    return [ owner, repo ];
 }
 
 async function fetchPullRequestTitle(
-    githubClient: Readonly<Octokit>,
+    githubClient: PullRequestTitleGitHubClient,
     githubRepo: string,
     pullRequestId: number
 ): Promise<string> {
-    const [owner, repo] = determineRepoDetails(githubRepo);
+    const [ owner, repo ] = determineRepoDetails(githubRepo);
     const { data: pullRequest } = await githubClient.pulls.get({
         owner,
         repo,
         pull_number: pullRequestId
     });
 
-    return (pullRequest as PullRequestData).title;
+    return pullRequest.title;
 }
 
-function createPullRequestTitleReader(githubClient: Readonly<Octokit>): PullRequestTitleReader {
+function createPullRequestTitleReader(githubClient: PullRequestTitleGitHubClient): PullRequestTitleReader {
     return {
         async getTitle(githubRepo, pullRequestId) {
             return fetchPullRequestTitle(githubClient, githubRepo, pullRequestId);
@@ -125,7 +140,7 @@ function createPullRequestTitleReader(githubClient: Readonly<Octokit>): PullRequ
 }
 
 type EnginePullRequestLabelReader = {
-    getLabels(githubRepo: string, pullRequestId: number): Promise<readonly string[]>;
+    getLabels: (githubRepo: string, pullRequestId: number) => Promise<readonly string[]>;
 };
 
 function createPullRequestLabelReader(dependencies: PrLogEngineDependencies): EnginePullRequestLabelReader {
@@ -150,7 +165,7 @@ async function readPullRequestLabels(
     const pullRequestLabels = new Map<number, readonly string[]>();
     const pullRequestLabelReader = createPullRequestLabelReader(dependencies);
 
-    for (const [pullRequestIndex, pullRequest] of input.pullRequests.entries()) {
+    for (const [ pullRequestIndex, pullRequest ] of input.pullRequests.entries()) {
         await waitBetweenLabelReads(dependencies, pullRequestIndex);
         pullRequestLabels.set(pullRequest.id, await pullRequestLabelReader.getLabels(input.githubRepo, pullRequest.id));
     }

@@ -1,5 +1,7 @@
 import assert from 'node:assert';
-import { Maybe, Result, Unit } from 'true-myth';
+import { just, nothing } from 'true-myth/maybe';
+import { err, ok } from 'true-myth/result';
+import { Unit } from 'true-myth/unit';
 import { validateVersionNumber, type ValidateVersionNumberOptions } from './version-number.ts';
 
 const validateVersionNumberTestCases = [
@@ -8,50 +10,50 @@ const validateVersionNumberTestCases = [
         options: {
             unreleased: true,
             autoVersion: false,
-            versionNumber: Maybe.nothing<string>()
+            versionNumber: nothing<string>()
         },
-        expectedResult: Result.ok(Unit)
+        expectedResult: ok(Unit)
     },
     {
         testName: 'validateVersionNumber() returns a Result Ok when version is auto-derived',
         options: {
             unreleased: false,
             autoVersion: true,
-            versionNumber: Maybe.nothing<string>()
+            versionNumber: nothing<string>()
         },
-        expectedResult: Result.ok(Unit)
+        expectedResult: ok(Unit)
     },
     {
         testName: 'validateVersionNumber() returns a Result Err when version number is an empty string',
         options: {
             unreleased: false,
             autoVersion: false,
-            versionNumber: Maybe.just('')
+            versionNumber: just('')
         },
-        expectedResult: Result.err(new TypeError('version-number not specified'))
+        expectedResult: err(new TypeError('version-number not specified'))
     },
     {
         testName: 'validateVersionNumber() returns a Result Err when version number is not valid',
         options: {
             unreleased: false,
             autoVersion: false,
-            versionNumber: Maybe.just('foo.bar')
+            versionNumber: just('foo.bar')
         },
-        expectedResult: Result.err(new Error('version-number is invalid'))
+        expectedResult: err(new Error('version-number is invalid'))
     },
     {
         testName: 'validateVersionNumber() returns a Result Ok when version number is valid',
         options: {
             unreleased: false,
             autoVersion: false,
-            versionNumber: Maybe.just('1.2.3')
+            versionNumber: just('1.2.3')
         },
-        expectedResult: Result.ok(Unit)
+        expectedResult: ok(Unit)
     }
 ] as const;
 
 for (const validateVersionNumberTestCase of validateVersionNumberTestCases) {
-    test(validateVersionNumberTestCase.testName, () => {
+    test(validateVersionNumberTestCase.testName, function () {
         const actual = validateVersionNumber(validateVersionNumberTestCase.options as ValidateVersionNumberOptions);
 
         assert.deepStrictEqual(actual, validateVersionNumberTestCase.expectedResult);
