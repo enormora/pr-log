@@ -154,6 +154,14 @@ Example:
 - Fix some spelling mistakes in documentation. (#22)
 ```
 
+To validate labels on a single pull request, run:
+
+```sh
+pr-log validate-pull-request-labels 123
+```
+
+This command uses the same `pr-log` label configuration as changelog generation, including custom `validLabels` and `ignoredLabels`.
+
 ## Options
 
 ### `--sloppy`
