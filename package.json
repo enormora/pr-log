@@ -34,7 +34,7 @@
         "@packtory/cli": "0.0.46",
         "@types/common-tags": "1.8.4",
         "@types/mocha": "10.0.10",
-        "@types/node": "24.13.1",
+        "@types/node": "24.13.2",
         "@types/parse-github-repo-url": "1.4.2",
         "@types/semver": "7.7.1",
         "@types/sinon": "21.0.1",
