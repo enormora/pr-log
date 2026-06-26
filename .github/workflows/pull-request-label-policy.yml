@@ -1,0 +1,32 @@
+---
+name: Pull request label policy
+
+on:
+    pull_request:
+        types: [opened, reopened, synchronize, labeled, unlabeled]
+
+permissions: {}
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+    pull-request-label-policy:
+        runs-on: ubuntu-latest
+        name: Pull request label policy
+        steps:
+            - name: Validate pull request label
+              if: >
+                  contains(github.event.pull_request.labels.*.name, 'breaking') == false &&
+                  contains(github.event.pull_request.labels.*.name, 'bug') == false &&
+                  contains(github.event.pull_request.labels.*.name, 'feature') == false &&
+                  contains(github.event.pull_request.labels.*.name, 'enhancement') == false &&
+                  contains(github.event.pull_request.labels.*.name, 'documentation') == false &&
+                  contains(github.event.pull_request.labels.*.name, 'upgrade') == false &&
+                  contains(github.event.pull_request.labels.*.name, 'refactor') == false &&
+                  contains(github.event.pull_request.labels.*.name, 'build') == false &&
+                  contains(github.event.pull_request.labels.*.name, 'release') == false
+              run: |
+                  echo "Set one pr-log pull request label: breaking, bug, feature, enhancement, documentation, upgrade, refactor, build, release"
+                  exit 1
