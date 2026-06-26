@@ -45,7 +45,7 @@
         "eslint": "10.4.0",
         "fishery": "2.4.0",
         "mocha": "11.7.6",
-        "prettier": "3.8.3",
+        "prettier": "3.8.5",
         "rust-just": "1.51.0",
         "sinon": "22.0.0",
         "typescript": "6.0.3"
