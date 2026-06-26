@@ -29,7 +29,13 @@ prepare-packtory-source: compile
     perl -pi -e 's/from ([\x22\x27])(\.[^\x22\x27]+)\.ts\1/from $1$2.js$1/g' $(find target/packtory/source -name '*.d.ts')
 
 prepare-release: prepare-packtory-source
-    packtory release --write-changelog --commit --no-dry-run
+    packtory release-pr maintain --no-dry-run
+
+validate-release-pr:
+    packtory release-pr validate
+
+authorize-release-publish *OPTIONS:
+    packtory release-pr authorize-publish {{OPTIONS}}
 
 publish-release: prepare-packtory-source
     packtory release --publish --tag --push --github-release --no-dry-run

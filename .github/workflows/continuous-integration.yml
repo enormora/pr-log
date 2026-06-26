@@ -118,219 +118,10 @@ jobs:
                   git config user.name 'github-actions[bot]'
                   git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
-            - name: Close completed release pull request
-              id: completed-release
-              env:
-                  GH_TOKEN: ${{ github.token }}
-                  GITHUB_REPOSITORY: ${{ github.repository }}
-              run: |
-                  set -euo pipefail
-
-                  close_release_state() {
-                      gh pr list \
-                          --repo "$GITHUB_REPOSITORY" \
-                          --head release/pr-log \
-                          --base main \
-                          --state open \
-                          --json number \
-                          --jq '.[].number' |
-                          while read -r pr_number; do
-                              gh pr close "$pr_number" --repo "$GITHUB_REPOSITORY"
-                          done
-
-                      git push origin --delete release/pr-log 2>/dev/null || true
-                  }
-
-                  if gh api -H "Accept: application/vnd.github+json" \
-                      "/repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" |
-                      jq -e --arg sha "$GITHUB_SHA" \
-                          'any(.[]; .merged_at != null and .merge_commit_sha == $sha and any(.labels[]?; .name == "release"))' \
-                          >/dev/null; then
-                      close_release_state
-                      echo 'skip=true' >> "$GITHUB_OUTPUT"
-                      echo 'Merged release pull request does not need a replacement release PR'
-                  else
-                      echo 'skip=false' >> "$GITHUB_OUTPUT"
-                  fi
-
-            - name: Prepare release
-              if: steps.completed-release.outputs.skip != 'true'
+            - name: Maintain release pull request
               env:
                   GH_TOKEN: ${{ github.token }}
               run: npx just prepare-release
-
-            - name: Maintain release pull request
-              if: steps.completed-release.outputs.skip != 'true'
-              env:
-                  GH_TOKEN: ${{ github.token }}
-                  GITHUB_REPOSITORY: ${{ github.repository }}
-              run: |
-                  set -euo pipefail
-
-                  release_branch='release/pr-log'
-                  release_label='release'
-                  release_title='Prepare release'
-                  release_body='Updates changelogs for the next `pr-log` release.'
-                  required_contexts=('Node v22' 'Node v24' 'Node v26')
-
-                  close_release_state() {
-                      gh pr list \
-                          --repo "$GITHUB_REPOSITORY" \
-                          --head "$release_branch" \
-                          --base main \
-                          --state open \
-                          --json number \
-                          --jq '.[].number' |
-                          while read -r pr_number; do
-                              gh pr close "$pr_number" --repo "$GITHUB_REPOSITORY"
-                          done
-
-                      git push origin --delete "$release_branch" 2>/dev/null || true
-                  }
-
-                  create_status() {
-                      local commit_sha=$1
-                      local context=$2
-                      local state=$3
-                      local description=$4
-                      local target_url=${5:-}
-
-                      if [ -n "$target_url" ]; then
-                          gh api "/repos/$GITHUB_REPOSITORY/statuses/$commit_sha" \
-                              -f state="$state" \
-                              -f context="$context" \
-                              -f description="$description" \
-                              -f target_url="$target_url" >/dev/null
-                      else
-                          gh api "/repos/$GITHUB_REPOSITORY/statuses/$commit_sha" \
-                              -f state="$state" \
-                              -f context="$context" \
-                              -f description="$description" >/dev/null
-                      fi
-                  }
-
-                  release_commit=$(git rev-parse HEAD)
-
-                  if [ "$release_commit" = "$GITHUB_SHA" ]; then
-                      close_release_state
-                      echo 'No release content remains'
-                      exit 0
-                  fi
-
-                  git fetch origin "refs/heads/$release_branch:refs/remotes/origin/$release_branch" || true
-
-                  if remote_release_sha=$(git rev-parse --verify "refs/remotes/origin/$release_branch" 2>/dev/null); then
-                      lease="--force-with-lease=refs/heads/$release_branch:$remote_release_sha"
-                  else
-                      lease="--force-with-lease=refs/heads/$release_branch:"
-                  fi
-
-                  git push "$lease" origin "HEAD:refs/heads/$release_branch"
-
-                  pr_number=$(gh pr list \
-                      --repo "$GITHUB_REPOSITORY" \
-                      --head "$release_branch" \
-                      --base main \
-                      --state open \
-                      --json number \
-                      --jq '.[0].number // ""')
-
-                  if [ -z "$pr_number" ]; then
-                      gh pr create \
-                          --repo "$GITHUB_REPOSITORY" \
-                          --title "$release_title" \
-                          --body "$release_body" \
-                          --head "$release_branch" \
-                          --base main \
-                          --label "$release_label" >/dev/null
-                      pr_number=$(gh pr list \
-                          --repo "$GITHUB_REPOSITORY" \
-                          --head "$release_branch" \
-                          --base main \
-                          --state open \
-                          --json number \
-                          --jq '.[0].number')
-                  else
-                      gh pr edit "$pr_number" \
-                          --repo "$GITHUB_REPOSITORY" \
-                          --title "$release_title" \
-                          --body "$release_body"
-                  fi
-
-                  gh api -X PUT "/repos/$GITHUB_REPOSITORY/issues/$pr_number/labels" -f labels[]="$release_label" >/dev/null
-
-                  for context in "${required_contexts[@]}"; do
-                      create_status "$release_commit" "$context" pending 'Waiting for dispatched release CI.'
-                  done
-
-                  gh workflow run continuous-integration.yml --repo "$GITHUB_REPOSITORY" --ref "$release_branch"
-
-                  run_id=''
-                  for attempt in $(seq 1 30); do
-                      run_id=$(gh run list \
-                          --repo "$GITHUB_REPOSITORY" \
-                          --workflow continuous-integration.yml \
-                          --branch "$release_branch" \
-                          --event workflow_dispatch \
-                          --json databaseId,headSha \
-                          --jq ".[] | select(.headSha == \"$release_commit\") | .databaseId" |
-                          head -n 1)
-
-                      if [ -n "$run_id" ]; then
-                          break
-                      fi
-
-                      sleep 10
-                  done
-
-                  if [ -z "$run_id" ]; then
-                      echo "Release workflow run was not created for $release_commit"
-                      exit 1
-                  fi
-
-                  watch_status=0
-                  gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status || watch_status=$?
-
-                  run_json=$(gh run view "$run_id" --repo "$GITHUB_REPOSITORY" --json conclusion,jobs,url)
-                  failed=0
-
-                  for context in "${required_contexts[@]}"; do
-                      job_json=$(printf '%s' "$run_json" |
-                          jq -c --arg context "$context" '.jobs[]? | select(.name == $context)' |
-                          head -n 1)
-
-                      if [ -z "$job_json" ]; then
-                          create_status "$release_commit" "$context" failure "Missing dispatched release CI job: $context."
-                          failed=1
-                          continue
-                      fi
-
-                      conclusion=$(printf '%s' "$job_json" | jq -r '.conclusion // "failure"')
-                      target_url=$(printf '%s' "$job_json" | jq -r '.url // ""')
-
-                      if [ "$conclusion" = 'success' ]; then
-                          create_status "$release_commit" "$context" success 'Dispatched release CI job success.' "$target_url"
-                      else
-                          create_status "$release_commit" "$context" failure "Dispatched release CI job $conclusion." "$target_url"
-                          failed=1
-                      fi
-                  done
-
-                  gh run list \
-                      --repo "$GITHUB_REPOSITORY" \
-                      --branch "$release_branch" \
-                      --event pull_request \
-                      --json conclusion,databaseId,headSha \
-                      --jq ".[] | select(.headSha == \"$release_commit\" and .conclusion == \"action_required\") | .databaseId" |
-                      while read -r awaiting_run_id; do
-                          gh api -X DELETE "/repos/$GITHUB_REPOSITORY/actions/runs/$awaiting_run_id" >/dev/null
-                      done
-
-                  if [ "$failed" -ne 0 ] || [ "$watch_status" -ne 0 ]; then
-                      exit 1
-                  fi
-
-                  echo "Release PR #$pr_number points at $release_commit"
 
     publish-release:
         needs: build
@@ -344,77 +135,32 @@ jobs:
             id-token: write # required by npm trusted publishing to mint the OIDC token
             pull-requests: read # required to validate release PR identity before publishing
         steps:
-            - name: Resolve release publish target
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+              with:
+                  fetch-depth: 0
+                  persist-credentials: false
+
+            - name: Use Node.js
+              uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+              with:
+                  node-version: 24
+
+            - name: Install dependencies
+              run: npm clean-install --ignore-scripts
+
+            - name: Authorize release publish
               id: publish-target
               env:
                   GH_TOKEN: ${{ github.token }}
-                  GITHUB_REPOSITORY: ${{ github.repository }}
-                  GITHUB_EVENT_NAME: ${{ github.event_name }}
-                  GITHUB_REF_NAME: ${{ github.ref_name }}
-                  GITHUB_SHA: ${{ github.sha }}
                   RELEASE_PULL_REQUEST_NUMBER: ${{ inputs.release_pull_request_number }}
               run: |
                   set -euo pipefail
 
-                  write_output() {
-                      printf '%s=%s\n' "$1" "$2" >> "$GITHUB_OUTPUT"
-                  }
-
-                  is_release_pull_request='
-                      .merged_at != null and
-                      ([.labels[]?.name] == ["release"]) and
-                      .user.login == "github-actions[bot]" and
-                      .head.ref == "release/pr-log" and
-                      .head.repo.full_name == $repo and
-                      .base.ref == "main" and
-                      .title == "Prepare release"
-                  '
-
-                  if [ "$GITHUB_EVENT_NAME" = 'workflow_dispatch' ]; then
-                      if [ "$GITHUB_REF_NAME" != 'main' ]; then
-                          echo 'Manual release publish retries must run from main'
-                          exit 1
-                      fi
-
-                      pull_request=$(gh api "/repos/$GITHUB_REPOSITORY/pulls/$RELEASE_PULL_REQUEST_NUMBER")
-
-                      if ! printf '%s' "$pull_request" |
-                          jq -e --arg repo "$GITHUB_REPOSITORY" "$is_release_pull_request" >/dev/null; then
-                          echo "Pull request #$RELEASE_PULL_REQUEST_NUMBER is not a merged release PR"
-                          exit 1
-                      fi
-
-                      write_output should_publish true
-                      write_output release_commit_sha "$(printf '%s' "$pull_request" | jq -r '.merge_commit_sha')"
-                      write_output publish_commit_sha "$(printf '%s' "$pull_request" | jq -r '.merge_commit_sha')"
-                      write_output release_pull_request_number "$(printf '%s' "$pull_request" | jq -r '.number')"
-                      exit 0
+                  if [ -n "$RELEASE_PULL_REQUEST_NUMBER" ]; then
+                      npx just authorize-release-publish --release-pull-request "$RELEASE_PULL_REQUEST_NUMBER"
+                  else
+                      npx just authorize-release-publish
                   fi
-
-                  pull_requests=$(gh api -H "Accept: application/vnd.github+json" \
-                      "/repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls")
-                  release_pull_request_count=$(printf '%s' "$pull_requests" |
-                      jq --arg sha "$GITHUB_SHA" --arg repo "$GITHUB_REPOSITORY" \
-                          "[.[] | select(.merge_commit_sha == \$sha and ($is_release_pull_request))] | length")
-
-                  if [ "$release_pull_request_count" -eq 0 ]; then
-                      write_output should_publish false
-                      exit 0
-                  fi
-
-                  if [ "$release_pull_request_count" -ne 1 ]; then
-                      echo "Commit $GITHUB_SHA is associated with multiple release PRs"
-                      exit 1
-                  fi
-
-                  release_pull_request_number=$(printf '%s' "$pull_requests" |
-                      jq -r --arg sha "$GITHUB_SHA" --arg repo "$GITHUB_REPOSITORY" \
-                          ".[] | select(.merge_commit_sha == \$sha and ($is_release_pull_request)) | .number")
-
-                  write_output should_publish true
-                  write_output release_commit_sha "$GITHUB_SHA"
-                  write_output publish_commit_sha "$GITHUB_SHA"
-                  write_output release_pull_request_number "$release_pull_request_number"
 
             - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
               if: steps.publish-target.outputs.should_publish == 'true'
@@ -432,53 +178,6 @@ jobs:
             - name: Install dependencies
               if: steps.publish-target.outputs.should_publish == 'true'
               run: npm clean-install --ignore-scripts
-
-            - name: Validate release commit
-              if: steps.publish-target.outputs.should_publish == 'true'
-              env:
-                  PUBLISH_COMMIT_SHA: ${{ steps.publish-target.outputs.publish_commit_sha }}
-                  RELEASE_COMMIT_SHA: ${{ steps.publish-target.outputs.release_commit_sha }}
-                  RELEASE_PULL_REQUEST_NUMBER: ${{ steps.publish-target.outputs.release_pull_request_number }}
-              run: |
-                  set -euo pipefail
-
-                  cli_changelog='source/packages/command-line-interface/CHANGELOG.md'
-                  core_changelog='source/packages/core/CHANGELOG.md'
-                  head_sha=$(git rev-parse HEAD)
-
-                  if [ "$head_sha" != "$PUBLISH_COMMIT_SHA" ]; then
-                      echo "HEAD $head_sha does not match publish commit $PUBLISH_COMMIT_SHA"
-                      exit 1
-                  fi
-
-                  subject=$(git log -1 --format=%s "$RELEASE_COMMIT_SHA")
-
-                  if [[ "$subject" != "Merge pull request #$RELEASE_PULL_REQUEST_NUMBER from "* ]]; then
-                      echo "Unexpected merged release commit subject: $subject"
-                      exit 1
-                  fi
-
-                  prepared_release_commit_sha=$(git rev-parse "$RELEASE_COMMIT_SHA^2")
-                  prepared_release_subject=$(git log -1 --format=%s "$prepared_release_commit_sha")
-
-                  if [ "$prepared_release_subject" != 'Release packages' ]; then
-                      echo "Unexpected prepared release commit subject: $prepared_release_subject"
-                      exit 1
-                  fi
-
-                  changed_files=$(git diff --name-only "$RELEASE_COMMIT_SHA^1" "$RELEASE_COMMIT_SHA")
-
-                  if [ -z "$changed_files" ]; then
-                      echo 'Release commit must change changelog files'
-                      exit 1
-                  fi
-
-                  while read -r changed_file; do
-                      if [ "$changed_file" != "$cli_changelog" ] && [ "$changed_file" != "$core_changelog" ]; then
-                          echo "Unexpected release file change: $changed_file"
-                          exit 1
-                      fi
-                  done <<< "$changed_files"
 
             - name: Check packages
               if: steps.publish-target.outputs.should_publish == 'true'
