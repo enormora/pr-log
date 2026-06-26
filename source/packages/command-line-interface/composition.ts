@@ -16,6 +16,7 @@ import {
 } from '../../lib/pr-log-engine-cli-adapter.ts';
 import { createJsonFileReader } from '../../lib/read-json-file.ts';
 import { createRemoteAliasReader } from '../../lib/remote-alias-reader.ts';
+import { createPullRequestLabelValidator } from '../../lib/validate-pull-request-labels.ts';
 import { createPrLogEngine, defaultValidLabels } from '../core/core.entry-point.ts';
 import { readPackageMetadata } from './package-metadata.ts';
 import { createErrorReporter } from './error-reporter.ts';
@@ -96,6 +97,15 @@ const commandLineInterfaceProgram = createProgram({
         };
 
         return createCliRunner(dependencies);
+    },
+    createPullRequestLabelValidator({ packageInfo }) {
+        return createPullRequestLabelValidator({
+            defaultValidLabels,
+            packageInfo,
+            async resolvePullRequestLabels(input) {
+                return prLogEngine.resolvePullRequestLabels(input);
+            }
+        });
     },
     reportError
 });

@@ -2,11 +2,16 @@ import { createCommand } from 'commander';
 import { isString } from '@sindresorhus/is';
 import { createCliRunOptions } from '../../lib/cli-run-options.ts';
 import type { CliRunner } from '../../lib/cli.ts';
+import type { PullRequestLabelValidator } from '../../lib/validate-pull-request-labels.ts';
 import type { ErrorReporter } from './error-reporter.ts';
 import type { PackageMetadata } from './package-metadata.ts';
 
 type ProgramRunnerOptions = {
     readonly defaultBranch: string;
+    readonly packageInfo: Record<string, unknown>;
+};
+
+type PullRequestLabelValidatorOptions = {
     readonly packageInfo: Record<string, unknown>;
 };
 
@@ -21,6 +26,7 @@ export type ProgramDependencies = {
     readonly changelogPath: string;
     readonly readPackageInfo: () => Promise<Record<string, unknown>>;
     readonly createCliRunner: (options: ProgramRunnerOptions) => CliRunner;
+    readonly createPullRequestLabelValidator: (options: PullRequestLabelValidatorOptions) => PullRequestLabelValidator;
     readonly reportError: ErrorReporter;
 };
 
@@ -36,9 +42,67 @@ export function createProgramError(value: unknown): Readonly<Error> {
     return new Error(String(value));
 }
 
+async function authenticateIfTokenExists(
+    dependencies: Pick<ProgramDependencies, 'githubClient' | 'githubToken'>
+): Promise<void> {
+    if (isString(dependencies.githubToken)) {
+        await dependencies.githubClient.auth();
+    }
+}
+
+function parsePullRequestId(value: string): number {
+    const pullRequestId = Number(value);
+
+    if (!Number.isSafeInteger(pullRequestId) || pullRequestId < 1) {
+        throw new Error('Pull request number must be a positive integer');
+    }
+
+    return pullRequestId;
+}
+
+async function runChangelogCommand(
+    dependencies: ProgramDependencies,
+    versionNumber: string | undefined,
+    commandOptions: Record<string, unknown>
+): Promise<void> {
+    const runOptionsResult = createCliRunOptions({
+        versionNumber,
+        changelogPath: dependencies.changelogPath,
+        commandOptions
+    });
+
+    await runOptionsResult.match({
+        async Ok(runOptions) {
+            await authenticateIfTokenExists(dependencies);
+
+            const cliRunner = dependencies.createCliRunner({
+                defaultBranch: commandOptions.defaultBranch as string,
+                packageInfo: await dependencies.readPackageInfo()
+            });
+
+            await cliRunner.run(runOptions);
+        },
+        Err(error) {
+            throw error;
+        }
+    });
+}
+
+async function runPullRequestLabelValidationCommand(
+    dependencies: ProgramDependencies,
+    pullRequestId: number
+): Promise<void> {
+    await authenticateIfTokenExists(dependencies);
+
+    const pullRequestLabelValidator = dependencies.createPullRequestLabelValidator({
+        packageInfo: await dependencies.readPackageInfo()
+    });
+
+    await pullRequestLabelValidator.validate(pullRequestId);
+}
+
 export function createProgram(dependencies: ProgramDependencies): Program {
-    const { packageMetadata, githubToken, githubClient, changelogPath, readPackageInfo, createCliRunner, reportError } =
-        dependencies;
+    const { packageMetadata } = dependencies;
     let isTracingEnabled = false;
     const program = createCommand(packageMetadata.name);
 
@@ -55,32 +119,22 @@ export function createProgram(dependencies: ProgramDependencies): Program {
         .option('--unreleased', 'include section for unreleased changes', false)
         .action(async (versionNumber: string | undefined, commandOptions: Record<string, unknown>) => {
             isTracingEnabled = commandOptions.trace === true;
+            await runChangelogCommand(dependencies, versionNumber, commandOptions);
+        });
 
-            const runOptionsResult = createCliRunOptions({ versionNumber, changelogPath, commandOptions });
-
-            await runOptionsResult.match({
-                async Ok(runOptions) {
-                    if (isString(githubToken)) {
-                        await githubClient.auth();
-                    }
-
-                    const cliRunner = createCliRunner({
-                        defaultBranch: commandOptions.defaultBranch as string,
-                        packageInfo: await readPackageInfo()
-                    });
-
-                    await cliRunner.run(runOptions);
-                },
-                Err(error) {
-                    throw error;
-                }
-            });
+    program
+        .command('validate-pull-request-labels')
+        .description('validate labels assigned to a GitHub pull request')
+        .argument('<pull-request-number>', 'GitHub pull request number', parsePullRequestId)
+        .action(async (pullRequestId: number) => {
+            isTracingEnabled = program.opts().trace === true;
+            await runPullRequestLabelValidationCommand(dependencies, pullRequestId);
         });
 
     return {
         async run(commandLineArguments) {
             await program.parseAsync(Array.from(commandLineArguments)).catch((error: unknown) => {
-                reportError(createProgramError(error), { isTracingEnabled });
+                dependencies.reportError(createProgramError(error), { isTracingEnabled });
             });
         }
     };
