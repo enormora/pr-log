@@ -14,7 +14,7 @@ type ChangelogEntry = {
 };
 
 function formatPullRequest(entry: ChangelogEntry, repo: string): string {
-    const formattedLinks = entry.pullRequestIds.map((pullRequestId) => {
+    const formattedLinks = entry.pullRequestIds.map(function (pullRequestId) {
         return formatLinkToPullRequest(pullRequestId, repo);
     });
 
@@ -23,7 +23,7 @@ function formatPullRequest(entry: ChangelogEntry, repo: string): string {
 
 function formatListOfPullRequests(entries: readonly ChangelogEntry[], repo: string): string {
     return entries
-        .map((entry) => {
+        .map(function (entry) {
             return formatPullRequest(entry, repo);
         })
         .join('');
@@ -35,7 +35,7 @@ function formatSection(displayLabel: string, entries: readonly ChangelogEntry[],
 
 export type CreateChangelog = (options: ChangelogOptions) => string;
 
-type PackageInfo = Record<string, unknown>;
+type PackageInfo = Readonly<Record<string, unknown>>;
 
 const defaultDateFormat = 'MMMM d, yyyy';
 
@@ -66,7 +66,7 @@ type CollapseRule = {
     readonly toGroup: string;
 };
 
-function getRequiredStringField(rule: Record<string, unknown>, fieldName: string): string {
+function getRequiredStringField(rule: Readonly<Record<string, unknown>>, fieldName: string): string {
     const value = rule[fieldName];
 
     if (!isString(value)) {
@@ -76,7 +76,7 @@ function getRequiredStringField(rule: Record<string, unknown>, fieldName: string
     return value;
 }
 
-function createCollapseRule(rule: Record<string, unknown>): CollapseRule {
+function createCollapseRule(rule: Readonly<Record<string, unknown>>): CollapseRule {
     const customKeyGroup = rule.keyGroup;
     const customFromGroup = rule.fromGroup;
     const customToGroup = rule.toGroup;
@@ -98,7 +98,7 @@ function getCollapseRules(packageInfo: PackageInfo): readonly CollapseRule[] {
         return [];
     }
 
-    return prLogConfig.collapseRules.map((rule) => {
+    return prLogConfig.collapseRules.map(function (rule) {
         if (!isPlainObject(rule)) {
             throw new TypeError('pr-log.collapseRules[] entries must be objects');
         }
@@ -108,20 +108,20 @@ function getCollapseRules(packageInfo: PackageInfo): readonly CollapseRule[] {
 }
 
 function groupByLabel(pullRequests: readonly PullRequestWithLabel[]): Record<string, PullRequestWithLabel[]> {
-    return pullRequests.reduce((groupedObject: Record<string, PullRequestWithLabel[]>, pullRequest) => {
+    return pullRequests.reduce(function (groupedObject: Readonly<Record<string, PullRequestWithLabel[]>>, pullRequest) {
         const { label } = pullRequest;
         const group = groupedObject[label];
 
         if (isArray(group)) {
             return {
                 ...groupedObject,
-                [label]: [...group, pullRequest]
+                [label]: [ ...group, pullRequest ]
             };
         }
 
         return {
             ...groupedObject,
-            [label]: [pullRequest]
+            [label]: [ pullRequest ]
         };
     }, {});
 }
@@ -131,7 +131,7 @@ type ChangelogEntryWithLabel = ChangelogEntry & {
 };
 
 type CollapseMatch = {
-    readonly groups: Record<string, string>;
+    readonly groups: Readonly<Record<string, string>>;
 };
 
 type RuleMatch = CollapseMatch & {
@@ -147,11 +147,21 @@ type CollapseChain = {
     readonly pullRequestIds: readonly number[];
 };
 
+type CollapseChainUpdate = {
+    readonly fromGroup: string;
+    readonly from: string;
+};
+
+type CollapseChainContext = {
+    readonly rule: CollapseRule;
+    readonly ruleMatch: RuleMatch;
+};
+
 function createChangelogEntries(pullRequests: readonly PullRequestWithLabel[]): readonly ChangelogEntryWithLabel[] {
-    return pullRequests.map((pullRequest) => {
+    return pullRequests.map(function (pullRequest) {
         return {
             title: pullRequest.title,
-            pullRequestIds: [pullRequest.id],
+            pullRequestIds: [ pullRequest.id ],
             label: pullRequest.label
         };
     });
@@ -172,11 +182,11 @@ function getRuleGroups(match: CollapseMatch, rule: CollapseRule): Readonly<[stri
         throw new TypeError(`Collapse rule for label "${rule.label}" requires capture group "${rule.toGroup}"`);
     }
 
-    return [key, from, to];
+    return [ key, from, to ];
 }
 
-function renderCollapsedTitle(replace: string, groups: Record<string, string>): string {
-    return replace.replaceAll(/\$<(?<groupName>[^>]+)>/gu, (_match, groupName: string) => {
+function renderCollapsedTitle(replace: string, groups: Readonly<Record<string, string>>): string {
+    return replace.replaceAll(/\$<(?<groupName>[^>]+)>/gu, function (_match, groupName: string) {
         return groups[groupName] ?? '';
     });
 }
@@ -188,7 +198,7 @@ function getRuleMatch(entry: ChangelogEntryWithLabel, rule: CollapseRule): RuleM
         return undefined;
     }
 
-    const [key, from, to] = getRuleGroups({ groups: match.groups }, rule);
+    const [ key, from, to ] = getRuleGroups({ groups: match.groups }, rule);
 
     return { key, from, to, groups: { ...match.groups } };
 }
@@ -197,27 +207,27 @@ function createExtendedChain(
     chain: CollapseChain,
     entry: ChangelogEntryWithLabel,
     index: number,
-    update: { readonly fromGroup: string; readonly from: string }
+    update: CollapseChainUpdate
 ): CollapseChain {
     return {
         ...chain,
-        indexes: [...chain.indexes, index],
+        indexes: [ ...chain.indexes, index ],
         groups: {
             ...chain.groups,
             [update.fromGroup]: update.from
         },
-        pullRequestIds: [...chain.pullRequestIds, ...entry.pullRequestIds]
+        pullRequestIds: [ ...chain.pullRequestIds, ...entry.pullRequestIds ]
     };
 }
 
 function createCollapseChain(
     index: number,
     entry: ChangelogEntryWithLabel,
-    groups: Record<string, string>
+    groups: Readonly<Record<string, string>>
 ): CollapseChain {
     return {
         firstIndex: index,
-        indexes: [index],
+        indexes: [ index ],
         groups,
         pullRequestIds: Array.from(entry.pullRequestIds)
     };
@@ -227,13 +237,13 @@ function createUpdatedChains(
     existingChains: readonly CollapseChain[],
     entry: ChangelogEntryWithLabel,
     index: number,
-    context: { readonly rule: CollapseRule; readonly ruleMatch: RuleMatch }
+    context: CollapseChainContext
 ): readonly CollapseChain[] {
     const { rule, ruleMatch } = context;
     const previousChain = existingChains.at(-1);
 
     if (previousChain?.groups[rule.fromGroup] !== ruleMatch.to) {
-        return [...existingChains, createCollapseChain(index, entry, ruleMatch.groups)];
+        return [ ...existingChains, createCollapseChain(index, entry, ruleMatch.groups) ];
     }
 
     return [
@@ -269,7 +279,7 @@ function createChainsByKey(
     entries: readonly ChangelogEntryWithLabel[],
     rule: CollapseRule
 ): ReadonlyMap<string, readonly CollapseChain[]> {
-    return entries.reduce<ReadonlyMap<string, readonly CollapseChain[]>>((chainsByKey, entry, index) => {
+    return entries.reduce<ReadonlyMap<string, readonly CollapseChain[]>>(function (chainsByKey, entry, index) {
         return createUpdatedChainsByKey(chainsByKey, entry, index, rule);
     }, new Map<string, readonly CollapseChain[]>());
 }
@@ -281,14 +291,15 @@ function createCollapsedEntriesByIndex(
     const collapsedEntries = new Map<number, ChangelogEntryWithLabel>();
     const skippedIndexes = new Set<number>();
     const minimumChainLength = 2;
-    const collapsedChains = Array.from(chainsByKey.values())
+    const collapsedChains = Array
+        .from(chainsByKey.values())
         .flat()
-        .filter((chain) => {
+        .filter(function (chain) {
             return chain.indexes.length >= minimumChainLength;
         });
 
-    collapsedChains.forEach((chain) => {
-        const [, ...remainingIndexes] = chain.indexes;
+    collapsedChains.forEach(function (chain) {
+        const [ , ...remainingIndexes ] = chain.indexes;
 
         collapsedEntries.set(chain.firstIndex, {
             title: renderCollapsedTitle(rule.replace, chain.groups),
@@ -296,12 +307,12 @@ function createCollapsedEntriesByIndex(
             label: rule.label
         });
 
-        remainingIndexes.forEach((index) => {
+        remainingIndexes.forEach(function (index) {
             skippedIndexes.add(index);
         });
     });
 
-    return [collapsedEntries, skippedIndexes];
+    return [ collapsedEntries, skippedIndexes ];
 }
 
 function collapseEntriesForRule(
@@ -309,14 +320,14 @@ function collapseEntriesForRule(
     rule: CollapseRule
 ): readonly ChangelogEntryWithLabel[] {
     const chainsByKey = createChainsByKey(entries, rule);
-    const [collapsedEntries, skippedIndexes] = createCollapsedEntriesByIndex(chainsByKey, rule);
+    const [ collapsedEntries, skippedIndexes ] = createCollapsedEntriesByIndex(chainsByKey, rule);
 
-    return entries.flatMap((entry, index) => {
+    return entries.flatMap(function (entry, index) {
         if (skippedIndexes.has(index)) {
             return [];
         }
 
-        return [collapsedEntries.get(index) ?? entry];
+        return [ collapsedEntries.get(index) ?? entry ];
     });
 }
 
@@ -326,7 +337,7 @@ function collapseEntries(
     rules: readonly CollapseRule[]
 ): readonly ChangelogEntryWithLabel[] {
     return rules
-        .filter((rule) => {
+        .filter(function (rule) {
             return rule.label === label;
         })
         .reduce(collapseEntriesForRule, entries);
@@ -334,7 +345,7 @@ function collapseEntries(
 
 type Dependencies = {
     readonly packageInfo: PackageInfo;
-    getCurrentDate(): Readonly<Date>;
+    getCurrentDate: () => Readonly<Date>;
 };
 
 type ChangelogOptionsUnreleased = {
@@ -378,7 +389,7 @@ export function createChangelogFactory(dependencies: Dependencies): CreateChange
 
         let changelog = createChangelogTitle(options);
 
-        for (const [label, displayLabel] of validLabels) {
+        for (const [ label, displayLabel ] of validLabels) {
             const pullRequests = groupedPullRequests[label];
 
             if (isArray(pullRequests)) {

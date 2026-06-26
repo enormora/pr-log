@@ -1,7 +1,7 @@
 import { isArray, isPlainObject, isString } from '@sindresorhus/is';
 import { getGithubRepo } from './get-github-repo.ts';
 
-type PackageInfo = Record<string, unknown>;
+type PackageInfo = Readonly<Record<string, unknown>>;
 
 export function getGithubRepoFromPackageInfo(packageInfo: PackageInfo): string {
     const { repository } = packageInfo;
@@ -43,7 +43,7 @@ function readStringArrayConfig(packageInfo: PackageInfo, fieldName: string): rea
         throw new TypeError(`pr-log.${fieldName} must be an array of strings`);
     }
 
-    return value.map((entry) => {
+    return value.map(function (entry) {
         if (!isString(entry)) {
             throw new TypeError(`pr-log.${fieldName} must be an array of strings`);
         }

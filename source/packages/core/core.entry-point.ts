@@ -45,7 +45,7 @@ function createGitHubClient(options: Readonly<PrLogEngineOptions>): Readonly<Oct
 
 export function createPrLogEngine(options: Readonly<PrLogEngineOptions>): PrLogEngineValue {
     const githubClient = createGitHubClient(options);
-    const execute: GitCommandExecutor = async (command) => {
+    const execute: GitCommandExecutor = async function (command) {
         return execaCommand(command, { cwd: options.workingDirectory });
     };
     const gitCommandRunner = createGitCommandRunner({ execute });

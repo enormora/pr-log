@@ -4,9 +4,9 @@ import { fetchPullRequestChangedFiles } from './pull-request-changed-files.ts';
 
 const secondPullRequestId = 2;
 
-test('fetches changed files for pull requests', async () => {
-    const getChangedFiles = fake(async (_githubRepo, pullRequestId: number) => {
-        return pullRequestId === 1 ? ['source/a.ts'] : ['source/b.ts'];
+test('fetches changed files for pull requests', async function () {
+    const getChangedFiles = fake(async function (_githubRepo, pullRequestId: number) {
+        return pullRequestId === 1 ? [ 'source/a.ts' ] : [ 'source/b.ts' ];
     });
 
     const changedFiles = await fetchPullRequestChangedFiles({
@@ -18,8 +18,8 @@ test('fetches changed files for pull requests', async () => {
         pullRequestChangedFilesReader: { getChangedFiles }
     });
 
-    assert.deepStrictEqual(Array.from(changedFiles.entries()), [
-        [1, ['source/a.ts']],
-        [secondPullRequestId, ['source/b.ts']]
+    assert.deepStrictEqual(Array.from(changedFiles), [
+        [ 1, [ 'source/a.ts' ] ],
+        [ secondPullRequestId, [ 'source/b.ts' ] ]
     ]);
 });

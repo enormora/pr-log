@@ -2,10 +2,10 @@ import semver from 'semver';
 import type { PullRequestWithLabel } from './get-merged-pull-requests.ts';
 import type { VersionBumpConfig, VersionBumpLevel } from './version-bump-config.ts';
 
-const orderedVersionBumpLevels: readonly VersionBumpLevel[] = ['major', 'minor', 'patch'];
+const orderedVersionBumpLevels: readonly VersionBumpLevel[] = [ 'major', 'minor', 'patch' ];
 
 function includesAnyLabel(labels: ReadonlySet<string>, candidates: readonly string[]): boolean {
-    return candidates.some((candidate) => {
+    return candidates.some(function (candidate) {
         return labels.has(candidate);
     });
 }
@@ -19,7 +19,7 @@ function determineVersionBumpLevel(
     }
 
     const labels = new Set(
-        pullRequests.map((pullRequest) => {
+        pullRequests.map(function (pullRequest) {
             return pullRequest.label;
         })
     );

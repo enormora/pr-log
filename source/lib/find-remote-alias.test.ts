@@ -16,7 +16,7 @@ function factory(result: readonly RemoteAlias[] = []): FindRemoteAlias {
     return findRemoteAliasFactory(dependencies);
 }
 
-test('rejects if no alias is found', async () => {
+test('rejects if no alias is found', async function () {
     const expectedGitRemote = `git://github.com/${githubRepo}.git`;
     const expectedErrorMessage = `This local git repository doesn’t have a remote pointing to ${expectedGitRemote}`;
     const findRemoteAlias = factory();
@@ -24,7 +24,7 @@ test('rejects if no alias is found', async () => {
     await assert.rejects(findRemoteAlias(githubRepo), { message: expectedErrorMessage });
 });
 
-test('resolves with the correct remote alias', async () => {
+test('resolves with the correct remote alias', async function () {
     const gitRemotes = [
         { alias: 'origin', url: 'git://github.com/fork/bar' },
         { alias: 'upstream', url: 'git://github.com/foo/bar' }
@@ -34,8 +34,8 @@ test('resolves with the correct remote alias', async () => {
     assert.strictEqual(await findRemoteAlias(githubRepo), 'upstream');
 });
 
-test('works with different forms of the same URL', async () => {
-    const gitRemotes = [{ alias: 'origin', url: 'git+ssh://git@github.com/foo/bar ' }];
+test('works with different forms of the same URL', async function () {
+    const gitRemotes = [ { alias: 'origin', url: 'git+ssh://git@github.com/foo/bar ' } ];
     const findRemoteAlias = factory(gitRemotes);
 
     assert.strictEqual(await findRemoteAlias(githubRepo), 'origin');

@@ -21,15 +21,15 @@ type FirstParentCommitLogFields = readonly [hash: string, subject: string, body:
 type FirstParentCommitLogParts = readonly [hash: string, subject: string, ...remainingFields: readonly string[]];
 
 export type GitCommandRunner = {
-    getShortStatus(): Promise<string>;
-    getCurrentBranchName(): Promise<string>;
-    fetchRemote(remoteAlias: string): Promise<void>;
-    getSymmetricDifferencesBetweenBranches(branchA: string, branchB: string): Promise<readonly string[]>;
-    getRemoteAliases(): Promise<readonly RemoteAlias[]>;
-    listTags(): Promise<readonly string[]>;
-    hasRef(ref: string): Promise<boolean>;
-    getMergeCommitLogs(from: string): Promise<readonly MergeCommitLogEntry[]>;
-    getFirstParentCommitLogs(from: string): Promise<readonly FirstParentCommitLogEntry[]>;
+    getShortStatus: () => Promise<string>;
+    getCurrentBranchName: () => Promise<string>;
+    fetchRemote: (remoteAlias: string) => Promise<void>;
+    getSymmetricDifferencesBetweenBranches: (branchA: string, branchB: string) => Promise<readonly string[]>;
+    getRemoteAliases: () => Promise<readonly RemoteAlias[]>;
+    listTags: () => Promise<readonly string[]>;
+    hasRef: (ref: string) => Promise<boolean>;
+    getMergeCommitLogs: (from: string) => Promise<readonly MergeCommitLogEntry[]>;
+    getFirstParentCommitLogs: (from: string) => Promise<readonly FirstParentCommitLogEntry[]>;
 };
 
 type GitCommandResult = {
@@ -62,7 +62,7 @@ const bodyFieldIndex = 2;
 function createParsableMergeGitLogFormat(): string {
     const subjectPlaceholder = '%s';
     const bodyPlaceholder = '%b';
-    const fields = [subjectPlaceholder, bodyPlaceholder];
+    const fields = [ subjectPlaceholder, bodyPlaceholder ];
 
     return `${fields.join(fieldSeparator)}${lineSeparator}`;
 }
@@ -71,14 +71,15 @@ function createParsableFirstParentGitLogFormat(): string {
     const hashPlaceholder = '%H';
     const subjectPlaceholder = '%s';
     const bodyPlaceholder = '%b';
-    const fields = [hashPlaceholder, subjectPlaceholder, bodyPlaceholder];
+    const fields = [ hashPlaceholder, subjectPlaceholder, bodyPlaceholder ];
 
     return `${fields.join(fieldSeparator)}${lineSeparator}`;
 }
 
 async function hasExistingRef(execute: GitCommandExecutor, ref: string): Promise<boolean> {
     try {
-        await execute(`git rev-parse --verify --quiet ${ref}^{commit}`);
+        const commitType = '{commit}';
+        await execute(`git rev-parse --verify --quiet ${ref}^${commitType}`);
         return true;
     } catch {
         return false;
@@ -96,10 +97,10 @@ function parseFirstParentCommitLogFields(log: string): FirstParentCommitLogField
         throw new TypeError('Failed to determine git commit log entry');
     }
 
-    const [hash, subject] = parts;
+    const [ hash, subject ] = parts;
     const body = parts[bodyFieldIndex];
 
-    return [hash, subject, body];
+    return [ hash, subject, body ];
 }
 
 async function readShortStatus(execute: GitCommandExecutor): Promise<string> {
@@ -128,9 +129,9 @@ async function readSymmetricBranchDifferences(
 async function readRemoteAliases(execute: GitCommandExecutor): Promise<readonly RemoteAlias[]> {
     const result = await execute('git remote -v');
 
-    return splitLines(result.stdout).map((line: string) => {
+    return splitLines(result.stdout).map(function (line: string) {
         const remoteLineTokens = splitByPattern(line, /\s/);
-        const [alias, url] = remoteLineTokens;
+        const [ alias, url ] = remoteLineTokens;
 
         if (url === undefined) {
             throw new TypeError('Failed to determine git remote alias');
@@ -150,9 +151,9 @@ async function readMergeCommitLogs(execute: GitCommandExecutor, from: string): P
         --pretty=format:${createParsableMergeGitLogFormat()} --merges ${from}..HEAD`);
 
     const logs = splitLines(result.stdout, lineSeparator);
-    return logs.map((log) => {
+    return logs.map(function (log) {
         const parts = splitByString(log, fieldSeparator);
-        const [subject, body] = parts;
+        const [ subject, body ] = parts;
 
         return { subject, body: body === '' ? undefined : body };
     });
@@ -168,8 +169,8 @@ async function readFirstParentCommitLogs(
     );
 
     const logs = splitLines(result.stdout, lineSeparator);
-    return logs.map((log) => {
-        const [hash, subject, body] = parseFirstParentCommitLogFields(log);
+    return logs.map(function (log) {
+        const [ hash, subject, body ] = parseFirstParentCommitLogFields(log);
         return { hash, subject, body: body === '' ? undefined : body };
     });
 }

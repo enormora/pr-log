@@ -1,24 +1,23 @@
 import assert from 'node:assert';
 import { Factory } from 'fishery';
-import Maybe, { type Just } from 'true-myth/maybe';
-import { createChangelogFactory, type ChangelogOptions } from './create-changelog.ts';
+import { nothing } from 'true-myth/maybe';
+import { createChangelogFactory, type ChangelogOptions, type CreateChangelog } from './create-changelog.ts';
 import { defaultValidLabels } from './valid-labels.ts';
+import { createVersionNumber } from './version-number.ts';
 
-const changelogOptionsFactory = Factory.define<ChangelogOptions>(() => {
+const changelogOptionsFactory = Factory.define<ChangelogOptions>(function () {
     return {
         unreleased: false,
-        versionNumber: Maybe.just('1.0.0') as Just<string>,
+        versionNumber: createVersionNumber('1.0.0'),
         validLabels: defaultValidLabels,
         mergedPullRequests: [],
         githubRepo: ''
     };
 });
 
-function createChangelogWithPackageInfo(
-    packageInfo: Record<string, unknown> = {}
-): ReturnType<typeof createChangelogFactory> {
+function createChangelogWithPackageInfo(packageInfo: Record<string, unknown> = {}): CreateChangelog {
     return createChangelogFactory({
-        getCurrentDate: () => {
+        getCurrentDate() {
             return new Date(0);
         },
         packageInfo
@@ -40,11 +39,11 @@ function createUpgradeCollapseRulePackageInfo(overrides: Record<string, unknown>
     };
 }
 
-test('contains no title when version was not released', () => {
+test('contains no title when version was not released', function () {
     const createChangelog = createChangelogWithPackageInfo();
     const options = changelogOptionsFactory.build({
         unreleased: true,
-        versionNumber: Maybe.nothing()
+        versionNumber: nothing()
     });
 
     const changelog = createChangelog(options);
@@ -53,7 +52,7 @@ test('contains no title when version was not released', () => {
     assert.strictEqual(changelog, expected);
 });
 
-test('contains a title with the version number and the formatted date when version was released', () => {
+test('contains a title with the version number and the formatted date when version was released', function () {
     const createChangelog = createChangelogWithPackageInfo();
     const options = changelogOptionsFactory.build();
     const changelog = createChangelog(options);
@@ -62,7 +61,7 @@ test('contains a title with the version number and the formatted date when versi
     assert.ok(changelog.includes(expectedTitle));
 });
 
-test('format the date with a custom date format when version was released', () => {
+test('format the date with a custom date format when version was released', function () {
     const packageInfo = { 'pr-log': { dateFormat: 'dd.MM.yyyy' } };
     const createChangelog = createChangelogWithPackageInfo(packageInfo);
     const options = changelogOptionsFactory.build();
@@ -72,7 +71,7 @@ test('format the date with a custom date format when version was released', () =
     assert.ok(changelog.includes(expectedTitle));
 });
 
-test('creates a formatted changelog when version was released', () => {
+test('creates a formatted changelog when version was released', function () {
     const createChangelog = createChangelogWithPackageInfo();
     const mergedPullRequests = [
         {
@@ -102,7 +101,8 @@ test('creates a formatted changelog when version was released', () => {
         '',
         '* Fix spelling error ([#3](https://github.com/any/repo/pull/3))',
         ''
-    ].join('\n');
+    ]
+        .join('\n');
 
     const options = changelogOptionsFactory.build({
         mergedPullRequests,
@@ -113,11 +113,11 @@ test('creates a formatted changelog when version was released', () => {
     assert.ok(changelog.includes(expectedChangelog));
 });
 
-test('uses custom labels when provided and version was released', () => {
+test('uses custom labels when provided and version was released', function () {
     const createChangelog = createChangelogWithPackageInfo();
     const customValidLabels = new Map([
-        ['core', 'Core Features'],
-        ['addons', 'Addons']
+        [ 'core', 'Core Features' ],
+        [ 'addons', 'Addons' ]
     ]);
     const mergedPullRequests = [
         {
@@ -147,7 +147,8 @@ test('uses custom labels when provided and version was released', () => {
         '',
         '* Fixed bug bar ([#2](https://github.com/any/repo/pull/2))',
         ''
-    ].join('\n');
+    ]
+        .join('\n');
 
     const options = changelogOptionsFactory.build({
         validLabels: customValidLabels,
@@ -159,11 +160,11 @@ test('uses custom labels when provided and version was released', () => {
     assert.ok(changelog.includes(expectedChangelog));
 });
 
-test('uses the same order for the changelog sections as in validLabels when version was released', () => {
+test('uses the same order for the changelog sections as in validLabels when version was released', function () {
     const createChangelog = createChangelogWithPackageInfo();
     const customValidLabels = new Map([
-        ['first', 'First Section'],
-        ['second', 'Second Section']
+        [ 'first', 'First Section' ],
+        [ 'second', 'Second Section' ]
     ]);
     const mergedPullRequests = [
         {
@@ -193,7 +194,8 @@ test('uses the same order for the changelog sections as in validLabels when vers
         '* Fixed bug foo ([#1](https://github.com/any/repo/pull/1))',
         '* Fixed bug bar ([#2](https://github.com/any/repo/pull/2))',
         ''
-    ].join('\n');
+    ]
+        .join('\n');
 
     const options = changelogOptionsFactory.build({
         validLabels: customValidLabels,
@@ -205,9 +207,9 @@ test('uses the same order for the changelog sections as in validLabels when vers
     assert.ok(changelog.includes(expectedChangelog));
 });
 
-test('collapses repeated pull requests when a matching collapse rule is configured', () => {
+test('collapses repeated pull requests when a matching collapse rule is configured', function () {
     const createChangelog = createChangelogWithPackageInfo(createUpgradeCollapseRulePackageInfo());
-    const validLabels = new Map([['upgrade', 'Dependency Upgrades']]);
+    const validLabels = new Map([ [ 'upgrade', 'Dependency Upgrades' ] ]);
     const mergedPullRequests = [
         {
             id: 4,
@@ -237,7 +239,8 @@ test('collapses repeated pull requests when a matching collapse rule is configur
         '* Update foo from 1 to 4 ([#4](https://github.com/any/repo/pull/4), [#3](https://github.com/any/repo/pull/3), [#2](https://github.com/any/repo/pull/2))',
         '* Update bar from 1 to 2 ([#5](https://github.com/any/repo/pull/5))',
         ''
-    ].join('\n');
+    ]
+        .join('\n');
 
     const options = changelogOptionsFactory.build({
         validLabels,
@@ -249,9 +252,9 @@ test('collapses repeated pull requests when a matching collapse rule is configur
     assert.ok(changelog.includes(expectedChangelog));
 });
 
-test('does not collapse pull requests when the configured version chain is incomplete', () => {
+test('does not collapse pull requests when the configured version chain is incomplete', function () {
     const createChangelog = createChangelogWithPackageInfo(createUpgradeCollapseRulePackageInfo());
-    const validLabels = new Map([['upgrade', 'Dependency Upgrades']]);
+    const validLabels = new Map([ [ 'upgrade', 'Dependency Upgrades' ] ]);
     const mergedPullRequests = [
         {
             id: 4,
@@ -271,7 +274,8 @@ test('does not collapse pull requests when the configured version chain is incom
         '* Update foo from 3 to 4 ([#4](https://github.com/any/repo/pull/4))',
         '* Update foo from 1 to 2 ([#2](https://github.com/any/repo/pull/2))',
         ''
-    ].join('\n');
+    ]
+        .join('\n');
 
     const options = changelogOptionsFactory.build({
         validLabels,
@@ -283,7 +287,7 @@ test('does not collapse pull requests when the configured version chain is incom
     assert.ok(changelog.includes(expectedChangelog));
 });
 
-test('supports custom capture group names in collapse rules', () => {
+test('supports custom capture group names in collapse rules', function () {
     const createChangelog = createChangelogWithPackageInfo({
         'pr-log': {
             collapseRules: [
@@ -298,7 +302,7 @@ test('supports custom capture group names in collapse rules', () => {
             ]
         }
     });
-    const validLabels = new Map([['upgrade', 'Dependency Upgrades']]);
+    const validLabels = new Map([ [ 'upgrade', 'Dependency Upgrades' ] ]);
     const mergedPullRequests = [
         {
             id: 3,
@@ -317,7 +321,8 @@ test('supports custom capture group names in collapse rules', () => {
         '',
         '* Bump foo (1 -> 3) ([#3](https://github.com/any/repo/pull/3), [#2](https://github.com/any/repo/pull/2))',
         ''
-    ].join('\n');
+    ]
+        .join('\n');
 
     const options = changelogOptionsFactory.build({
         validLabels,
@@ -329,7 +334,7 @@ test('supports custom capture group names in collapse rules', () => {
     assert.ok(changelog.includes(expectedChangelog));
 });
 
-test('falls back to an empty string for missing placeholders in collapse rule replacements', () => {
+test('falls back to an empty string for missing placeholders in collapse rule replacements', function () {
     const createChangelog = createChangelogWithPackageInfo({
         'pr-log': {
             collapseRules: [
@@ -341,7 +346,7 @@ test('falls back to an empty string for missing placeholders in collapse rule re
             ]
         }
     });
-    const validLabels = new Map([['upgrade', 'Dependency Upgrades']]);
+    const validLabels = new Map([ [ 'upgrade', 'Dependency Upgrades' ] ]);
     const mergedPullRequests = [
         {
             id: 3,
@@ -369,12 +374,12 @@ test('falls back to an empty string for missing placeholders in collapse rule re
     );
 });
 
-test('throws when a collapse rule is missing required fields', () => {
+test('throws when a collapse rule is missing required fields', function () {
     assert.throws(
-        () => {
+        function () {
             createChangelogWithPackageInfo({
                 'pr-log': {
-                    collapseRules: [{ label: 'upgrade', pattern: '^Update .+$' }]
+                    collapseRules: [ { label: 'upgrade', pattern: '^Update .+$' } ]
                 }
             });
         },
@@ -382,12 +387,12 @@ test('throws when a collapse rule is missing required fields', () => {
     );
 });
 
-test('throws when a collapse rule entry is not an object', () => {
+test('throws when a collapse rule entry is not an object', function () {
     assert.throws(
-        () => {
+        function () {
             createChangelogWithPackageInfo({
                 'pr-log': {
-                    collapseRules: ['invalid']
+                    collapseRules: [ 'invalid' ]
                 }
             });
         },
@@ -395,9 +400,9 @@ test('throws when a collapse rule entry is not an object', () => {
     );
 });
 
-test('does not collapse pull requests when titles do not match the configured collapse rule', () => {
+test('does not collapse pull requests when titles do not match the configured collapse rule', function () {
     const createChangelog = createChangelogWithPackageInfo(createUpgradeCollapseRulePackageInfo());
-    const validLabels = new Map([['upgrade', 'Dependency Upgrades']]);
+    const validLabels = new Map([ [ 'upgrade', 'Dependency Upgrades' ] ]);
     const mergedPullRequests = [
         {
             id: 7,
@@ -441,9 +446,9 @@ const invalidCaptureGroupTestCases = [
 ] as const;
 
 for (const testCase of invalidCaptureGroupTestCases) {
-    test(testCase.testName, () => {
+    test(testCase.testName, function () {
         const createChangelog = createChangelogWithPackageInfo(testCase.packageInfo);
-        const validLabels = new Map([['upgrade', 'Dependency Upgrades']]);
+        const validLabels = new Map([ [ 'upgrade', 'Dependency Upgrades' ] ]);
         const mergedPullRequests = [
             {
                 id: 2,
@@ -459,7 +464,7 @@ for (const testCase of invalidCaptureGroupTestCases) {
         });
 
         assert.throws(
-            () => {
+            function () {
                 createChangelog(options);
             },
             { message: testCase.expectedErrorMessage }

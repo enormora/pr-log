@@ -8,7 +8,7 @@ export type PackageMetadata = {
 
 type PackageMetadataReader = {
     readonly packageJsonUrls: readonly URL[];
-    readonly readJsonFile: (filePath: string) => Promise<Record<string, unknown>>;
+    readonly readJsonFile: (filePath: string) => Promise<Readonly<Record<string, unknown>>>;
 };
 
 function readStringValue(value: unknown): string {
@@ -19,7 +19,7 @@ function readStringValue(value: unknown): string {
     return '';
 }
 
-export function createPackageMetadata(packageJson: Record<string, unknown>): PackageMetadata {
+export function createPackageMetadata(packageJson: Readonly<Record<string, unknown>>): PackageMetadata {
     return {
         name: readStringValue(packageJson.name),
         description: readStringValue(packageJson.description),
@@ -32,7 +32,7 @@ export async function readPackageMetadata(reader: PackageMetadataReader): Promis
         try {
             return createPackageMetadata(await reader.readJsonFile(packageJsonUrl.pathname));
         } catch (error: unknown) {
-            if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
+            if (!(error instanceof Error && Reflect.get(error, 'code') === 'ENOENT')) {
                 throw error;
             }
         }

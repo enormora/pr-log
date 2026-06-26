@@ -1,24 +1,30 @@
 import { isArray, isPlainObject, isString } from '@sindresorhus/is';
 
-export const versionBumpLevels = ['major', 'minor', 'patch'] as const;
+export const versionBumpLevels = [ 'major', 'minor', 'patch' ] as const;
 
 export type VersionBumpLevel = (typeof versionBumpLevels)[number];
 
 export type VersionBumpConfig = Readonly<Record<VersionBumpLevel, readonly string[]>>;
 
-type PackageInfo = Record<string, unknown>;
+type PackageInfo = Readonly<Record<string, unknown>>;
 
 function hasDuplicateLabels(labels: readonly string[]): boolean {
-    return new Set(labels).size !== labels.length;
+    const uniqueLabels = new Set(labels);
+    return uniqueLabels.size !== labels.length;
+}
+
+function isVersionBumpLevel(value: string): value is VersionBumpLevel {
+    const supportedVersionBumpLevels: readonly string[] = versionBumpLevels;
+    return supportedVersionBumpLevels.includes(value);
 }
 
 function getDefaultVersionBumpConfig(validLabels: ReadonlyMap<string, string>): VersionBumpConfig {
     const allLabels = Array.from(validLabels.keys());
 
     return {
-        major: ['breaking'],
-        minor: ['feature'],
-        patch: allLabels.filter((label) => {
+        major: [ 'breaking' ],
+        minor: [ 'feature' ],
+        patch: allLabels.filter(function (label) {
             return label !== 'breaking' && label !== 'feature';
         })
     };
@@ -42,10 +48,10 @@ function assertValidConfiguredLabels(
 }
 
 function parseVersionBumpLabels(
-    versionBumps: Record<string, unknown>,
+    versionBumps: Readonly<Record<string, unknown>>,
     level: VersionBumpLevel
 ): readonly string[] | undefined {
-    if (!(level in versionBumps)) {
+    if (!Object.hasOwn(versionBumps, level)) {
         return undefined;
     }
 
@@ -57,7 +63,7 @@ function parseVersionBumpLabels(
     return value;
 }
 
-function parseConfiguredVersionBumps(versionBumps: Record<string, unknown>): VersionBumpConfig {
+function parseConfiguredVersionBumps(versionBumps: Readonly<Record<string, unknown>>): VersionBumpConfig {
     return {
         major: parseVersionBumpLabels(versionBumps, 'major') ?? [],
         minor: parseVersionBumpLabels(versionBumps, 'minor') ?? [],
@@ -65,9 +71,9 @@ function parseConfiguredVersionBumps(versionBumps: Record<string, unknown>): Ver
     };
 }
 
-function assertSupportedVersionBumpLevels(versionBumps: Record<string, unknown>): void {
+function assertSupportedVersionBumpLevels(versionBumps: Readonly<Record<string, unknown>>): void {
     for (const key of Object.keys(versionBumps)) {
-        if (!versionBumpLevels.includes(key as VersionBumpLevel)) {
+        if (!isVersionBumpLevel(key)) {
             throw new TypeError(`Configured version bump level "${key}" is not supported`);
         }
     }
@@ -79,7 +85,7 @@ export function getVersionBumpConfig(
 ): VersionBumpConfig {
     const prLogConfig = packageInfo['pr-log'];
 
-    if (!isPlainObject(prLogConfig) || !('versionBumps' in prLogConfig)) {
+    if (!isPlainObject(prLogConfig) || !Object.hasOwn(prLogConfig, 'versionBumps')) {
         return getDefaultVersionBumpConfig(validLabels);
     }
 

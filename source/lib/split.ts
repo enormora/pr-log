@@ -1,15 +1,24 @@
+import assert from 'node:assert';
+
 type NonEmptyArray<T> = readonly [T, ...(readonly T[])];
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- only with inference it is possible to define a non empty string type, but we don’t need the inferred type
-type NonEmptyString<T extends string> = T extends `${infer _Character}${string}` ? T : never;
+type NonEmptyString<T extends string> = T extends '' ? never : T;
 
-type SplitReturnValue<T extends string> = T extends NonEmptyString<T> ? NonEmptyArray<string> : readonly string[];
-
+export function splitByString(value: string, separator: ''): readonly string[];
 export function splitByString<Separator extends string>(
     value: string,
-    separator: Separator
-): SplitReturnValue<Separator> {
-    return value.split(separator) as unknown as SplitReturnValue<Separator>;
+    separator: NonEmptyString<Separator>
+): NonEmptyArray<string>;
+export function splitByString(value: string, separator: string): readonly string[] {
+    return value.split(separator);
+}
+
+function requireNonEmptyArray<T>(values: readonly T[]): NonEmptyArray<T> {
+    const [ first, ...rest ] = values;
+
+    assert.ok(first !== undefined);
+
+    return [ first, ...rest ];
 }
 
 function isEmptyRegExp(value: Readonly<RegExp>): boolean {
@@ -22,5 +31,5 @@ export function splitByPattern(value: string, separator: Readonly<RegExp>): NonE
         throw new Error('The given regex pattern was empty and can’t be used to split a string value');
     }
 
-    return value.split(separator) as unknown as NonEmptyArray<string>;
+    return requireNonEmptyArray(value.split(separator));
 }

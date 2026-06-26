@@ -5,9 +5,9 @@ import { createGitHubPullRequestChangedFilesReader } from './github-pull-request
 
 const pullRequestId = 123;
 
-test('creates a GitHub changed files reader', async () => {
+test('creates a GitHub changed files reader', async function () {
     const listFiles = fake();
-    const paginate = fake.resolves([{ filename: 'source/a.ts' }, { filename: 'README.md' }]);
+    const paginate = fake.resolves([ { filename: 'source/a.ts' }, { filename: 'README.md' } ]);
     const githubClient = {
         paginate,
         pulls: { listFiles }
@@ -20,10 +20,10 @@ test('creates a GitHub changed files reader', async () => {
         listFiles,
         { owner: 'owner', repo: 'repo', pull_number: pullRequestId }
     ]);
-    assert.deepStrictEqual(changedFiles, ['source/a.ts', 'README.md']);
+    assert.deepStrictEqual(changedFiles, [ 'source/a.ts', 'README.md' ]);
 });
 
-test('throws when the GitHub repo cannot be split', async () => {
+test('throws when the GitHub repo cannot be split', async function () {
     const githubClient = { paginate: fake.resolves([]), pulls: { listFiles: fake() } } as unknown as Octokit;
     const changedFilesReader = createGitHubPullRequestChangedFilesReader(githubClient);
 

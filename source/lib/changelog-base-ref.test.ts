@@ -24,20 +24,20 @@ const packageInput = {
     explicitBaseRef: 'explicit-ref'
 };
 
-test('resolves the latest semver tag base ref', () => {
-    assert.deepStrictEqual(resolveLatestSemverTagBaseRef({ tags: ['1.0.0', '2.0.0-alpha.1', '1.2.0'] }), {
+test('resolves the latest semver tag base ref', function () {
+    assert.deepStrictEqual(resolveLatestSemverTagBaseRef({ tags: [ '1.0.0', '2.0.0-alpha.1', '1.2.0' ] }), {
         ref: '1.2.0'
     });
 });
 
-test('formats package version tags', () => {
+test('formats package version tags', function () {
     assert.strictEqual(
         formatPackageVersionTag({ packageName: '@scope/package', version: '1.2.3', packageTagFormat: undefined }),
         '@scope/package@1.2.3'
     );
 });
 
-test('formats package version tags with a custom format', () => {
+test('formats package version tags with a custom format', function () {
     assert.strictEqual(
         formatPackageVersionTag({
             packageName: '@scope/package',
@@ -48,36 +48,36 @@ test('formats package version tags with a custom format', () => {
     );
 });
 
-test('uses the explicit base ref first', async () => {
+test('uses the explicit base ref first', async function () {
     const hasRef = fake.resolves(true);
     const gitRefReader = { hasRef };
 
     const baseRef = await resolveChangelogBaseRef(packageInput, gitRefReader);
 
     assert.deepStrictEqual(baseRef, { ref: 'explicit-ref' });
-    assert.deepStrictEqual(hasRef.firstCall.args, ['explicit-ref']);
+    assert.deepStrictEqual(hasRef.firstCall.args, [ 'explicit-ref' ]);
 });
 
-test('uses the previous git head before the package version tag', async () => {
+test('uses the previous git head before the package version tag', async function () {
     const baseRef = await resolveChangelogBaseRef(
         { ...packageInput, explicitBaseRef: undefined },
-        gitRefReaderFactory(['abc123', '@scope/package@1.2.3'])
+        gitRefReaderFactory([ 'abc123', '@scope/package@1.2.3' ])
     );
 
     assert.deepStrictEqual(baseRef, { ref: 'abc123' });
 });
 
-test('uses the package version tag when no git head was provided', async () => {
+test('uses the package version tag when no git head was provided', async function () {
     const baseRef = await resolveChangelogBaseRef(
         { ...packageInput, explicitBaseRef: undefined, previousGitHead: undefined },
-        gitRefReaderFactory(['@scope/package@1.2.3'])
+        gitRefReaderFactory([ '@scope/package@1.2.3' ])
     );
 
     assert.deepStrictEqual(baseRef, { ref: '@scope/package@1.2.3' });
 });
 
-test('throws when the selected base ref is missing', async () => {
-    await assert.rejects(resolveChangelogBaseRef(packageInput, gitRefReaderFactory([])), (error: unknown) => {
+test('throws when the selected base ref is missing', async function () {
+    await assert.rejects(resolveChangelogBaseRef(packageInput, gitRefReaderFactory([])), function (error: unknown) {
         const missingBaseRefError = error as MissingChangelogBaseRefError;
 
         assert.strictEqual(missingBaseRefError.name, 'MissingChangelogBaseRefError');
@@ -88,7 +88,7 @@ test('throws when the selected base ref is missing', async () => {
     });
 });
 
-test('throws when no package base ref can be determined', async () => {
+test('throws when no package base ref can be determined', async function () {
     await assert.rejects(
         resolveChangelogBaseRef(
             {

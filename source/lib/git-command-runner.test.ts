@@ -17,17 +17,17 @@ function gitCommandRunnerFactory(overrides: Overrides = {}): GitCommandRunner {
     return createGitCommandRunner(fakeDependencies);
 }
 
-test('getShortStatus() executes "git status" with correct options', async () => {
+test('getShortStatus() executes "git status" with correct options', async function () {
     const execute = fake.resolves({ stdout: '' });
     const runner = gitCommandRunnerFactory({ execute });
 
     await runner.getShortStatus();
 
     assert.strictEqual(execute.callCount, 1);
-    assert.deepStrictEqual(execute.firstCall.args, ['git status --short']);
+    assert.deepStrictEqual(execute.firstCall.args, [ 'git status --short' ]);
 });
 
-test('getShortStatus() returns the command output without leading or trailing whitespace', async () => {
+test('getShortStatus() returns the command output without leading or trailing whitespace', async function () {
     const execute = fake.resolves({ stdout: '  foo \n' });
     const runner = gitCommandRunnerFactory({ execute });
 
@@ -36,17 +36,17 @@ test('getShortStatus() returns the command output without leading or trailing wh
     assert.strictEqual(result, 'foo');
 });
 
-test('getCurrentBranchName() executes "git rev-parse" with correct options', async () => {
+test('getCurrentBranchName() executes "git rev-parse" with correct options', async function () {
     const execute = fake.resolves({ stdout: '' });
     const runner = gitCommandRunnerFactory({ execute });
 
     await runner.getCurrentBranchName();
 
     assert.strictEqual(execute.callCount, 1);
-    assert.deepStrictEqual(execute.firstCall.args, ['git rev-parse --abbrev-ref HEAD']);
+    assert.deepStrictEqual(execute.firstCall.args, [ 'git rev-parse --abbrev-ref HEAD' ]);
 });
 
-test('getCurrentBranchName() returns the command output without leading or trailing whitespace', async () => {
+test('getCurrentBranchName() returns the command output without leading or trailing whitespace', async function () {
     const execute = fake.resolves({ stdout: '  foo \n' });
     const runner = gitCommandRunnerFactory({ execute });
 
@@ -55,46 +55,46 @@ test('getCurrentBranchName() returns the command output without leading or trail
     assert.strictEqual(result, 'foo');
 });
 
-test('fetchRemote() executes "git fetch" with the given remote', async () => {
+test('fetchRemote() executes "git fetch" with the given remote', async function () {
     const execute = fake.resolves({ stdout: '' });
     const runner = gitCommandRunnerFactory({ execute });
 
     await runner.fetchRemote('foo');
 
     assert.strictEqual(execute.callCount, 1);
-    assert.deepStrictEqual(execute.firstCall.args, ['git fetch foo']);
+    assert.deepStrictEqual(execute.firstCall.args, [ 'git fetch foo' ]);
 });
 
-test('getSymmetricDifferencesBetweenBranches() executes "git rev-list" with correct options', async () => {
+test('getSymmetricDifferencesBetweenBranches() executes "git rev-list" with correct options', async function () {
     const execute = fake.resolves({ stdout: '' });
     const runner = gitCommandRunnerFactory({ execute });
 
     await runner.getSymmetricDifferencesBetweenBranches('a', 'b');
 
     assert.strictEqual(execute.callCount, 1);
-    assert.deepStrictEqual(execute.firstCall.args, ['git rev-list --left-right a...b']);
+    assert.deepStrictEqual(execute.firstCall.args, [ 'git rev-list --left-right a...b' ]);
 });
 
-test('getSymmetricDifferencesBetweenBranches() returns the command output splitted as individual lines', async () => {
+test('getSymmetricDifferencesBetweenBranches() returns the command output splitted as individual lines', async function () {
     const execute = fake.resolves({ stdout: ' a \nb\nc \n \n\n' });
     const runner = gitCommandRunnerFactory({ execute });
 
     const result = await runner.getSymmetricDifferencesBetweenBranches('a', 'b');
 
-    assert.deepStrictEqual(result, ['a', 'b', 'c']);
+    assert.deepStrictEqual(result, [ 'a', 'b', 'c' ]);
 });
 
-test('getRemoteAliases() executes "git remote -v"', async () => {
+test('getRemoteAliases() executes "git remote -v"', async function () {
     const execute = fake.resolves({ stdout: '' });
     const runner = gitCommandRunnerFactory({ execute });
 
     await runner.getRemoteAliases();
 
     assert.strictEqual(execute.callCount, 1);
-    assert.deepStrictEqual(execute.firstCall.args, ['git remote -v']);
+    assert.deepStrictEqual(execute.firstCall.args, [ 'git remote -v' ]);
 });
 
-test('getRemoteAliases() returns the parsed command output', async () => {
+test('getRemoteAliases() returns the parsed command output', async function () {
     const execute = fake.resolves({
         stdout: 'foo git@example.com/repo/a.git (fetch)\nfoo\tgit@example.com/repo/a.git (push)\n\n'
     });
@@ -108,43 +108,43 @@ test('getRemoteAliases() returns the parsed command output', async () => {
     ]);
 });
 
-test('getRemoteAliases() throws when the url of an remote entry cannot be determined', async () => {
+test('getRemoteAliases() throws when the url of an remote entry cannot be determined', async function () {
     const execute = fake.resolves({ stdout: 'foo git@example.com/repo/a.git (fetch)\nfoo' });
     const runner = gitCommandRunnerFactory({ execute });
 
     await assert.rejects(runner.getRemoteAliases(), { message: 'Failed to determine git remote alias' });
 });
 
-test('listTags() executes "git tag" with correct options', async () => {
+test('listTags() executes "git tag" with correct options', async function () {
     const execute = fake.resolves({ stdout: '' });
     const runner = gitCommandRunnerFactory({ execute });
 
     await runner.listTags();
 
     assert.strictEqual(execute.callCount, 1);
-    assert.deepStrictEqual(execute.firstCall.args, ['git tag --list']);
+    assert.deepStrictEqual(execute.firstCall.args, [ 'git tag --list' ]);
 });
 
-test('listTags() returns the command output splitted as individual lines', async () => {
+test('listTags() returns the command output splitted as individual lines', async function () {
     const execute = fake.resolves({ stdout: ' a \nb\nc \n \n\n' });
     const runner = gitCommandRunnerFactory({ execute });
 
     const result = await runner.listTags();
 
-    assert.deepStrictEqual(result, ['a', 'b', 'c']);
+    assert.deepStrictEqual(result, [ 'a', 'b', 'c' ]);
 });
 
-test('hasRef() executes "git rev-parse" with the given ref', async () => {
+test('hasRef() executes "git rev-parse" with the given ref', async function () {
     const execute = fake.resolves({ stdout: '' });
     const runner = gitCommandRunnerFactory({ execute });
 
     await runner.hasRef('foo');
 
     assert.strictEqual(execute.callCount, 1);
-    assert.deepStrictEqual(execute.firstCall.args, ['git rev-parse --verify --quiet foo^{commit}']);
+    assert.deepStrictEqual(execute.firstCall.args, [ 'git rev-parse --verify --quiet foo^{commit}' ]);
 });
 
-test('hasRef() returns true when git finds the ref', async () => {
+test('hasRef() returns true when git finds the ref', async function () {
     const execute = fake.resolves({ stdout: '' });
     const runner = gitCommandRunnerFactory({ execute });
 
@@ -153,7 +153,7 @@ test('hasRef() returns true when git finds the ref', async () => {
     assert.strictEqual(result, true);
 });
 
-test('hasRef() returns false when git cannot find the ref', async () => {
+test('hasRef() returns false when git cannot find the ref', async function () {
     const execute = fake.rejects(new Error('missing ref'));
     const runner = gitCommandRunnerFactory({ execute });
 
@@ -162,7 +162,7 @@ test('hasRef() returns false when git cannot find the ref', async () => {
     assert.strictEqual(result, false);
 });
 
-test('getMergeCommitLogs() executes "git log" with the correct options', async () => {
+test('getMergeCommitLogs() executes "git log" with the correct options', async function () {
     const execute = fake.resolves({ stdout: '' });
     const runner = gitCommandRunnerFactory({ execute });
 
@@ -174,7 +174,7 @@ test('getMergeCommitLogs() executes "git log" with the correct options', async (
     ]);
 });
 
-test('getMergeCommitLogs() returns the parsed command output', async () => {
+test('getMergeCommitLogs() returns the parsed command output', async function () {
     const execute = fake.resolves({ stdout: 'foo__||__bar##$$@@$$##\nbaz__||__qux##$$@@$$##\n\n' });
     const runner = gitCommandRunnerFactory({ execute });
 
@@ -186,7 +186,7 @@ test('getMergeCommitLogs() returns the parsed command output', async () => {
     ]);
 });
 
-test('getMergeCommitLogs() parses multi-line message bodies correctly', async () => {
+test('getMergeCommitLogs() parses multi-line message bodies correctly', async function () {
     const execute = fake.resolves({ stdout: 'foo__||__bar\nbaz\nqux##$$@@$$##\nbaz__||__qux##$$@@$$##\n\n' });
     const runner = gitCommandRunnerFactory({ execute });
 
@@ -198,7 +198,7 @@ test('getMergeCommitLogs() parses multi-line message bodies correctly', async ()
     ]);
 });
 
-test('getMergeCommitLogs() parses multi-line bodies correctly when it doesn’t end with a line break', async () => {
+test('getMergeCommitLogs() parses multi-line bodies correctly when it doesn’t end with a line break', async function () {
     const execute = fake.resolves({ stdout: 'foo__||__bar\nbaz\nqux##$$@@$$##\nbaz__||__qux##$$@@$$##' });
     const runner = gitCommandRunnerFactory({ execute });
 
@@ -210,25 +210,25 @@ test('getMergeCommitLogs() parses multi-line bodies correctly when it doesn’t 
     ]);
 });
 
-test('getMergeCommitLogs() falls back to undefined when the body couldn’t be extracted', async () => {
+test('getMergeCommitLogs() falls back to undefined when the body couldn’t be extracted', async function () {
     const execute = fake.resolves({ stdout: 'foo##$$@@$$##\n\n\n' });
     const runner = gitCommandRunnerFactory({ execute });
 
     const result = await runner.getMergeCommitLogs('');
 
-    assert.deepStrictEqual(result, [{ subject: 'foo', body: undefined }]);
+    assert.deepStrictEqual(result, [ { subject: 'foo', body: undefined } ]);
 });
 
-test('getMergeCommitLogs() falls back to undefined when the body is an empty string', async () => {
+test('getMergeCommitLogs() falls back to undefined when the body is an empty string', async function () {
     const execute = fake.resolves({ stdout: 'foo__||__##$$@@$$##\n\n\n' });
     const runner = gitCommandRunnerFactory({ execute });
 
     const result = await runner.getMergeCommitLogs('');
 
-    assert.deepStrictEqual(result, [{ subject: 'foo', body: undefined }]);
+    assert.deepStrictEqual(result, [ { subject: 'foo', body: undefined } ]);
 });
 
-test('getFirstParentCommitLogs() executes "git log" with the correct options', async () => {
+test('getFirstParentCommitLogs() executes "git log" with the correct options', async function () {
     const execute = fake.resolves({ stdout: '' });
     const runner = gitCommandRunnerFactory({ execute });
 
@@ -240,7 +240,7 @@ test('getFirstParentCommitLogs() executes "git log" with the correct options', a
     ]);
 });
 
-test('getFirstParentCommitLogs() returns the parsed command output', async () => {
+test('getFirstParentCommitLogs() returns the parsed command output', async function () {
     const execute = fake.resolves({
         stdout: 'hash-1__||__foo__||__bar##$$@@$$##\nhash-2__||__baz__||__qux##$$@@$$##\n\n'
     });
@@ -254,7 +254,7 @@ test('getFirstParentCommitLogs() returns the parsed command output', async () =>
     ]);
 });
 
-test('getFirstParentCommitLogs() parses multi-line message bodies correctly', async () => {
+test('getFirstParentCommitLogs() parses multi-line message bodies correctly', async function () {
     const execute = fake.resolves({
         stdout: 'hash-1__||__foo__||__bar\nbaz\nqux##$$@@$$##\nhash-2__||__baz__||__qux##$$@@$$##\n\n'
     });
@@ -268,7 +268,7 @@ test('getFirstParentCommitLogs() parses multi-line message bodies correctly', as
     ]);
 });
 
-test('getFirstParentCommitLogs() parses multi-line bodies correctly when it doesn’t end with a line break', async () => {
+test('getFirstParentCommitLogs() parses multi-line bodies correctly when it doesn’t end with a line break', async function () {
     const execute = fake.resolves({
         stdout: 'hash-1__||__foo__||__bar\nbaz\nqux##$$@@$$##\nhash-2__||__baz__||__qux##$$@@$$##'
     });
@@ -282,25 +282,25 @@ test('getFirstParentCommitLogs() parses multi-line bodies correctly when it does
     ]);
 });
 
-test('getFirstParentCommitLogs() falls back to undefined when the body couldn’t be extracted', async () => {
+test('getFirstParentCommitLogs() falls back to undefined when the body couldn’t be extracted', async function () {
     const execute = fake.resolves({ stdout: 'hash-1__||__foo##$$@@$$##\n\n\n' });
     const runner = gitCommandRunnerFactory({ execute });
 
     const result = await runner.getFirstParentCommitLogs('');
 
-    assert.deepStrictEqual(result, [{ hash: 'hash-1', subject: 'foo', body: undefined }]);
+    assert.deepStrictEqual(result, [ { hash: 'hash-1', subject: 'foo', body: undefined } ]);
 });
 
-test('getFirstParentCommitLogs() falls back to undefined when the body is an empty string', async () => {
+test('getFirstParentCommitLogs() falls back to undefined when the body is an empty string', async function () {
     const execute = fake.resolves({ stdout: 'hash-1__||__foo__||__##$$@@$$##\n\n\n' });
     const runner = gitCommandRunnerFactory({ execute });
 
     const result = await runner.getFirstParentCommitLogs('');
 
-    assert.deepStrictEqual(result, [{ hash: 'hash-1', subject: 'foo', body: undefined }]);
+    assert.deepStrictEqual(result, [ { hash: 'hash-1', subject: 'foo', body: undefined } ]);
 });
 
-test('getFirstParentCommitLogs() throws when the commit subject cannot be determined', async () => {
+test('getFirstParentCommitLogs() throws when the commit subject cannot be determined', async function () {
     const execute = fake.resolves({ stdout: 'hash-1##$$@@$$##\n\n\n' });
     const runner = gitCommandRunnerFactory({ execute });
 

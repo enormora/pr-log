@@ -23,16 +23,16 @@ export type CliRunnerDependencies = {
     readonly getMergedPullRequests: GetMergedPullRequests;
     readonly renderChangelogMarkdown: typeof renderChangelogMarkdown;
     readonly getCurrentDate: () => Readonly<Date>;
-    readonly packageInfo: Record<string, unknown>;
+    readonly packageInfo: Readonly<Record<string, unknown>>;
     readonly prependFile: typeof _prependFile;
     readonly logger: Logger;
 };
 
 export type CliRunner = {
-    run(options: CliRunOptions): Promise<void>;
+    run: (options: CliRunOptions) => Promise<void>;
 };
 
-type ReleasedCliRunOptions = Extract<CliRunOptions, { unreleased: false }>;
+type ReleasedCliRunOptions = Extract<CliRunOptions, { readonly unreleased: false; }>;
 type GenerateChangelogContext = Pick<
     CliRunnerDependencies,
     | 'ensureCleanLocalGitState'
@@ -171,7 +171,7 @@ export function createCliRunner(dependencies: CliRunnerDependencies): CliRunner 
             const validLabels = getValidLabels(packageInfo, defaultValidLabels);
             const ignoredLabels = getIgnoredLabels(packageInfo);
 
-            validateVersionNumber(options).unwrapOrElse((error) => {
+            validateVersionNumber(options).unwrapOrElse(function (error) {
                 throw error;
             });
 

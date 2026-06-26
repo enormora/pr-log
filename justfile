@@ -11,16 +11,9 @@ eslint *OPTIONS:
 
 eslint-fix: (eslint '--fix')
 
-prettier *OPTIONS:
-    prettier './**/*.{yml,yaml,json,md}' {{OPTIONS}}
+lint: eslint
 
-prettier-check: (prettier '--check')
-
-prettier-fix: (prettier '--write')
-
-lint: eslint prettier-check
-
-lint-fix: eslint-fix prettier-fix
+lint-fix: eslint-fix
 
 prepare-packtory-source: compile
     rm -rf target/packtory/source

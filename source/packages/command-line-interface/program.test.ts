@@ -77,11 +77,11 @@ function createDependencies(githubToken: string | undefined): FactoryResult {
     return { dependencies, ...programStubs };
 }
 
-test('createProgram() runs the CLI with parsed release options', async () => {
+test('createProgram() runs the CLI with parsed release options', async function () {
     const { dependencies, auth, createCliRunner, readPackageInfo, run } = createDependencies('github-token');
     const program = createProgram(dependencies);
 
-    await program.run(['node', 'pr-log', '1.2.3', '--sloppy', '--stdout', '--default-branch', 'develop']);
+    await program.run([ 'node', 'pr-log', '1.2.3', '--sloppy', '--stdout', '--default-branch', 'develop' ]);
 
     assert.strictEqual(auth.callCount, 1);
     assert.strictEqual(readPackageInfo.callCount, 1);
@@ -104,22 +104,23 @@ test('createProgram() runs the CLI with parsed release options', async () => {
     assert.strictEqual(runOptions.versionNumber.unwrapOr(''), '1.2.3');
 });
 
-test('createProgram() skips authentication without a GitHub token', async () => {
+test('createProgram() skips authentication without a GitHub token', async function () {
     const { dependencies, auth, run } = createDependencies(undefined);
     const program = createProgram(dependencies);
 
-    await program.run(['node', 'pr-log', '--unreleased']);
+    await program.run([ 'node', 'pr-log', '--unreleased' ]);
 
     assert.strictEqual(auth.callCount, 0);
     assert.strictEqual((run.firstCall.args[0] as CliRunOptions).unreleased, true);
 });
 
-test('createProgram() validates pull request labels', async () => {
-    const { dependencies, auth, createPullRequestLabelValidator, readPackageInfo, validate } =
-        createDependencies('github-token');
+test('createProgram() validates pull request labels', async function () {
+    const { dependencies, auth, createPullRequestLabelValidator, readPackageInfo, validate } = createDependencies(
+        'github-token'
+    );
     const program = createProgram(dependencies);
 
-    await program.run(['node', 'pr-log', 'validate-pull-request-labels', pullRequestIdText]);
+    await program.run([ 'node', 'pr-log', 'validate-pull-request-labels', pullRequestIdText ]);
 
     assert.strictEqual(auth.callCount, 1);
     assert.strictEqual(readPackageInfo.callCount, 1);
@@ -128,14 +129,14 @@ test('createProgram() validates pull request labels', async () => {
             packageInfo: { name: 'consumer-package' }
         }
     ]);
-    assert.deepStrictEqual(validate.firstCall.args, [pullRequestId]);
+    assert.deepStrictEqual(validate.firstCall.args, [ pullRequestId ]);
 });
 
-test('createProgram() reports invalid pull request numbers', async () => {
+test('createProgram() reports invalid pull request numbers', async function () {
     const { dependencies, reportError, validate } = createDependencies(undefined);
     const program = createProgram(dependencies);
 
-    await program.run(['node', 'pr-log', 'validate-pull-request-labels', 'not-a-number']);
+    await program.run([ 'node', 'pr-log', 'validate-pull-request-labels', 'not-a-number' ]);
 
     assert.strictEqual(validate.callCount, 0);
     assert.strictEqual(
@@ -144,11 +145,11 @@ test('createProgram() reports invalid pull request numbers', async () => {
     );
 });
 
-test('createProgram() reports run option errors', async () => {
+test('createProgram() reports run option errors', async function () {
     const { dependencies, reportError } = createDependencies(undefined);
     const program = createProgram(dependencies);
 
-    await program.run(['node', 'pr-log', '1.2.3', '--unreleased']);
+    await program.run([ 'node', 'pr-log', '1.2.3', '--unreleased' ]);
 
     assert.strictEqual(reportError.callCount, 1);
     assert.strictEqual(
@@ -158,23 +159,23 @@ test('createProgram() reports run option errors', async () => {
     assert.deepStrictEqual(reportError.firstCall.args[1], { isTracingEnabled: false });
 });
 
-test('createProgram() reports runner errors with trace state', async () => {
+test('createProgram() reports runner errors with trace state', async function () {
     const { dependencies, reportError, run } = createDependencies(undefined);
     const error = new Error('run failed');
     run.rejects(error);
     const program = createProgram(dependencies);
 
-    await program.run(['node', 'pr-log', '1.2.3', '--trace']);
+    await program.run([ 'node', 'pr-log', '1.2.3', '--trace' ]);
 
-    assert.deepStrictEqual(reportError.firstCall.args, [error, { isTracingEnabled: true }]);
+    assert.deepStrictEqual(reportError.firstCall.args, [ error, { isTracingEnabled: true } ]);
 });
 
-test('createProgramError() keeps Error values', () => {
+test('createProgramError() keeps Error values', function () {
     const error = new Error('run failed');
 
     assert.strictEqual(createProgramError(error), error);
 });
 
-test('createProgramError() wraps unknown values', () => {
+test('createProgramError() wraps unknown values', function () {
     assert.strictEqual(createProgramError('run failed').message, 'run failed');
 });

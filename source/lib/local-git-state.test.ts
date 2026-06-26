@@ -10,7 +10,7 @@ type FactoryResult = {
 
 function createDependencies(): FactoryResult {
     const fetchRemote = fake.resolves(undefined);
-    const getSymmetricDifferencesBetweenBranches = fake.resolves(['>commit']);
+    const getSymmetricDifferencesBetweenBranches = fake.resolves([ '>commit' ]);
 
     return {
         dependencies: {
@@ -31,35 +31,35 @@ function createDependencies(): FactoryResult {
     };
 }
 
-test('createLocalGitState() reads the short status through the git command runner', async () => {
+test('createLocalGitState() reads the short status through the git command runner', async function () {
     const { dependencies } = createDependencies();
     const localGitState = createLocalGitState(dependencies);
 
     assert.strictEqual(await localGitState.getShortStatus(), 'short-status');
 });
 
-test('createLocalGitState() reads the current branch through the git command runner', async () => {
+test('createLocalGitState() reads the current branch through the git command runner', async function () {
     const { dependencies } = createDependencies();
     const localGitState = createLocalGitState(dependencies);
 
     assert.strictEqual(await localGitState.getCurrentBranchName(), 'main');
 });
 
-test('createLocalGitState() fetches a remote through the git command runner', async () => {
+test('createLocalGitState() fetches a remote through the git command runner', async function () {
     const { dependencies, fetchRemote } = createDependencies();
     const localGitState = createLocalGitState(dependencies);
 
     await localGitState.fetchRemote('origin');
 
-    assert.deepStrictEqual(fetchRemote.firstCall.args, ['origin']);
+    assert.deepStrictEqual(fetchRemote.firstCall.args, [ 'origin' ]);
 });
 
-test('createLocalGitState() reads branch differences through the git command runner', async () => {
+test('createLocalGitState() reads branch differences through the git command runner', async function () {
     const { dependencies, getSymmetricDifferencesBetweenBranches } = createDependencies();
     const localGitState = createLocalGitState(dependencies);
 
     const result = await localGitState.getSymmetricDifferencesBetweenBranches('main', 'origin/main');
 
-    assert.deepStrictEqual(result, ['>commit']);
-    assert.deepStrictEqual(getSymmetricDifferencesBetweenBranches.firstCall.args, ['main', 'origin/main']);
+    assert.deepStrictEqual(result, [ '>commit' ]);
+    assert.deepStrictEqual(getSymmetricDifferencesBetweenBranches.firstCall.args, [ 'main', 'origin/main' ]);
 });

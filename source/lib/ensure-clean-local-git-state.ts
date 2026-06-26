@@ -2,10 +2,10 @@ import { oneLine } from 'common-tags';
 import type { FindRemoteAlias } from './find-remote-alias.ts';
 
 export type LocalGitState = {
-    getShortStatus(): Promise<string>;
-    getCurrentBranchName(): Promise<string>;
-    fetchRemote(remoteAlias: string): Promise<void>;
-    getSymmetricDifferencesBetweenBranches(branchA: string, branchB: string): Promise<readonly string[]>;
+    getShortStatus: () => Promise<string>;
+    getCurrentBranchName: () => Promise<string>;
+    fetchRemote: (remoteAlias: string) => Promise<void>;
+    getSymmetricDifferencesBetweenBranches: (branchA: string, branchB: string) => Promise<readonly string[]>;
 };
 
 type EnsureCleanLocalGitStateOptions = {
@@ -46,7 +46,7 @@ export function ensureCleanLocalGitStateFactory(
         let commitsAhead = 0;
         let commitsBehind = 0;
 
-        commits.forEach((commit: string) => {
+        commits.forEach(function (commit: string) {
             if (commit.startsWith('>')) {
                 commitsBehind += 1;
             } else {

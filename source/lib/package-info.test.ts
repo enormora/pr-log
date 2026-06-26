@@ -1,24 +1,24 @@
 import assert from 'node:assert';
 import { getIgnoredLabels } from './package-info.ts';
 
-test('reads ignored labels from package info', () => {
+test('reads ignored labels from package info', function () {
     assert.deepStrictEqual(
         getIgnoredLabels({
             'pr-log': {
-                ignoredLabels: ['release']
+                ignoredLabels: [ 'release' ]
             }
         }),
-        ['release']
+        [ 'release' ]
     );
 });
 
-test('falls back to no ignored labels', () => {
+test('falls back to no ignored labels', function () {
     assert.deepStrictEqual(getIgnoredLabels({}), []);
 });
 
-test('rejects ignored labels that are not an array', () => {
+test('rejects ignored labels that are not an array', function () {
     assert.throws(
-        () => {
+        function () {
             getIgnoredLabels({
                 'pr-log': {
                     ignoredLabels: 'release'
@@ -29,12 +29,12 @@ test('rejects ignored labels that are not an array', () => {
     );
 });
 
-test('rejects ignored label entries that are not strings', () => {
+test('rejects ignored label entries that are not strings', function () {
     assert.throws(
-        () => {
+        function () {
             getIgnoredLabels({
                 'pr-log': {
-                    ignoredLabels: ['release', 1]
+                    ignoredLabels: [ 'release', 1 ]
                 }
             });
         },
