@@ -93,9 +93,11 @@ test('fetches the remote repository', async function () {
 });
 
 test('fulfills if the local git state is clean', async function () {
-    const ensureCleanLocalGitState = factory();
+    const getSymmetricDifferencesBetweenBranches = fake.resolves([]);
+    const ensureCleanLocalGitState = factory({ getSymmetricDifferencesBetweenBranches });
 
     await ensureCleanLocalGitState(githubRepo);
 
-    assert.ok(true);
+    assert.strictEqual(getSymmetricDifferencesBetweenBranches.callCount, 1);
+    assert.deepStrictEqual(getSymmetricDifferencesBetweenBranches.firstCall.args, [ 'master', 'origin/master' ]);
 });
