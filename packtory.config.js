@@ -1,19 +1,12 @@
 // @ts-check
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { execaCommand } from 'execa';
-import { createPrLogEngine, defaultValidLabels } from './source/packages/core/core.entry-point.ts';
-import { getGithubRepoFromPackageInfo, getIgnoredLabels, getValidLabels } from './source/lib/package-info.ts';
-import { splitByString } from './source/lib/split.ts';
-import { resolvePrLogReleaseVersion } from './source/release/pr-log-release-version.ts';
 
 const projectFolder = process.cwd();
 const sourcesFolder = path.join(projectFolder, 'target/packtory/source');
 const licensePath = path.join(projectFolder, 'LICENSE');
 const coreReadmePath = path.join(projectFolder, 'packages/core/README.md');
 const cliReadmePath = path.join(projectFolder, 'packages/pr-log/README.md');
-const labelLookupIntervalMilliseconds = 250;
-const maximumRateLimitRetryCount = 3;
 
 async function readPackageInfo() {
     const packageJsonContent = await fs.readFile(path.join(projectFolder, 'package.json'), { encoding: 'utf8' });
@@ -49,53 +42,6 @@ function registrySettings() {
     };
 }
 
-function splitLines(value) {
-    return splitByString(value, '\n').filter((line) => {
-        return line !== '';
-    });
-}
-
-async function listTags() {
-    const { stdout } = await execaCommand('git tag --list');
-    return splitLines(stdout);
-}
-
-async function readPrLogVersion(packageInfo, versionInput) {
-    const environment = globalThis.process.env;
-    const githubRepo = getGithubRepoFromPackageInfo(packageInfo);
-    const validLabels = getValidLabels(packageInfo, defaultValidLabels);
-    const ignoredLabels = getIgnoredLabels(packageInfo);
-    const prLogEngine = createPrLogEngine({
-        githubToken: environment.GH_TOKEN ?? environment.GITHUB_TOKEN,
-        workingDirectory: projectFolder,
-        labelLookupIntervalMilliseconds,
-        maximumRateLimitRetryCount
-    });
-
-    return resolvePrLogReleaseVersion({
-        tags: await listTags(),
-        currentVersion: versionInput.currentVersion,
-        packageInfo,
-        githubRepo,
-        validLabels,
-        ignoredLabels,
-        targetSourceFiles: versionInput.targetSourceFiles,
-        ignoredAttributionPaths: versionInput.ignoredAttributionPaths,
-        collectMergedPullRequests(input) {
-            return prLogEngine.collectMergedPullRequests(input);
-        },
-        readPullRequestChangedFiles(input) {
-            return prLogEngine.readPullRequestChangedFiles(input);
-        },
-        filterPullRequestsByTargetFiles(input) {
-            return prLogEngine.filterPullRequestsByTargetFiles(input);
-        },
-        resolvePullRequestLabels(input) {
-            return prLogEngine.resolvePullRequestLabels(input);
-        }
-    });
-}
-
 function corePackage(sharedAttributes) {
     return {
         name: '@pr-log/core',
@@ -120,9 +66,7 @@ function cliPackage(packageInfo, sharedAttributes) {
         name: 'pr-log',
         versioning: {
             automatic: false,
-            provideVersion(input) {
-                return readPrLogVersion(packageInfo, input);
-            }
+            source: 'pull-request-labels'
         },
         additionalFiles: [{ sourceFilePath: cliReadmePath, targetFilePath: 'README.md' }],
         roots: {
@@ -142,7 +86,19 @@ function cliPackage(packageInfo, sharedAttributes) {
     };
 }
 
-/** @returns {Promise<import('@packtory/cli').PacktoryConfig>} */
+function releasePullRequestSettings() {
+    return {
+        branch: 'release/pr-log',
+        body: 'Updates changelogs for the next `pr-log` release.',
+        githubActionsCi: {
+            trigger: 'workflow-dispatch',
+            workflowFile: 'continuous-integration.yml',
+            requiredStatusContexts: ['Node v22', 'Node v24', 'Node v26']
+        }
+    };
+}
+
+/** @returns {Promise<import('@packtory/cli').PacktoryConfig & Record<string, unknown>>} */
 export async function buildConfig() {
     const packageInfo = await readPackageInfo();
     const sharedAttributes = sharedPackageAttributes(packageInfo);
@@ -173,6 +129,7 @@ export async function buildConfig() {
             uniqueTargetPaths: { enabled: true },
             noSideEffects: { enabled: false }
         },
+        releasePullRequest: releasePullRequestSettings(),
         packages: [corePackage(sharedAttributes), cliPackage(packageInfo, sharedAttributes)]
     };
 }
