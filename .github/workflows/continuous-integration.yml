@@ -84,6 +84,142 @@ jobs:
                   echo "zizmor findings: $count"
                   test "$count" -eq 0
 
+    release-pr-context:
+        runs-on: ubuntu-latest
+        name: Release PR context
+        if: github.event_name == 'workflow_dispatch' && github.ref_name == 'release/pr-log'
+        permissions:
+            pull-requests: read # required to find the release PR for the dispatched release branch
+        outputs:
+            number: ${{ steps.release-pull-request.outputs.number }}
+        steps:
+            - name: Use Node.js
+              uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+              with:
+                  node-version: 24
+
+            - name: Find release pull request
+              id: release-pull-request
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  RELEASE_PULL_REQUEST_BRANCH: ${{ github.ref_name }}
+              run: |
+                  node --input-type=module <<'NODE'
+                  import fs from 'node:fs';
+
+                  const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
+                  const url = new URL(`https://api.github.com/repos/${owner}/${repo}/pulls`);
+                  url.searchParams.set('base', 'main');
+                  url.searchParams.set('head', `${owner}:${process.env.RELEASE_PULL_REQUEST_BRANCH}`);
+                  url.searchParams.set('state', 'open');
+                  url.searchParams.set('per_page', '2');
+
+                  const response = await fetch(url, {
+                      headers: {
+                          accept: 'application/vnd.github+json',
+                          authorization: `Bearer ${process.env.GH_TOKEN}`,
+                          'x-github-api-version': '2022-11-28'
+                      }
+                  });
+
+                  if (!response.ok) {
+                      throw new Error(`GitHub API returned ${response.status} for release PR lookup`);
+                  }
+
+                  const pullRequests = await response.json();
+
+                  if (!Array.isArray(pullRequests)) {
+                      throw new Error('GitHub API returned an invalid release PR lookup response');
+                  }
+
+                  if (pullRequests.length !== 1) {
+                      throw new Error(`Expected one release PR, found ${pullRequests.length}`);
+                  }
+
+                  const number = Number(pullRequests[0].number);
+
+                  if (!Number.isSafeInteger(number)) {
+                      throw new Error('GitHub API returned an invalid release PR number');
+                  }
+
+                  fs.appendFileSync(process.env.GITHUB_OUTPUT, `number=${number}\n`);
+                  NODE
+
+    release-pr-policy:
+        needs: release-pr-context
+        runs-on: ubuntu-latest
+        name: Release PR policy
+        if: github.event_name == 'workflow_dispatch' && github.ref_name == 'release/pr-log'
+        permissions:
+            contents: read # required for actions/checkout to read the workflow source
+            pull-requests: read # required to read release PR files and metadata
+        steps:
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+              with:
+                  persist-credentials: false
+
+            - name: Use Node.js
+              uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+              with:
+                  node-version: 24
+
+            - name: Install dependencies
+              run: npm clean-install --ignore-scripts
+
+            - name: Validate release pull request
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  GITHUB_EVENT_NAME: pull_request
+                  GITHUB_EVENT_PATH: target/release/release-pr-event.json
+                  RELEASE_PULL_REQUEST_NUMBER: ${{ needs.release-pr-context.outputs.number }}
+              run: |
+                  mkdir -p target/release
+                  node --input-type=module <<'NODE'
+                  import fs from 'node:fs';
+
+                  const number = Number(process.env.RELEASE_PULL_REQUEST_NUMBER);
+
+                  if (!Number.isSafeInteger(number)) {
+                      throw new Error('RELEASE_PULL_REQUEST_NUMBER must be an integer');
+                  }
+
+                  fs.writeFileSync(
+                      'target/release/release-pr-event.json',
+                      `${JSON.stringify({ pull_request: { number } })}\n`
+                  );
+                  NODE
+                  npx just validate-release-pr
+
+    pull-request-label-policy:
+        needs: release-pr-context
+        runs-on: ubuntu-latest
+        name: Pull request label policy
+        if: github.event_name == 'workflow_dispatch' && github.ref_name == 'release/pr-log'
+        permissions:
+            contents: read # required for actions/checkout to read the workflow source
+            issues: read # required to read labels assigned to the pull request
+        steps:
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+              with:
+                  persist-credentials: false
+
+            - name: Use Node.js
+              uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+              with:
+                  node-version: 24
+
+            - name: Install dependencies
+              run: npm clean-install --ignore-scripts
+
+            - name: Compile
+              run: npx just compile
+
+            - name: Validate pull request label
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  RELEASE_PULL_REQUEST_NUMBER: ${{ needs.release-pr-context.outputs.number }}
+              run: node target/build/source/packages/command-line-interface/bin.entry-point.js validate-pull-request-labels "$RELEASE_PULL_REQUEST_NUMBER"
+
     publish-release:
         needs: build
         runs-on: ubuntu-latest
