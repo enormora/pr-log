@@ -18,7 +18,7 @@ function isVersionBumpLevel(value: string): value is VersionBumpLevel {
     return supportedVersionBumpLevels.includes(value);
 }
 
-function getDefaultVersionBumpConfig(validLabels: ReadonlyMap<string, string>): VersionBumpConfig {
+export function createDefaultVersionBumpConfig(validLabels: ReadonlyMap<string, string>): VersionBumpConfig {
     const allLabels = Array.from(validLabels.keys());
 
     return {
@@ -79,6 +79,19 @@ function assertSupportedVersionBumpLevels(versionBumps: Readonly<Record<string, 
     }
 }
 
+export function parseVersionBumpConfig(
+    versionBumps: Readonly<Record<string, unknown>>,
+    validLabels: ReadonlyMap<string, string>
+): VersionBumpConfig {
+    assertSupportedVersionBumpLevels(versionBumps);
+
+    const parsedVersionBumps = parseConfiguredVersionBumps(versionBumps);
+
+    assertValidConfiguredLabels(parsedVersionBumps, validLabels);
+
+    return parsedVersionBumps;
+}
+
 export function getVersionBumpConfig(
     packageInfo: PackageInfo,
     validLabels: ReadonlyMap<string, string>
@@ -86,7 +99,7 @@ export function getVersionBumpConfig(
     const prLogConfig = packageInfo['pr-log'];
 
     if (!isPlainObject(prLogConfig) || !Object.hasOwn(prLogConfig, 'versionBumps')) {
-        return getDefaultVersionBumpConfig(validLabels);
+        return createDefaultVersionBumpConfig(validLabels);
     }
 
     const { versionBumps } = prLogConfig;
@@ -95,11 +108,5 @@ export function getVersionBumpConfig(
         throw new TypeError('Configured version bumps must be an object');
     }
 
-    assertSupportedVersionBumpLevels(versionBumps);
-
-    const parsedVersionBumps = parseConfiguredVersionBumps(versionBumps);
-
-    assertValidConfiguredLabels(parsedVersionBumps, validLabels);
-
-    return parsedVersionBumps;
+    return parseVersionBumpConfig(versionBumps, validLabels);
 }

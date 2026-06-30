@@ -1,11 +1,14 @@
 import type { PullRequest } from './collect-merged-pull-requests.ts';
-import { getGithubRepoFromPackageInfo, getIgnoredLabels, getValidLabels } from './package-info.ts';
+import { getGithubRepoFromPackageInfo } from './package-info.ts';
+import {
+    createPrLogConfigFromPackageInfo,
+    type PrLogConfig
+} from './pr-log-config.ts';
 import type { PullRequestWithLabel } from './resolve-pull-request-labels.ts';
 
 type ResolvePullRequestLabelsInput = {
     readonly githubRepo: string;
-    readonly validLabels: ReadonlyMap<string, string>;
-    readonly ignoredLabels: readonly string[];
+    readonly config: PrLogConfig;
     readonly pullRequests: readonly PullRequest[];
     readonly targetName: string | undefined;
     readonly targetScopedLabelPattern: string | undefined;
@@ -14,7 +17,7 @@ type ResolvePullRequestLabelsInput = {
 type ResolvePullRequestLabels = (input: ResolvePullRequestLabelsInput) => Promise<readonly PullRequestWithLabel[]>;
 
 export type PullRequestLabelValidatorDependencies = {
-    readonly defaultValidLabels: ReadonlyMap<string, string>;
+    readonly defaultPrLogConfig: PrLogConfig;
     readonly packageInfo: Readonly<Record<string, unknown>>;
     readonly resolvePullRequestLabels: ResolvePullRequestLabels;
 };
@@ -26,18 +29,16 @@ export type PullRequestLabelValidator = {
 export function createPullRequestLabelValidator(
     dependencies: PullRequestLabelValidatorDependencies
 ): PullRequestLabelValidator {
-    const { defaultValidLabels, packageInfo, resolvePullRequestLabels } = dependencies;
+    const { defaultPrLogConfig, packageInfo, resolvePullRequestLabels } = dependencies;
 
     return {
         async validate(pullRequestId) {
             const githubRepo = getGithubRepoFromPackageInfo(packageInfo);
-            const validLabels = getValidLabels(packageInfo, defaultValidLabels);
-            const ignoredLabels = getIgnoredLabels(packageInfo);
+            const config = createPrLogConfigFromPackageInfo(packageInfo, defaultPrLogConfig);
 
             await resolvePullRequestLabels({
                 githubRepo,
-                validLabels,
-                ignoredLabels,
+                config,
                 pullRequests: [ { id: pullRequestId, title: '' } ],
                 targetName: undefined,
                 targetScopedLabelPattern: undefined

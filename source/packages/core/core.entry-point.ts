@@ -4,6 +4,11 @@ import { execaCommand } from 'execa';
 import { createGitHubPullRequestChangedFilesReader } from '../../lib/github-pull-request-changed-files.ts';
 import { createGitCommandRunner, type GitCommandExecutor } from '../../lib/git-command-runner.ts';
 import { getPullRequestLabels } from '../../lib/get-pull-request-label.ts';
+import {
+    defaultPrLogConfig as defaultPrLogConfigValue,
+    type CollapseRule as CollapseRuleValue,
+    type PrLogConfig as PrLogConfigValue
+} from '../../lib/pr-log-config.ts';
 import type {
     MissingChangelogBaseRefError as MissingChangelogBaseRefErrorValue,
     MissingChangelogBaseRefReason as MissingChangelogBaseRefReasonValue
@@ -23,6 +28,7 @@ import {
     type RenderGroupedTargetChangelogMarkdownInput as RenderGroupedTargetChangelogMarkdownInputValue,
     type RenderChangelogMarkdownInput as RenderChangelogMarkdownInputValue,
     type RenderTargetChangelogMarkdownInput as RenderTargetChangelogMarkdownInputValue,
+    type ResolveVersionNumberInput as ResolveVersionNumberInputValue,
     type ResolvePullRequestLabelsOptions as ResolvePullRequestLabelsOptionsValue,
     type TargetChangelogSection as TargetChangelogSectionValue,
     type UpdateChangelogInput as UpdateChangelogInputValue
@@ -31,8 +37,7 @@ import {
 export type PrLogEngineOptions = {
     readonly githubToken: string | undefined;
     readonly workingDirectory: string;
-    readonly labelLookupIntervalMilliseconds: number;
-    readonly maximumRateLimitRetryCount: number;
+    readonly config: PrLogConfigValue;
 };
 
 function createCurrentDate(): Readonly<Date> {
@@ -57,20 +62,22 @@ export function createPrLogEngine(options: Readonly<PrLogEngineOptions>): PrLogE
         getPullRequestLabels,
         waitForMilliseconds: waitForTimeout,
         getCurrentDate: createCurrentDate,
-        labelLookupIntervalMilliseconds: options.labelLookupIntervalMilliseconds,
-        maximumRateLimitRetryCount: options.maximumRateLimitRetryCount
+        config: options.config
     });
 }
 
 export const defaultValidLabels: ReadonlyMap<string, string> = new Map(defaultValidLabelsValue);
+export const defaultPrLogConfig: PrLogConfigValue = defaultPrLogConfigValue;
 
 export type ChangelogBaseRef = ChangelogBaseRefValue;
+export type CollapseRule = CollapseRuleValue;
 export type CollectMergedPullRequestsOptions = CollectMergedPullRequestsOptionsValue;
 export type FilterPullRequestsByTargetFilesInput = FilterPullRequestsByTargetFilesInputValue;
 export type MissingChangelogBaseRefError = MissingChangelogBaseRefErrorValue;
 export type MissingChangelogBaseRefReason = MissingChangelogBaseRefReasonValue;
 export type PackageChangelogBaseRefInput = PackageChangelogBaseRefInputValue;
 export type PrLogEngine = PrLogEngineValue;
+export type PrLogConfig = PrLogConfigValue;
 export type PullRequest = PullRequestValue;
 export type PullRequestWithLabel = PullRequestWithLabelValue;
 export type ReadPullRequestChangedFilesOptions = ReadPullRequestChangedFilesOptionsValue;
@@ -79,5 +86,6 @@ export type RenderGroupedTargetChangelogMarkdownInput = RenderGroupedTargetChang
 export type RenderChangelogMarkdownInput = RenderChangelogMarkdownInputValue;
 export type RenderTargetChangelogMarkdownInput = RenderTargetChangelogMarkdownInputValue;
 export type ResolvePullRequestLabelsOptions = ResolvePullRequestLabelsOptionsValue;
+export type ResolveVersionNumberInput = ResolveVersionNumberInputValue;
 export type TargetChangelogSection = TargetChangelogSectionValue;
 export type UpdateChangelogInput = UpdateChangelogInputValue;

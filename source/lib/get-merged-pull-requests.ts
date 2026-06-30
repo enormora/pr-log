@@ -11,6 +11,7 @@ import {
     resolvePullRequestLabels,
     type PullRequestWithLabel as PullRequestWithLabelValue
 } from './resolve-pull-request-labels.ts';
+import type { PrLogConfig } from './pr-log-config.ts';
 
 export type PullRequest = PullRequestValue;
 export type PullRequestWithLabel = PullRequestWithLabelValue;
@@ -20,15 +21,12 @@ export type GetMergedPullRequestsDependencies = {
     readonly getPullRequestLabels: GetPullRequestLabels;
     readonly githubClient: Octokit;
     readonly waitForMilliseconds: (durationMilliseconds: number) => Promise<void>;
-    readonly labelLookupIntervalMilliseconds: number;
     readonly getCurrentDate: () => Readonly<Date>;
-    readonly maximumRateLimitRetryCount: number;
 };
 
 export type GetMergedPullRequests = (
     repo: string,
-    validLabels: ReadonlyMap<string, string>,
-    ignoredLabels: readonly string[]
+    config: PrLogConfig
 ) => Promise<readonly PullRequestWithLabel[]>;
 
 type PullRequestData = Readonly<Awaited<ReturnType<Octokit['pulls']['get']>>['data']>;
@@ -59,13 +57,7 @@ async function fetchPullRequestTitle(
 }
 
 export function getMergedPullRequestsFactory(dependencies: GetMergedPullRequestsDependencies): GetMergedPullRequests {
-    const {
-        gitCommandRunner,
-        getPullRequestLabels,
-        githubClient,
-        waitForMilliseconds,
-        labelLookupIntervalMilliseconds
-    } = dependencies;
+    const { gitCommandRunner, getPullRequestLabels, githubClient, waitForMilliseconds } = dependencies;
 
     async function getLatestVersionTag(): Promise<string> {
         const tags = await gitCommandRunner.listTags();
@@ -89,23 +81,25 @@ export function getMergedPullRequestsFactory(dependencies: GetMergedPullRequests
 
     return async function getMergedPullRequests(
         githubRepo: string,
-        validLabels: ReadonlyMap<string, string>,
-        ignoredLabels: readonly string[]
+        config: PrLogConfig
     ) {
         const latestVersionTag = await getLatestVersionTag();
         const pullRequests = await getPullRequests(latestVersionTag, githubRepo);
         const pullRequestsWithLabels = await resolvePullRequestLabels({
             githubRepo,
-            validLabels,
-            ignoredLabels,
+            validLabels: config.validLabels,
+            ignoredLabels: config.ignoredLabels,
             pullRequests,
             waitForMilliseconds,
-            labelLookupIntervalMilliseconds,
+            labelLookupIntervalMilliseconds: config.labelLookupIntervalMilliseconds,
             targetName: undefined,
             targetScopedLabelPattern: undefined,
             pullRequestLabelReader: {
                 async getLabels(repo, pullRequestId) {
-                    return getPullRequestLabels(repo, pullRequestId, dependencies);
+                    return getPullRequestLabels(repo, pullRequestId, {
+                        ...dependencies,
+                        maximumRateLimitRetryCount: config.maximumRateLimitRetryCount
+                    });
                 }
             }
         });

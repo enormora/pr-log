@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { renderGroupedTargetChangelogMarkdown, updateChangelogMarkdown } from './render-changelog-markdown.ts';
-import { defaultValidLabels } from './valid-labels.ts';
+import { defaultPrLogConfig } from './pr-log-config.ts';
 
 test('updates an empty changelog', function () {
     const changelog = updateChangelogMarkdown({
@@ -45,9 +45,8 @@ test('prepends repeated generated changelog sections', function () {
 
 test('updates a changelog with grouped target sections', function () {
     const generatedChangelogMarkdown = renderGroupedTargetChangelogMarkdown({
-        packageInfo: {},
+        config: defaultPrLogConfig,
         currentDate: new Date(0),
-        validLabels: defaultValidLabels,
         targets: [
             {
                 targetName: 'pkg-a',

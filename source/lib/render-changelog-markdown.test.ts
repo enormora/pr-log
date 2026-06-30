@@ -4,13 +4,12 @@ import {
     renderGroupedTargetChangelogMarkdown,
     renderTargetChangelogMarkdown
 } from './render-changelog-markdown.ts';
-import { defaultValidLabels } from './valid-labels.ts';
+import { defaultPrLogConfig } from './pr-log-config.ts';
 
 test('renders released changelog markdown', function () {
     const changelog = renderChangelogMarkdown({
-        packageInfo: {},
+        config: defaultPrLogConfig,
         currentDate: new Date(0),
-        validLabels: defaultValidLabels,
         mergedPullRequests: [ { id: 1, title: 'Fix bug', label: 'bug' } ],
         githubRepo: 'owner/repo',
         unreleased: false,
@@ -23,9 +22,8 @@ test('renders released changelog markdown', function () {
 
 test('renders unreleased changelog markdown without a title', function () {
     const changelog = renderChangelogMarkdown({
-        packageInfo: {},
+        config: defaultPrLogConfig,
         currentDate: new Date(0),
-        validLabels: defaultValidLabels,
         mergedPullRequests: [ { id: 1, title: 'Fix bug', label: 'bug' } ],
         githubRepo: 'owner/repo',
         unreleased: true,
@@ -38,9 +36,8 @@ test('renders unreleased changelog markdown without a title', function () {
 
 test('renders target changelog markdown', function () {
     const changelog = renderTargetChangelogMarkdown({
-        packageInfo: {},
+        config: defaultPrLogConfig,
         currentDate: new Date(0),
-        validLabels: defaultValidLabels,
         targetName: 'pkg-a',
         mergedPullRequests: [ { id: 1, title: 'Fix bug', label: 'bug' } ],
         githubRepo: 'owner/repo',
@@ -54,9 +51,8 @@ test('renders target changelog markdown', function () {
 
 test('renders grouped target changelog markdown', function () {
     const changelog = renderGroupedTargetChangelogMarkdown({
-        packageInfo: {},
+        config: defaultPrLogConfig,
         currentDate: new Date(0),
-        validLabels: defaultValidLabels,
         targets: [
             {
                 targetName: 'pkg-a',
@@ -82,9 +78,8 @@ test('renders grouped target changelog markdown', function () {
 
 test('does not render empty target sections', function () {
     const changelog = renderGroupedTargetChangelogMarkdown({
-        packageInfo: {},
+        config: defaultPrLogConfig,
         currentDate: new Date(0),
-        validLabels: defaultValidLabels,
         targets: [
             { targetName: 'pkg-a', unreleased: true, versionNumber: undefined, mergedPullRequests: [] },
             {
@@ -103,9 +98,8 @@ test('does not render empty target sections', function () {
 
 test('renders grouped target changelog markdown with custom date formatting', function () {
     const changelog = renderGroupedTargetChangelogMarkdown({
-        packageInfo: { 'pr-log': { dateFormat: 'dd.MM.yyyy' } },
+        config: { ...defaultPrLogConfig, dateFormat: 'dd.MM.yyyy' },
         currentDate: new Date(0),
-        validLabels: defaultValidLabels,
         targets: [
             {
                 targetName: 'pkg-a',

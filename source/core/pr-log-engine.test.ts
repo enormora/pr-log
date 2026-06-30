@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { fake } from 'sinon';
-import { defaultValidLabels } from '../lib/valid-labels.ts';
+import { defaultPrLogConfig, type PrLogConfig } from '../lib/pr-log-config.ts';
 import type { GitCommandRunner } from '../lib/git-command-runner.ts';
 import type { GetPullRequestLabels } from '../lib/get-pull-request-label.ts';
 import type { PullRequestChangedFilesReader } from '../lib/pull-request-changed-files.ts';
@@ -21,7 +21,7 @@ type EngineOverrides = {
     readonly pullRequestChangedFilesReader?: PullRequestChangedFilesReader;
     readonly getPullRequestLabels?: GetPullRequestLabels;
     readonly waitForMilliseconds?: (durationMilliseconds: number) => Promise<void>;
-    readonly labelLookupIntervalMilliseconds?: number;
+    readonly config?: PrLogConfig;
 };
 
 function createGitCommandRunner(overrides: Partial<GitCommandRunner> = {}): GitCommandRunner {
@@ -77,7 +77,11 @@ function createDefaultEngineOverrides(): Required<EngineOverrides> {
         async waitForMilliseconds() {
             return undefined;
         },
-        labelLookupIntervalMilliseconds: waitDurationMilliseconds
+        config: {
+            ...defaultPrLogConfig,
+            labelLookupIntervalMilliseconds: waitDurationMilliseconds,
+            maximumRateLimitRetryCount: 0
+        }
     };
 }
 
@@ -94,8 +98,7 @@ function createEngine(overrides: EngineOverrides = {}): PrLogEngine {
         getPullRequestLabels: dependencies.getPullRequestLabels,
         waitForMilliseconds: dependencies.waitForMilliseconds,
         getCurrentDate: fake.returns(new Date(0)),
-        labelLookupIntervalMilliseconds: dependencies.labelLookupIntervalMilliseconds,
-        maximumRateLimitRetryCount: 0
+        config: dependencies.config
     });
 }
 
@@ -216,7 +219,8 @@ test('reads pull request labels', async function () {
 
 test('waits between raw pull request label reads', async function () {
     const waitForMilliseconds = fake.resolves(undefined);
-    const engine = createEngine({ waitForMilliseconds, labelLookupIntervalMilliseconds: waitDurationMilliseconds });
+    const config = { ...defaultPrLogConfig, labelLookupIntervalMilliseconds: waitDurationMilliseconds };
+    const engine = createEngine({ waitForMilliseconds, config });
 
     await engine.readPullRequestLabels({
         githubRepo,
@@ -235,8 +239,7 @@ test('resolves pull request labels', async function () {
     assert.deepStrictEqual(
         await engine.resolvePullRequestLabels({
             githubRepo,
-            validLabels: defaultValidLabels,
-            ignoredLabels: [],
+            config: defaultPrLogConfig,
             pullRequests: [ { id: pullRequestId, title: 'Fix bug' } ],
             targetName: undefined,
             targetScopedLabelPattern: undefined
@@ -253,8 +256,7 @@ test('resolves target scoped pull request labels', async function () {
     assert.deepStrictEqual(
         await engine.resolvePullRequestLabels({
             githubRepo,
-            validLabels: defaultValidLabels,
-            ignoredLabels: [],
+            config: defaultPrLogConfig,
             pullRequests: [ { id: pullRequestId, title: 'Fix bug' } ],
             targetName: 'pkg-a',
             targetScopedLabelPattern: undefined
@@ -263,13 +265,52 @@ test('resolves target scoped pull request labels', async function () {
     );
 });
 
+test('resolves pull request labels with custom config labels', async function () {
+    const customConfig: PrLogConfig = {
+        ...defaultPrLogConfig,
+        validLabels: new Map([ [ 'custom', 'Custom Changes' ] ]),
+        versionBumps: { major: [], minor: [], patch: [ 'custom' ] }
+    };
+    const engine = createEngine({
+        getPullRequestLabels: fake.resolves([ 'custom' ])
+    });
+
+    assert.deepStrictEqual(
+        await engine.resolvePullRequestLabels({
+            githubRepo,
+            config: customConfig,
+            pullRequests: [ { id: pullRequestId, title: 'Custom change' } ],
+            targetName: undefined,
+            targetScopedLabelPattern: undefined
+        }),
+        [ { id: pullRequestId, title: 'Custom change', label: 'custom' } ]
+    );
+});
+
+test('resolves pull request labels with ignored config labels', async function () {
+    const config: PrLogConfig = { ...defaultPrLogConfig, ignoredLabels: [ 'release' ] };
+    const engine = createEngine({
+        getPullRequestLabels: fake.resolves([ 'release', 'bug' ])
+    });
+
+    assert.deepStrictEqual(
+        await engine.resolvePullRequestLabels({
+            githubRepo,
+            config,
+            pullRequests: [ { id: pullRequestId, title: 'Release prep' } ],
+            targetName: undefined,
+            targetScopedLabelPattern: undefined
+        }),
+        []
+    );
+});
+
 test('renders changelog markdown', function () {
     const engine = createEngine();
 
     const changelog = engine.renderChangelog({
-        packageInfo: {},
+        config: defaultPrLogConfig,
         currentDate: new Date(0),
-        validLabels: defaultValidLabels,
         mergedPullRequests: [ { id: pullRequestId, title: 'Fix bug', label: 'bug' } ],
         githubRepo,
         unreleased: false,
@@ -278,13 +319,110 @@ test('renders changelog markdown', function () {
 
     assert.ok(changelog.includes('## 1.0.0 (January 1, 1970)'));
 });
+
+test('renders changelog markdown with configured date format', function () {
+    const engine = createEngine();
+
+    const changelog = engine.renderChangelog({
+        config: { ...defaultPrLogConfig, dateFormat: 'dd.MM.yyyy' },
+        currentDate: new Date(0),
+        mergedPullRequests: [ { id: pullRequestId, title: 'Fix bug', label: 'bug' } ],
+        githubRepo,
+        unreleased: false,
+        versionNumber: '1.0.0'
+    });
+
+    assert.ok(changelog.includes('## 1.0.0 (01.01.1970)'));
+});
+
+test('renders changelog markdown with configured collapse rules', function () {
+    const engine = createEngine();
+    const config: PrLogConfig = {
+        ...defaultPrLogConfig,
+        validLabels: new Map([ [ 'upgrade', 'Dependency Upgrades' ] ]),
+        versionBumps: { major: [], minor: [], patch: [ 'upgrade' ] },
+        collapseRules: [
+            {
+                label: 'upgrade',
+                pattern: /^Update (?<dependency>.+) from (?<from>.+) to (?<to>.+)$/u,
+                replace: 'Update $<dependency> from $<from> to $<to>',
+                keyGroup: 'dependency',
+                fromGroup: 'from',
+                toGroup: 'to'
+            }
+        ]
+    };
+
+    const changelog = engine.renderChangelog({
+        config,
+        currentDate: new Date(0),
+        mergedPullRequests: [
+            { id: 3, title: 'Update foo from 2 to 3', label: 'upgrade' },
+            { id: 2, title: 'Update foo from 1 to 2', label: 'upgrade' }
+        ],
+        githubRepo,
+        unreleased: true,
+        versionNumber: undefined
+    });
+
+    assert.ok(
+        changelog.includes(
+            '* Update foo from 1 to 3 ([#3](https://github.com/owner/repo/pull/3), [#2](https://github.com/owner/repo/pull/2))'
+        )
+    );
+});
+
+test('resolves version number with configured version bump labels', function () {
+    const engine = createEngine();
+    const config: PrLogConfig = {
+        ...defaultPrLogConfig,
+        validLabels: new Map([ [ 'documentation', 'Documentation' ] ]),
+        versionBumps: { major: [], minor: [ 'documentation' ], patch: [] }
+    };
+
+    const versionNumber = engine.resolveVersionNumber({
+        latestVersionTag: '1.2.3',
+        mergedPullRequests: [ { id: pullRequestId, title: 'Docs', label: 'documentation' } ],
+        config
+    });
+
+    assert.strictEqual(versionNumber, '1.3.0');
+});
+
+test('uses configured label lookup interval and maximum rate-limit retry count', async function () {
+    const waitForMilliseconds = fake.resolves(undefined);
+    const config: PrLogConfig = {
+        ...defaultPrLogConfig,
+        labelLookupIntervalMilliseconds: 123,
+        maximumRateLimitRetryCount: 5
+    };
+    const getPullRequestLabels = fake.resolves([ 'bug' ]);
+    const engine = createEngine({ waitForMilliseconds, getPullRequestLabels });
+
+    await engine.resolvePullRequestLabels({
+        githubRepo,
+        config,
+        pullRequests: [
+            { id: pullRequestId, title: 'Fix bug' },
+            { id: documentationPullRequestId, title: 'Fix another bug' }
+        ],
+        targetName: undefined,
+        targetScopedLabelPattern: undefined
+    });
+
+    assert.deepStrictEqual(waitForMilliseconds.firstCall.args, [ 123 ]);
+    const labelReaderDependencies = getPullRequestLabels.firstCall.args[2] as {
+        readonly maximumRateLimitRetryCount: number;
+    };
+    assert.strictEqual(labelReaderDependencies.maximumRateLimitRetryCount, 5);
+});
+
 test('renders target changelog markdown', function () {
     const engine = createEngine();
 
     const changelog = engine.renderTargetChangelog({
-        packageInfo: {},
+        config: defaultPrLogConfig,
         currentDate: new Date(0),
-        validLabels: defaultValidLabels,
         targetName: 'pkg-a',
         mergedPullRequests: [ { id: pullRequestId, title: 'Fix bug', label: 'bug' } ],
         githubRepo,
@@ -299,9 +437,8 @@ test('renders grouped target changelog markdown', function () {
     const engine = createEngine();
 
     const changelog = engine.renderGroupedTargetChangelog({
-        packageInfo: {},
+        config: defaultPrLogConfig,
         currentDate: new Date(0),
-        validLabels: defaultValidLabels,
         targets: [
             {
                 targetName: 'pkg-a',

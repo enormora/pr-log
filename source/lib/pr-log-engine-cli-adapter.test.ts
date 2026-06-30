@@ -1,13 +1,18 @@
 import assert from 'node:assert';
 import { fake, type SinonSpy } from 'sinon';
 import type { PrLogEngine } from '../core/pr-log-engine.ts';
+import { defaultPrLogConfig } from './pr-log-config.ts';
 import {
     createChangelogMarkdownRenderer,
     createLatestVersionTagReader,
     createMergedPullRequestReader
 } from './pr-log-engine-cli-adapter.ts';
 
-const validLabels = new Map([ [ 'bug', 'Bug Fixes' ] ]);
+const config = {
+    ...defaultPrLogConfig,
+    validLabels: new Map([ [ 'bug', 'Bug Fixes' ] ]),
+    versionBumps: { major: [], minor: [], patch: [ 'bug' ] }
+};
 
 type FactoryResult = {
     readonly prLogEngine: Pick<
@@ -54,7 +59,7 @@ test('createMergedPullRequestReader() collects pull requests from the latest bas
         targetScopedLabelPattern: undefined
     });
 
-    const result = await getMergedPullRequests('owner/repository', validLabels, []);
+    const result = await getMergedPullRequests('owner/repository', config);
 
     assert.deepStrictEqual(result, [ { id: 1, title: 'Fix bug', label: 'bug' } ]);
     assert.deepStrictEqual(collectMergedPullRequests.firstCall.args, [
@@ -63,8 +68,7 @@ test('createMergedPullRequestReader() collects pull requests from the latest bas
     assert.deepStrictEqual(resolvePullRequestLabels.firstCall.args, [
         {
             githubRepo: 'owner/repository',
-            validLabels,
-            ignoredLabels: [],
+            config,
             pullRequests: [ { id: 1, title: 'Fix bug' } ],
             targetName: undefined,
             targetScopedLabelPattern: undefined
@@ -76,9 +80,8 @@ test('createChangelogMarkdownRenderer() renders through the pr-log engine', func
     const { prLogEngine, renderChangelog } = createPrLogEngine();
     const renderChangelogMarkdown = createChangelogMarkdownRenderer(prLogEngine);
     const input = {
-        packageInfo: {},
+        config,
         currentDate: new Date(0),
-        validLabels,
         githubRepo: 'owner/repository',
         mergedPullRequests: [],
         unreleased: true as const,

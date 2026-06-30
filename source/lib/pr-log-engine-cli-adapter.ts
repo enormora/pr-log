@@ -1,4 +1,5 @@
 import type { PrLogEngine } from '../core/pr-log-engine.ts';
+import type { PrLogConfig } from './pr-log-config.ts';
 import type { GetMergedPullRequests } from './get-merged-pull-requests.ts';
 import type { renderChangelogMarkdown } from './render-changelog-markdown.ts';
 import type { GetLatestVersionTag } from './resolve-version-number.ts';
@@ -26,14 +27,13 @@ export function createMergedPullRequestReader(
     prLogEngine: MergedPullRequestReaderEngine,
     options: MergedPullRequestReaderOptions
 ): GetMergedPullRequests {
-    return async function getMergedPullRequests(githubRepo, validLabels, ignoredLabels) {
+    return async function getMergedPullRequests(githubRepo: string, config: PrLogConfig) {
         const baseRef = await prLogEngine.resolveLatestSemverChangelogBaseRef();
         const pullRequests = await prLogEngine.collectMergedPullRequests({ githubRepo, baseRef: baseRef.ref });
 
         return prLogEngine.resolvePullRequestLabels({
             githubRepo,
-            validLabels,
-            ignoredLabels,
+            config,
             pullRequests,
             targetName: options.targetName,
             targetScopedLabelPattern: options.targetScopedLabelPattern

@@ -1,4 +1,3 @@
-import { splitByString } from '../lib/split.ts';
 import {
     resolveChangelogBaseRef as resolveChangelogBaseRefValue,
     resolveLatestSemverTagBaseRef as resolveLatestSemverTagBaseRefValue,
@@ -17,10 +16,12 @@ import {
 } from '../lib/filter-pull-requests-by-target-files.ts';
 import type { GitCommandRunner } from '../lib/git-command-runner.ts';
 import type { GetPullRequestLabels, GitHubPullRequestLabelClient } from '../lib/get-pull-request-label.ts';
+import type { PrLogConfig as PrLogConfigValue } from '../lib/pr-log-config.ts';
 import {
     fetchPullRequestChangedFiles as fetchPullRequestChangedFilesValue,
     type PullRequestChangedFilesReader
 } from '../lib/pull-request-changed-files.ts';
+import { proposeVersionNumber as proposeVersionNumberValue } from '../lib/propose-version-number.ts';
 import {
     resolvePullRequestLabels as resolvePullRequestLabelsValue,
     type PullRequestWithLabel as PullRequestWithLabelValue
@@ -54,11 +55,16 @@ export type ReadPullRequestLabelsOptions = {
 
 export type ResolvePullRequestLabelsOptions = {
     readonly githubRepo: string;
-    readonly validLabels: ReadonlyMap<string, string>;
-    readonly ignoredLabels: readonly string[];
+    readonly config: PrLogConfigValue;
     readonly pullRequests: readonly PullRequestValue[];
     readonly targetName: string | undefined;
     readonly targetScopedLabelPattern: string | undefined;
+};
+
+export type ResolveVersionNumberInput = {
+    readonly latestVersionTag: string;
+    readonly mergedPullRequests: readonly PullRequestWithLabelValue[];
+    readonly config: PrLogConfigValue;
 };
 
 export type PrLogEngine = {
@@ -71,6 +77,7 @@ export type PrLogEngine = {
     readPullRequestLabels: (input: ReadPullRequestLabelsOptions) => Promise<ReadonlyMap<number, readonly string[]>>;
     filterPullRequestsByTargetFiles: (input: FilterPullRequestsByTargetFilesInputValue) => readonly PullRequestValue[];
     resolvePullRequestLabels: (input: ResolvePullRequestLabelsOptions) => Promise<readonly PullRequestWithLabelValue[]>;
+    resolveVersionNumber: (input: ResolveVersionNumberInput) => string;
     renderChangelog: (input: RenderChangelogMarkdownInputValue) => string;
     renderTargetChangelog: (input: RenderTargetChangelogMarkdownInputValue) => string;
     renderGroupedTargetChangelog: (input: RenderGroupedTargetChangelogMarkdownInputValue) => string;
@@ -102,14 +109,13 @@ export type PrLogEngineDependencies = {
     readonly getPullRequestLabels: GetPullRequestLabels;
     readonly waitForMilliseconds: (durationMilliseconds: number) => Promise<void>;
     readonly getCurrentDate: () => Readonly<Date>;
-    readonly labelLookupIntervalMilliseconds: number;
-    readonly maximumRateLimitRetryCount: number;
+    readonly config: PrLogConfigValue;
 };
 
 function determineRepoDetails(githubRepo: string): Readonly<[owner: string, repo: string]> {
-    const [ owner, repo ] = splitByString(githubRepo, '/');
+    const [ owner, repo ] = githubRepo.split('/');
 
-    if (repo === undefined) {
+    if (owner === undefined || repo === undefined) {
         throw new TypeError('Could not find a repository');
     }
 
@@ -143,18 +149,28 @@ type EnginePullRequestLabelReader = {
     getLabels: (githubRepo: string, pullRequestId: number) => Promise<readonly string[]>;
 };
 
-function createPullRequestLabelReader(dependencies: PrLogEngineDependencies): EnginePullRequestLabelReader {
+function createPullRequestLabelReader(
+    dependencies: PrLogEngineDependencies,
+    config: PrLogConfigValue
+): EnginePullRequestLabelReader {
     return {
         async getLabels(githubRepo: string, pullRequestId: number) {
-            const labels = await dependencies.getPullRequestLabels(githubRepo, pullRequestId, dependencies);
+            const labels = await dependencies.getPullRequestLabels(githubRepo, pullRequestId, {
+                githubClient: dependencies.githubClient,
+                waitForMilliseconds: dependencies.waitForMilliseconds,
+                getCurrentDate: dependencies.getCurrentDate,
+                maximumRateLimitRetryCount: config.maximumRateLimitRetryCount
+            });
             return labels;
         }
     };
 }
 
 async function waitBetweenLabelReads(dependencies: PrLogEngineDependencies, pullRequestIndex: number): Promise<void> {
-    if (pullRequestIndex > 0 && dependencies.labelLookupIntervalMilliseconds > 0) {
-        await dependencies.waitForMilliseconds(dependencies.labelLookupIntervalMilliseconds);
+    const { labelLookupIntervalMilliseconds } = dependencies.config;
+
+    if (pullRequestIndex > 0 && labelLookupIntervalMilliseconds > 0) {
+        await dependencies.waitForMilliseconds(labelLookupIntervalMilliseconds);
     }
 }
 
@@ -163,7 +179,7 @@ async function readPullRequestLabels(
     input: ReadPullRequestLabelsOptions
 ): Promise<ReadonlyMap<number, readonly string[]>> {
     const pullRequestLabels = new Map<number, readonly string[]>();
-    const pullRequestLabelReader = createPullRequestLabelReader(dependencies);
+    const pullRequestLabelReader = createPullRequestLabelReader(dependencies, dependencies.config);
 
     for (const [ pullRequestIndex, pullRequest ] of input.pullRequests.entries()) {
         await waitBetweenLabelReads(dependencies, pullRequestIndex);
@@ -213,15 +229,23 @@ export function createPrLogEngineWithDependencies(dependencies: PrLogEngineDepen
         async resolvePullRequestLabels(input) {
             return resolvePullRequestLabelsValue({
                 githubRepo: input.githubRepo,
-                validLabels: input.validLabels,
-                ignoredLabels: input.ignoredLabels,
+                validLabels: input.config.validLabels,
+                ignoredLabels: input.config.ignoredLabels,
                 pullRequests: input.pullRequests,
-                pullRequestLabelReader: createPullRequestLabelReader(dependencies),
+                pullRequestLabelReader: createPullRequestLabelReader(dependencies, input.config),
                 waitForMilliseconds: dependencies.waitForMilliseconds,
-                labelLookupIntervalMilliseconds: dependencies.labelLookupIntervalMilliseconds,
+                labelLookupIntervalMilliseconds: input.config.labelLookupIntervalMilliseconds,
                 targetName: input.targetName,
                 targetScopedLabelPattern: input.targetScopedLabelPattern
             });
+        },
+
+        resolveVersionNumber(input) {
+            return proposeVersionNumberValue(
+                input.latestVersionTag,
+                input.mergedPullRequests,
+                input.config.versionBumps
+            );
         },
 
         renderChangelog: renderChangelogMarkdown,
@@ -236,6 +260,7 @@ export type FilterPullRequestsByTargetFilesInput = FilterPullRequestsByTargetFil
 export type PackageChangelogBaseRefInput = PackageChangelogBaseRefInputValue;
 export type PullRequest = PullRequestValue;
 export type PullRequestWithLabel = PullRequestWithLabelValue;
+export type PrLogConfig = PrLogConfigValue;
 export type RenderGroupedTargetChangelogMarkdownInput = RenderGroupedTargetChangelogMarkdownInputValue;
 export type RenderChangelogMarkdownInput = RenderChangelogMarkdownInputValue;
 export type RenderTargetChangelogMarkdownInput = RenderTargetChangelogMarkdownInputValue;

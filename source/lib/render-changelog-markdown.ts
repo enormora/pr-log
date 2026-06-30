@@ -1,12 +1,12 @@
 import { nothing } from 'true-myth/maybe';
 import { createChangelogFactory, formatChangelogDate } from './create-changelog.ts';
+import type { PrLogConfig } from './pr-log-config.ts';
 import type { PullRequestWithLabel } from './resolve-pull-request-labels.ts';
 import { createVersionNumber } from './version-number.ts';
 
 type RenderChangelogMarkdownInputBase = {
-    readonly packageInfo: Readonly<Record<string, unknown>>;
+    readonly config: PrLogConfig;
     readonly currentDate: Readonly<Date>;
-    readonly validLabels: ReadonlyMap<string, string>;
     readonly mergedPullRequests: readonly PullRequestWithLabel[];
     readonly githubRepo: string;
 };
@@ -43,9 +43,8 @@ type UnreleasedTargetChangelogSection = TargetChangelogSectionBase & {
 export type TargetChangelogSection = ReleasedTargetChangelogSection | UnreleasedTargetChangelogSection;
 
 export type RenderGroupedTargetChangelogMarkdownInput = {
-    readonly packageInfo: Readonly<Record<string, unknown>>;
+    readonly config: PrLogConfig;
     readonly currentDate: Readonly<Date>;
-    readonly validLabels: ReadonlyMap<string, string>;
     readonly githubRepo: string;
     readonly targets: readonly TargetChangelogSection[];
 };
@@ -59,7 +58,7 @@ export type UpdateChangelogMarkdownInput = {
 
 export function renderChangelogMarkdown(input: RenderChangelogMarkdownInput): string {
     const createChangelog = createChangelogFactory({
-        packageInfo: input.packageInfo,
+        config: input.config,
         getCurrentDate() {
             return input.currentDate;
         }
@@ -67,7 +66,6 @@ export function renderChangelogMarkdown(input: RenderChangelogMarkdownInput): st
 
     if (input.unreleased) {
         return createChangelog({
-            validLabels: input.validLabels,
             mergedPullRequests: input.mergedPullRequests,
             githubRepo: input.githubRepo,
             unreleased: true,
@@ -76,7 +74,6 @@ export function renderChangelogMarkdown(input: RenderChangelogMarkdownInput): st
     }
 
     return createChangelog({
-        validLabels: input.validLabels,
         mergedPullRequests: input.mergedPullRequests,
         githubRepo: input.githubRepo,
         unreleased: false,
@@ -95,7 +92,7 @@ function renderTargetSectionTitle(
         return `## ${target.targetName}`;
     }
 
-    const date = formatChangelogDate(input.packageInfo, input.currentDate);
+    const date = formatChangelogDate(input.config.dateFormat, input.currentDate);
     return `## ${target.targetName} ${target.versionNumber} (${date})`;
 }
 
@@ -105,9 +102,8 @@ function renderTargetSection(input: RenderGroupedTargetChangelogMarkdownInput, t
     }
 
     const targetBody = renderChangelogMarkdown({
-        packageInfo: input.packageInfo,
+        config: input.config,
         currentDate: input.currentDate,
-        validLabels: input.validLabels,
         mergedPullRequests: target.mergedPullRequests,
         githubRepo: input.githubRepo,
         unreleased: true,
