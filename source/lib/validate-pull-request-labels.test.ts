@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { fake } from 'sinon';
 import { createPullRequestLabelValidator } from './validate-pull-request-labels.ts';
-import { defaultValidLabels } from './valid-labels.ts';
+import { defaultPrLogConfig } from './pr-log-config.ts';
 
 const pullRequestId = 123;
 
@@ -10,7 +10,7 @@ test('validates pull request labels with package configuration', async function 
     const configuredValidLabels = [ [ 'custom', 'Custom Changes' ] ];
     const resolvePullRequestLabels = fake.resolves([]);
     const validator = createPullRequestLabelValidator({
-        defaultValidLabels,
+        defaultPrLogConfig,
         packageInfo: {
             repository: { url: 'https://github.com/owner/repo.git' },
             'pr-log': {
@@ -26,8 +26,12 @@ test('validates pull request labels with package configuration', async function 
     assert.deepStrictEqual(resolvePullRequestLabels.firstCall.args, [
         {
             githubRepo: 'owner/repo',
-            validLabels,
-            ignoredLabels: [ 'release' ],
+            config: {
+                ...defaultPrLogConfig,
+                validLabels,
+                ignoredLabels: [ 'release' ],
+                versionBumps: { major: [ 'breaking' ], minor: [ 'feature' ], patch: [ 'custom' ] }
+            },
             pullRequests: [ { id: pullRequestId, title: '' } ],
             targetName: undefined,
             targetScopedLabelPattern: undefined
@@ -38,7 +42,7 @@ test('validates pull request labels with package configuration', async function 
 test('reports pull request label validation failures', async function () {
     const error = new Error('Pull Request #123 has no label of bug');
     const validator = createPullRequestLabelValidator({
-        defaultValidLabels,
+        defaultPrLogConfig,
         packageInfo: {
             repository: { url: 'https://github.com/owner/repo.git' }
         },

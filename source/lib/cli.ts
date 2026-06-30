@@ -3,7 +3,11 @@ import type { Logger } from 'loglevel';
 import type { CliRunOptions } from './cli-run-options.ts';
 import type { GetMergedPullRequests } from './get-merged-pull-requests.ts';
 import type { EnsureCleanLocalGitState } from './ensure-clean-local-git-state.ts';
-import { getGithubRepoFromPackageInfo, getIgnoredLabels, getValidLabels } from './package-info.ts';
+import { getGithubRepoFromPackageInfo } from './package-info.ts';
+import {
+    createPrLogConfigFromPackageInfo,
+    type PrLogConfig
+} from './pr-log-config.ts';
 import { type GetLatestVersionTag, resolveReleasedVersionNumber } from './resolve-version-number.ts';
 import { validateVersionNumber } from './version-number.ts';
 import type { renderChangelogMarkdown } from './render-changelog-markdown.ts';
@@ -17,7 +21,7 @@ function stripTrailingEmptyLine(text: string): string {
 }
 
 export type CliRunnerDependencies = {
-    readonly defaultValidLabels: ReadonlyMap<string, string>;
+    readonly defaultPrLogConfig: PrLogConfig;
     readonly ensureCleanLocalGitState: EnsureCleanLocalGitState;
     readonly getLatestVersionTag: GetLatestVersionTag;
     readonly getMergedPullRequests: GetMergedPullRequests;
@@ -39,13 +43,12 @@ type GenerateChangelogContext = Pick<
     | 'getCurrentDate'
     | 'getLatestVersionTag'
     | 'getMergedPullRequests'
-    | 'packageInfo'
     | 'renderChangelogMarkdown'
 >;
 
 type ChangelogData = {
     readonly githubRepo: string;
-    readonly validLabels: ReadonlyMap<string, string>;
+    readonly config: PrLogConfig;
     readonly mergedPullRequests: Awaited<ReturnType<GetMergedPullRequests>>;
 };
 
@@ -53,8 +56,7 @@ type WriteChangelogContext = Pick<CliRunnerDependencies, 'logger' | 'prependFile
 
 type ChangelogRequest = {
     readonly githubRepo: string;
-    readonly validLabels: ReadonlyMap<string, string>;
-    readonly ignoredLabels: readonly string[];
+    readonly config: PrLogConfig;
 };
 
 async function ensureCleanState(
@@ -68,17 +70,16 @@ async function ensureCleanState(
 }
 
 function generateUnreleasedChangelog(
-    context: Pick<CliRunnerDependencies, 'getCurrentDate' | 'packageInfo' | 'renderChangelogMarkdown'>,
+    context: Pick<CliRunnerDependencies, 'getCurrentDate' | 'renderChangelogMarkdown'>,
     changelogData: ChangelogData
 ): string {
-    const { getCurrentDate, packageInfo, renderChangelogMarkdown } = context;
-    const { githubRepo, validLabels, mergedPullRequests } = changelogData;
+    const { getCurrentDate, renderChangelogMarkdown } = context;
+    const { githubRepo, config, mergedPullRequests } = changelogData;
 
     return stripTrailingEmptyLine(
         renderChangelogMarkdown({
-            packageInfo,
+            config,
             currentDate: getCurrentDate(),
-            validLabels,
             githubRepo,
             mergedPullRequests,
             unreleased: true,
@@ -88,24 +89,20 @@ function generateUnreleasedChangelog(
 }
 
 async function generateReleasedChangelog(
-    context: Pick<
-        CliRunnerDependencies,
-        'getCurrentDate' | 'getLatestVersionTag' | 'packageInfo' | 'renderChangelogMarkdown'
-    >,
+    context: Pick<CliRunnerDependencies, 'getCurrentDate' | 'getLatestVersionTag' | 'renderChangelogMarkdown'>,
     options: ReleasedCliRunOptions,
     changelogData: ChangelogData
 ): Promise<string> {
-    const { getCurrentDate, packageInfo, getLatestVersionTag, renderChangelogMarkdown } = context;
-    const { githubRepo, validLabels, mergedPullRequests } = changelogData;
+    const { getCurrentDate, getLatestVersionTag, renderChangelogMarkdown } = context;
+    const { githubRepo, config, mergedPullRequests } = changelogData;
     const versionNumber = options.autoVersion
-        ? await resolveReleasedVersionNumber(packageInfo, validLabels, getLatestVersionTag, mergedPullRequests)
+        ? await resolveReleasedVersionNumber(config, getLatestVersionTag, mergedPullRequests)
         : options.versionNumber;
 
     return stripTrailingEmptyLine(
         renderChangelogMarkdown({
-            packageInfo,
+            config,
             currentDate: getCurrentDate(),
-            validLabels,
             githubRepo,
             mergedPullRequests,
             unreleased: false,
@@ -124,7 +121,6 @@ async function generateChangelog(
         getCurrentDate,
         getLatestVersionTag,
         getMergedPullRequests,
-        packageInfo,
         renderChangelogMarkdown
     } = dependencies;
 
@@ -132,16 +128,16 @@ async function generateChangelog(
 
     const changelogData: ChangelogData = {
         githubRepo: request.githubRepo,
-        validLabels: request.validLabels,
-        mergedPullRequests: await getMergedPullRequests(request.githubRepo, request.validLabels, request.ignoredLabels)
+        config: request.config,
+        mergedPullRequests: await getMergedPullRequests(request.githubRepo, request.config)
     };
 
     if (options.unreleased) {
-        return generateUnreleasedChangelog({ getCurrentDate, packageInfo, renderChangelogMarkdown }, changelogData);
+        return generateUnreleasedChangelog({ getCurrentDate, renderChangelogMarkdown }, changelogData);
     }
 
     return generateReleasedChangelog(
-        { getCurrentDate, packageInfo, getLatestVersionTag, renderChangelogMarkdown },
+        { getCurrentDate, getLatestVersionTag, renderChangelogMarkdown },
         options,
         changelogData
     );
@@ -163,13 +159,12 @@ async function writeChangelog(
 }
 
 export function createCliRunner(dependencies: CliRunnerDependencies): CliRunner {
-    const { defaultValidLabels, packageInfo } = dependencies;
+    const { defaultPrLogConfig, packageInfo } = dependencies;
 
     return {
         async run(options: CliRunOptions) {
             const githubRepo = getGithubRepoFromPackageInfo(packageInfo);
-            const validLabels = getValidLabels(packageInfo, defaultValidLabels);
-            const ignoredLabels = getIgnoredLabels(packageInfo);
+            const config = createPrLogConfigFromPackageInfo(packageInfo, defaultPrLogConfig);
 
             validateVersionNumber(options).unwrapOrElse(function (error) {
                 throw error;
@@ -177,8 +172,7 @@ export function createCliRunner(dependencies: CliRunnerDependencies): CliRunner 
 
             const changelog = await generateChangelog(dependencies, options, {
                 githubRepo,
-                validLabels,
-                ignoredLabels
+                config
             });
 
             await writeChangelog(dependencies, changelog, options);

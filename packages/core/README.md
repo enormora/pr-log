@@ -11,13 +11,12 @@ npm install @pr-log/core
 ## Usage
 
 ```ts
-import { createPrLogEngine } from '@pr-log/core';
+import { createPrLogEngine, defaultPrLogConfig } from '@pr-log/core';
 
 const prLogEngine = createPrLogEngine({
     githubToken: process.env.GH_TOKEN,
     workingDirectory: process.cwd(),
-    labelLookupIntervalMilliseconds: 250,
-    maximumRateLimitRetryCount: 3
+    config: defaultPrLogConfig
 });
 ```
 
@@ -39,6 +38,37 @@ A target-aware integration usually follows this flow:
 
 Target-scoped labels can override the pull request level label for one target. The default pattern is `{targetName}:{label}`.
 For example, `pkg-a:breaking` overrides a `bug` pull request label when rendering `pkg-a`, while other targets still use `bug`.
+
+Changelog behavior is configured with `PrLogConfig`.
+Start from `defaultPrLogConfig` and override the fields your integration owns:
+
+```ts
+const config = {
+    ...defaultPrLogConfig,
+    validLabels: new Map([ [ 'change', 'Changes' ] ]),
+    ignoredLabels: [ 'release' ],
+    dateFormat: 'dd.MM.yyyy',
+    collapseRules: [
+        {
+            label: 'change',
+            pattern: /^Update (?<dependency>.+?) from (?<from>.+?) to (?<to>.+?)$/u,
+            replace: 'Update $<dependency> from $<from> to $<to>',
+            keyGroup: 'dependency',
+            fromGroup: 'from',
+            toGroup: 'to'
+        }
+    ],
+    versionBumps: {
+        major: [],
+        minor: [ 'change' ],
+        patch: []
+    },
+    labelLookupIntervalMilliseconds: 250,
+    maximumRateLimitRetryCount: 3
+};
+```
+
+Pass that config to label resolution, rendering, and version-number resolution calls.
 
 Package-aware release tags use `<packageName>@<version>` by default, for example `@scope/package@1.2.3`.
 Consumers can pass a package tag format with `{packageName}` and `{version}` placeholders.

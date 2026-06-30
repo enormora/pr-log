@@ -1,7 +1,8 @@
 import { format as formatDate } from 'date-fns';
-import { isPlainObject, isArray, isString } from '@sindresorhus/is';
+import { isArray } from '@sindresorhus/is';
 import { enUS as enLocale } from 'date-fns/locale/en-US';
 import type { Just, Nothing } from 'true-myth/maybe';
+import type { CollapseRule, PrLogConfig } from './pr-log-config.ts';
 import type { PullRequestWithLabel } from './resolve-pull-request-labels.ts';
 
 function formatLinkToPullRequest(pullRequestId: number, repo: string): string {
@@ -35,76 +36,11 @@ function formatSection(displayLabel: string, entries: readonly ChangelogEntry[],
 
 export type CreateChangelog = (options: ChangelogOptions) => string;
 
-type PackageInfo = Readonly<Record<string, unknown>>;
-
 const defaultDateFormat = 'MMMM d, yyyy';
 
-function getConfigValueFromPackageInfo(packageInfo: PackageInfo, fieldName: string, fallback: string): string {
-    const prLogConfig = packageInfo['pr-log'];
-
-    if (isPlainObject(prLogConfig)) {
-        const field = prLogConfig[fieldName];
-        if (isString(field)) {
-            return field;
-        }
-    }
-
-    return fallback;
-}
-
-export function formatChangelogDate(packageInfo: PackageInfo, date: Readonly<Date>): string {
-    const dateFormat = getConfigValueFromPackageInfo(packageInfo, 'dateFormat', defaultDateFormat);
-    return formatDate(date, dateFormat, { locale: enLocale });
-}
-
-type CollapseRule = {
-    readonly label: string;
-    readonly pattern: RegExp;
-    readonly replace: string;
-    readonly keyGroup: string;
-    readonly fromGroup: string;
-    readonly toGroup: string;
-};
-
-function getRequiredStringField(rule: Readonly<Record<string, unknown>>, fieldName: string): string {
-    const value = rule[fieldName];
-
-    if (!isString(value)) {
-        throw new TypeError(`pr-log.collapseRules[].${fieldName} must be a string`);
-    }
-
-    return value;
-}
-
-function createCollapseRule(rule: Readonly<Record<string, unknown>>): CollapseRule {
-    const customKeyGroup = rule.keyGroup;
-    const customFromGroup = rule.fromGroup;
-    const customToGroup = rule.toGroup;
-
-    return {
-        label: getRequiredStringField(rule, 'label'),
-        pattern: new RegExp(getRequiredStringField(rule, 'pattern'), 'u'),
-        replace: getRequiredStringField(rule, 'replace'),
-        keyGroup: isString(customKeyGroup) ? customKeyGroup : 'dependency',
-        fromGroup: isString(customFromGroup) ? customFromGroup : 'from',
-        toGroup: isString(customToGroup) ? customToGroup : 'to'
-    };
-}
-
-function getCollapseRules(packageInfo: PackageInfo): readonly CollapseRule[] {
-    const prLogConfig = packageInfo['pr-log'];
-
-    if (!isPlainObject(prLogConfig) || !isArray(prLogConfig.collapseRules)) {
-        return [];
-    }
-
-    return prLogConfig.collapseRules.map(function (rule) {
-        if (!isPlainObject(rule)) {
-            throw new TypeError('pr-log.collapseRules[] entries must be objects');
-        }
-
-        return createCollapseRule(rule);
-    });
+export function formatChangelogDate(dateFormat: string | undefined, date: Readonly<Date>): string {
+    const resolvedDateFormat = dateFormat ?? defaultDateFormat;
+    return formatDate(date, resolvedDateFormat, { locale: enLocale });
 }
 
 function groupByLabel(pullRequests: readonly PullRequestWithLabel[]): Record<string, PullRequestWithLabel[]> {
@@ -153,7 +89,7 @@ type CollapseChainUpdate = {
 };
 
 type CollapseChainContext = {
-    readonly rule: CollapseRule;
+    readonly rule: PrLogConfig['collapseRules'][number];
     readonly ruleMatch: RuleMatch;
 };
 
@@ -344,14 +280,13 @@ function collapseEntries(
 }
 
 type Dependencies = {
-    readonly packageInfo: PackageInfo;
+    readonly config: PrLogConfig;
     getCurrentDate: () => Readonly<Date>;
 };
 
 type ChangelogOptionsUnreleased = {
     readonly unreleased: true;
     readonly versionNumber: Nothing<string>;
-    readonly validLabels: ReadonlyMap<string, string>;
     readonly mergedPullRequests: readonly PullRequestWithLabel[];
     readonly githubRepo: string;
 };
@@ -359,7 +294,6 @@ type ChangelogOptionsUnreleased = {
 type ChangelogOptionsReleased = {
     readonly unreleased: false;
     readonly versionNumber: Just<string>;
-    readonly validLabels: ReadonlyMap<string, string>;
     readonly mergedPullRequests: readonly PullRequestWithLabel[];
     readonly githubRepo: string;
 };
@@ -367,8 +301,7 @@ type ChangelogOptionsReleased = {
 export type ChangelogOptions = ChangelogOptionsReleased | ChangelogOptionsUnreleased;
 
 export function createChangelogFactory(dependencies: Dependencies): CreateChangelog {
-    const { getCurrentDate, packageInfo } = dependencies;
-    const collapseRules = getCollapseRules(packageInfo);
+    const { config, getCurrentDate } = dependencies;
 
     function createChangelogTitle(options: ChangelogOptions): string {
         const { unreleased } = options;
@@ -377,23 +310,23 @@ export function createChangelogFactory(dependencies: Dependencies): CreateChange
             return '';
         }
 
-        const date = formatChangelogDate(packageInfo, getCurrentDate());
+        const date = formatChangelogDate(config.dateFormat, getCurrentDate());
         const title = `## ${options.versionNumber.value} (${date})`;
 
         return `${title}\n\n`;
     }
 
     return function createChangelog(options) {
-        const { validLabels, mergedPullRequests, githubRepo } = options;
+        const { mergedPullRequests, githubRepo } = options;
         const groupedPullRequests = groupByLabel(mergedPullRequests);
 
         let changelog = createChangelogTitle(options);
 
-        for (const [ label, displayLabel ] of validLabels) {
+        for (const [ label, displayLabel ] of config.validLabels) {
             const pullRequests = groupedPullRequests[label];
 
             if (isArray(pullRequests)) {
-                const entries = collapseEntries(label, createChangelogEntries(pullRequests), collapseRules);
+                const entries = collapseEntries(label, createChangelogEntries(pullRequests), config.collapseRules);
                 changelog += formatSection(displayLabel, entries, githubRepo);
             }
         }

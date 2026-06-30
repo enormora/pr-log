@@ -6,7 +6,7 @@ import { Factory, type DeepPartial } from 'fishery';
 import { nothing } from 'true-myth/maybe';
 import { createCliRunner, type CliRunner, type CliRunnerDependencies } from './cli.ts';
 import type { CliRunOptions } from './cli-run-options.ts';
-import { defaultValidLabels } from './valid-labels.ts';
+import { defaultPrLogConfig } from './pr-log-config.ts';
 import { createVersionNumber } from './version-number.ts';
 
 const cliRunOptionsFactory = Factory.define<CliRunOptions>(function () {
@@ -22,7 +22,7 @@ const cliRunOptionsFactory = Factory.define<CliRunOptions>(function () {
 
 function createDefaultCliDependencies(): CliRunnerDependencies {
     return {
-        defaultValidLabels,
+        defaultPrLogConfig,
         ensureCleanLocalGitState: stub().resolves(),
         getLatestVersionTag: stub().resolves('1.2.2'),
         getMergedPullRequests: stub().resolves([]),
@@ -161,10 +161,18 @@ test('uses custom labels if they are provided in package.json', async function (
             ]
         }
     };
-    const expectedLabels = new Map([
-        [ 'foo', 'Foo' ],
-        [ 'bar', 'Bar' ]
-    ]);
+    const expectedConfig = {
+        ...defaultPrLogConfig,
+        validLabels: new Map([
+            [ 'foo', 'Foo' ],
+            [ 'bar', 'Bar' ]
+        ]),
+        versionBumps: {
+            major: [ 'breaking' ],
+            minor: [ 'feature' ],
+            patch: [ 'foo', 'bar' ]
+        }
+    };
     const renderChangelogMarkdown = stub().returns('generated changelog');
     const getMergedPullRequests = stub().resolves();
     const cli = createCli({ packageInfo, renderChangelogMarkdown, getMergedPullRequests });
@@ -172,13 +180,12 @@ test('uses custom labels if they are provided in package.json', async function (
     await cli.run(cliRunOptionsFactory.build());
 
     assert.strictEqual(getMergedPullRequests.callCount, 1);
-    assert.deepStrictEqual(getMergedPullRequests.firstCall.args, [ 'foo/bar', expectedLabels, [] ]);
+    assert.deepStrictEqual(getMergedPullRequests.firstCall.args, [ 'foo/bar', expectedConfig ]);
 
     assert.strictEqual(renderChangelogMarkdown.callCount, 1);
     assert.deepStrictEqual(renderChangelogMarkdown.firstCall.args[0], {
-        packageInfo,
+        config: expectedConfig,
         currentDate: new Date(0),
-        validLabels: expectedLabels,
         mergedPullRequests: undefined,
         githubRepo: 'foo/bar',
         unreleased: false,
@@ -198,7 +205,10 @@ test('passes configured ignored labels to merged pull request collection', async
 
     await cli.run(cliRunOptionsFactory.build());
 
-    assert.deepStrictEqual(getMergedPullRequests.firstCall.args, [ 'foo/bar', defaultValidLabels, [ 'release' ] ]);
+    assert.deepStrictEqual(getMergedPullRequests.firstCall.args, [
+        'foo/bar',
+        { ...defaultPrLogConfig, ignoredLabels: [ 'release' ] }
+    ]);
 });
 
 test('calls ensureCleanLocalGitState with correct parameters', async function () {
@@ -248,9 +258,8 @@ test('reports the generated changelog to stdout and not to a file when stdout is
 
     assert.strictEqual(renderChangelogMarkdown.callCount, 1);
     assert.deepStrictEqual(renderChangelogMarkdown.firstCall.args[0], {
-        packageInfo: { repository: { url: 'https://github.com/foo/bar.git' } },
+        config: defaultPrLogConfig,
         currentDate: new Date(0),
-        validLabels: defaultValidLabels,
         mergedPullRequests: [],
         githubRepo: 'foo/bar',
         unreleased: false,
@@ -279,9 +288,8 @@ test('reports the generated changelog to a file when stdout is set to false', as
 
     assert.strictEqual(renderChangelogMarkdown.callCount, 1);
     assert.deepStrictEqual(renderChangelogMarkdown.firstCall.args[0], {
-        packageInfo: { repository: { url: 'https://github.com/foo/bar.git' } },
+        config: defaultPrLogConfig,
         currentDate: new Date(0),
-        validLabels: defaultValidLabels,
         mergedPullRequests: [],
         githubRepo: 'foo/bar',
         unreleased: false,
@@ -313,9 +321,8 @@ test('reports the generated unreleased changelog to a file when stdout is set to
 
     assert.strictEqual(renderChangelogMarkdown.callCount, 1);
     assert.deepStrictEqual(renderChangelogMarkdown.firstCall.args[0], {
-        packageInfo: { repository: { url: 'https://github.com/foo/bar.git' } },
+        config: defaultPrLogConfig,
         currentDate: new Date(0),
-        validLabels: defaultValidLabels,
         mergedPullRequests: [],
         githubRepo: 'foo/bar',
         unreleased: true,
@@ -350,9 +357,8 @@ test('derives the version number automatically from merged pull request labels',
 
     assert.strictEqual(getLatestVersionTag.callCount, 1);
     assert.deepStrictEqual(renderChangelogMarkdown.firstCall.args[0], {
-        packageInfo: { repository: { url: 'https://github.com/foo/bar.git' } },
+        config: defaultPrLogConfig,
         currentDate: new Date(0),
-        validLabels: defaultValidLabels,
         mergedPullRequests: [ { id: 1, title: 'Add thing', label: 'feature' } ],
         githubRepo: 'foo/bar',
         unreleased: false,
@@ -392,9 +398,15 @@ test('uses configured version bump labels for auto-versioning', async function (
     await cli.run(options);
 
     assert.deepStrictEqual(renderChangelogMarkdown.firstCall.args[0], {
-        packageInfo,
+        config: {
+            ...defaultPrLogConfig,
+            versionBumps: {
+                major: [],
+                minor: [],
+                patch: [ 'documentation' ]
+            }
+        },
         currentDate: new Date(0),
-        validLabels: defaultValidLabels,
         mergedPullRequests: [ { id: 1, title: 'Docs', label: 'documentation' } ],
         githubRepo: 'foo/bar',
         unreleased: false,

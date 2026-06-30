@@ -2,26 +2,29 @@ import assert from 'node:assert';
 import { Factory } from 'fishery';
 import { nothing } from 'true-myth/maybe';
 import { createChangelogFactory, type ChangelogOptions, type CreateChangelog } from './create-changelog.ts';
-import { defaultValidLabels } from './valid-labels.ts';
+import { createPrLogConfigFromPackageInfo, defaultPrLogConfig, type PrLogConfig } from './pr-log-config.ts';
 import { createVersionNumber } from './version-number.ts';
 
 const changelogOptionsFactory = Factory.define<ChangelogOptions>(function () {
     return {
         unreleased: false,
         versionNumber: createVersionNumber('1.0.0'),
-        validLabels: defaultValidLabels,
         mergedPullRequests: [],
         githubRepo: ''
     };
 });
 
-function createChangelogWithPackageInfo(packageInfo: Record<string, unknown> = {}): CreateChangelog {
+function createChangelogWithConfig(config: PrLogConfig): CreateChangelog {
     return createChangelogFactory({
         getCurrentDate() {
             return new Date(0);
         },
-        packageInfo
+        config
     });
+}
+
+function createChangelogWithPackageInfo(packageInfo: Record<string, unknown> = {}): CreateChangelog {
+    return createChangelogWithConfig(createPrLogConfigFromPackageInfo(packageInfo));
 }
 
 function createUpgradeCollapseRulePackageInfo(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -114,11 +117,19 @@ test('creates a formatted changelog when version was released', function () {
 });
 
 test('uses custom labels when provided and version was released', function () {
-    const createChangelog = createChangelogWithPackageInfo();
     const customValidLabels = new Map([
         [ 'core', 'Core Features' ],
         [ 'addons', 'Addons' ]
     ]);
+    const createChangelog = createChangelogWithConfig({
+        ...defaultPrLogConfig,
+        validLabels: customValidLabels,
+        versionBumps: {
+            major: [],
+            minor: [],
+            patch: [ 'core', 'addons' ]
+        }
+    });
     const mergedPullRequests = [
         {
             id: 1,
@@ -151,7 +162,6 @@ test('uses custom labels when provided and version was released', function () {
         .join('\n');
 
     const options = changelogOptionsFactory.build({
-        validLabels: customValidLabels,
         mergedPullRequests,
         githubRepo: 'any/repo'
     });
@@ -161,11 +171,19 @@ test('uses custom labels when provided and version was released', function () {
 });
 
 test('uses the same order for the changelog sections as in validLabels when version was released', function () {
-    const createChangelog = createChangelogWithPackageInfo();
     const customValidLabels = new Map([
         [ 'first', 'First Section' ],
         [ 'second', 'Second Section' ]
     ]);
+    const createChangelog = createChangelogWithConfig({
+        ...defaultPrLogConfig,
+        validLabels: customValidLabels,
+        versionBumps: {
+            major: [],
+            minor: [],
+            patch: [ 'first', 'second' ]
+        }
+    });
     const mergedPullRequests = [
         {
             id: 1,
@@ -198,7 +216,6 @@ test('uses the same order for the changelog sections as in validLabels when vers
         .join('\n');
 
     const options = changelogOptionsFactory.build({
-        validLabels: customValidLabels,
         mergedPullRequests,
         githubRepo: 'any/repo'
     });
@@ -208,8 +225,12 @@ test('uses the same order for the changelog sections as in validLabels when vers
 });
 
 test('collapses repeated pull requests when a matching collapse rule is configured', function () {
-    const createChangelog = createChangelogWithPackageInfo(createUpgradeCollapseRulePackageInfo());
     const validLabels = new Map([ [ 'upgrade', 'Dependency Upgrades' ] ]);
+    const createChangelog = createChangelogWithConfig({
+        ...createPrLogConfigFromPackageInfo(createUpgradeCollapseRulePackageInfo()),
+        validLabels,
+        versionBumps: { major: [], minor: [], patch: [ 'upgrade' ] }
+    });
     const mergedPullRequests = [
         {
             id: 4,
@@ -243,7 +264,6 @@ test('collapses repeated pull requests when a matching collapse rule is configur
         .join('\n');
 
     const options = changelogOptionsFactory.build({
-        validLabels,
         mergedPullRequests,
         githubRepo: 'any/repo'
     });
@@ -253,8 +273,12 @@ test('collapses repeated pull requests when a matching collapse rule is configur
 });
 
 test('does not collapse pull requests when the configured version chain is incomplete', function () {
-    const createChangelog = createChangelogWithPackageInfo(createUpgradeCollapseRulePackageInfo());
     const validLabels = new Map([ [ 'upgrade', 'Dependency Upgrades' ] ]);
+    const createChangelog = createChangelogWithConfig({
+        ...createPrLogConfigFromPackageInfo(createUpgradeCollapseRulePackageInfo()),
+        validLabels,
+        versionBumps: { major: [], minor: [], patch: [ 'upgrade' ] }
+    });
     const mergedPullRequests = [
         {
             id: 4,
@@ -278,7 +302,6 @@ test('does not collapse pull requests when the configured version chain is incom
         .join('\n');
 
     const options = changelogOptionsFactory.build({
-        validLabels,
         mergedPullRequests,
         githubRepo: 'any/repo'
     });
@@ -302,7 +325,6 @@ test('supports custom capture group names in collapse rules', function () {
             ]
         }
     });
-    const validLabels = new Map([ [ 'upgrade', 'Dependency Upgrades' ] ]);
     const mergedPullRequests = [
         {
             id: 3,
@@ -325,7 +347,6 @@ test('supports custom capture group names in collapse rules', function () {
         .join('\n');
 
     const options = changelogOptionsFactory.build({
-        validLabels,
         mergedPullRequests,
         githubRepo: 'any/repo'
     });
@@ -346,7 +367,6 @@ test('falls back to an empty string for missing placeholders in collapse rule re
             ]
         }
     });
-    const validLabels = new Map([ [ 'upgrade', 'Dependency Upgrades' ] ]);
     const mergedPullRequests = [
         {
             id: 3,
@@ -361,7 +381,6 @@ test('falls back to an empty string for missing placeholders in collapse rule re
     ] as const;
 
     const options = changelogOptionsFactory.build({
-        validLabels,
         mergedPullRequests,
         githubRepo: 'any/repo'
     });
@@ -402,7 +421,6 @@ test('throws when a collapse rule entry is not an object', function () {
 
 test('does not collapse pull requests when titles do not match the configured collapse rule', function () {
     const createChangelog = createChangelogWithPackageInfo(createUpgradeCollapseRulePackageInfo());
-    const validLabels = new Map([ [ 'upgrade', 'Dependency Upgrades' ] ]);
     const mergedPullRequests = [
         {
             id: 7,
@@ -412,7 +430,6 @@ test('does not collapse pull requests when titles do not match the configured co
     ] as const;
 
     const options = changelogOptionsFactory.build({
-        validLabels,
         mergedPullRequests,
         githubRepo: 'any/repo'
     });
@@ -448,7 +465,6 @@ const invalidCaptureGroupTestCases = [
 for (const testCase of invalidCaptureGroupTestCases) {
     test(testCase.testName, function () {
         const createChangelog = createChangelogWithPackageInfo(testCase.packageInfo);
-        const validLabels = new Map([ [ 'upgrade', 'Dependency Upgrades' ] ]);
         const mergedPullRequests = [
             {
                 id: 2,
@@ -458,7 +474,6 @@ for (const testCase of invalidCaptureGroupTestCases) {
         ] as const;
 
         const options = changelogOptionsFactory.build({
-            validLabels,
             mergedPullRequests,
             githubRepo: 'any/repo'
         });

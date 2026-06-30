@@ -17,7 +17,7 @@ import {
 import { createJsonFileReader } from '../../lib/read-json-file.ts';
 import { createRemoteAliasReader } from '../../lib/remote-alias-reader.ts';
 import { createPullRequestLabelValidator } from '../../lib/validate-pull-request-labels.ts';
-import { createPrLogEngine, defaultValidLabels } from '../core/core.entry-point.ts';
+import { createPrLogEngine, defaultPrLogConfig } from '../core/core.entry-point.ts';
 import { readPackageMetadata } from './package-metadata.ts';
 import { createErrorReporter } from './error-reporter.ts';
 import { createProgram } from './program.ts';
@@ -52,8 +52,11 @@ const findRemoteAlias = findRemoteAliasFactory({ remoteAliasReader });
 const prLogEngine = createPrLogEngine({
     githubToken: GH_TOKEN,
     workingDirectory: process.cwd(),
-    labelLookupIntervalMilliseconds,
-    maximumRateLimitRetryCount
+    config: {
+        ...defaultPrLogConfig,
+        labelLookupIntervalMilliseconds,
+        maximumRateLimitRetryCount
+    }
 });
 const getLatestVersionTag = createLatestVersionTagReader(prLogEngine);
 const getMergedPullRequests = createMergedPullRequestReader(prLogEngine, {
@@ -80,7 +83,7 @@ const commandLineInterfaceProgram = createProgram({
     },
     createCliRunner({ defaultBranch, packageInfo }) {
         const dependencies: CliRunnerDependencies = {
-            defaultValidLabels,
+            defaultPrLogConfig,
             prependFile,
             packageInfo,
             logger: loglevel,
@@ -100,7 +103,7 @@ const commandLineInterfaceProgram = createProgram({
     },
     createPullRequestLabelValidator({ packageInfo }) {
         return createPullRequestLabelValidator({
-            defaultValidLabels,
+            defaultPrLogConfig,
             packageInfo,
             async resolvePullRequestLabels(input) {
                 return prLogEngine.resolvePullRequestLabels(input);
