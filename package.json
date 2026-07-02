@@ -37,7 +37,7 @@
         "@types/node": "24.13.2",
         "@types/parse-github-repo-url": "1.4.2",
         "@types/semver": "7.7.1",
-        "@types/sinon": "21.0.1",
+        "@types/sinon": "22.0.0",
         "c8": "11.0.0",
         "eslint": "10.6.0",
         "fishery": "2.4.0",
