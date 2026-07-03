@@ -27,10 +27,10 @@
         "true-myth": "9.4.0"
     },
     "devDependencies": {
-        "@enormora/eslint-config-base": "0.0.46",
-        "@enormora/eslint-config-mocha": "0.0.43",
+        "@enormora/eslint-config-base": "0.0.47",
+        "@enormora/eslint-config-mocha": "0.0.44",
         "@enormora/eslint-config-node": "0.0.36",
-        "@enormora/eslint-config-typescript": "0.0.53",
+        "@enormora/eslint-config-typescript": "0.0.54",
         "@packtory/cli": "0.0.53",
         "@types/common-tags": "1.8.4",
         "@types/mocha": "10.0.10",
