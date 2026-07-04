@@ -71,7 +71,8 @@ function cliPackage(packageInfo, sharedAttributes) {
         additionalFiles: [ { sourceFilePath: cliReadmePath, targetFilePath: 'README.md' } ],
         roots: {
             cli: {
-                js: 'packages/command-line-interface/bin.entry-point.js'
+                js: 'packages/command-line-interface/bin.entry-point.js',
+                declarationFile: 'packages/command-line-interface/bin.entry-point.d.ts'
             }
         },
         packageInterface: {
