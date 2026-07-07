@@ -1,3 +1,14 @@
+## 0.0.3 (July 7, 2026)
+
+### Enhancements
+
+* Expose `PrLogConfig` from `@pr-log/core` ([#610](https://github.com/enormora/pr-log/pull/610))
+
+### Dependency Upgrades
+
+* Update `eslint` config packages ([#602](https://github.com/enormora/pr-log/pull/602))
+* ⬆️ Update dependency semver to v7.8.5 ([#561](https://github.com/enormora/pr-log/pull/561))
+
 ## 0.0.2 (June 18, 2026)
 
 ### Features
