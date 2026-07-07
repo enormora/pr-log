@@ -14,6 +14,22 @@
 * ⬆️ Update dependency commander to v15 ([#526](https://github.com/enormora/pr-log/pull/526))
 * ⬆️ Update dependency semver to v7.8.5 ([#561](https://github.com/enormora/pr-log/pull/561))
 
+## 6.4.0 (July 7, 2026)
+
+### Features
+
+* Add `validate-pull-request-labels` command ([#599](https://github.com/enormora/pr-log/pull/599))
+
+### Enhancements
+
+* Expose `PrLogConfig` from `@pr-log/core` ([#610](https://github.com/enormora/pr-log/pull/610))
+
+### Dependency Upgrades
+
+* Update `eslint` config packages ([#602](https://github.com/enormora/pr-log/pull/602))
+* ⬆️ Update dependency commander to v15 ([#526](https://github.com/enormora/pr-log/pull/526))
+* ⬆️ Update dependency semver to v7.8.5 ([#561](https://github.com/enormora/pr-log/pull/561))
+
 ## 6.3.0 (June 18, 2026)
 
 ### Features
