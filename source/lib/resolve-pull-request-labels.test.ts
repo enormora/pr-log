@@ -27,9 +27,14 @@ test('resolves labels for pull requests sequentially', async function () {
         targetScopedLabelPattern: undefined
     });
 
-    assert.partialDeepStrictEqual(waitForMilliseconds, {
+    assert.deepStrictEqual({
+        callCount: waitForMilliseconds.callCount,
+        calls: waitForMilliseconds.getCalls().map(function (call): readonly unknown[] {
+            return call.args as readonly unknown[];
+        })
+    }, {
         callCount: 1,
-        firstCall: { args: [ labelLookupIntervalMilliseconds ] }
+        calls: [ [ labelLookupIntervalMilliseconds ] ]
     });
     assert.deepStrictEqual(pullRequests, [
         { id: 1, title: 'Fix bug', label: 'bug' },

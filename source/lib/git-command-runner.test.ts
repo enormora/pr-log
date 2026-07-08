@@ -18,9 +18,14 @@ function gitCommandRunnerFactory(overrides: Overrides = {}): GitCommandRunner {
 }
 
 function assertExecutedCommand(execute: SinonSpy, command: string): void {
-    assert.partialDeepStrictEqual(execute, {
+    assert.deepStrictEqual({
+        callCount: execute.callCount,
+        calls: execute.getCalls().map(function (call): readonly unknown[] {
+            return call.args as readonly unknown[];
+        })
+    }, {
         callCount: 1,
-        firstCall: { args: [ command ] }
+        calls: [ [ command ] ]
     });
 }
 

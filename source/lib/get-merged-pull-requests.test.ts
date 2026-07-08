@@ -11,9 +11,20 @@ import {
 const anyRepo = 'any/repo';
 const latestVersion = '1.2.3';
 const expectedPullRequestLabelCallCount = 2;
-const expectedWaitForMillisecondsCallCount = 2;
 const comparedArgumentCount = 2;
 const secondPullRequestIdentifier = 2;
+
+function assertSpyCalls(sinonSpy: SinonSpy, calls: readonly (readonly unknown[])[]): void {
+    assert.deepStrictEqual({
+        callCount: sinonSpy.callCount,
+        calls: sinonSpy.getCalls().map(function (call): readonly unknown[] {
+            return call.args as readonly unknown[];
+        })
+    }, {
+        callCount: calls.length,
+        calls
+    });
+}
 
 type Overrides = {
     readonly listTags?: SinonSpy;
@@ -130,10 +141,7 @@ test('ignores non-semver tag', async function () {
 
     await getMergedPullRequests(anyRepo, defaultPrLogConfig);
 
-    assert.partialDeepStrictEqual(getFirstParentCommitLogs, {
-        callCount: 1,
-        firstCall: { args: [ '0.0.2' ] }
-    });
+    assertSpyCalls(getFirstParentCommitLogs, [ [ '0.0.2' ] ]);
 });
 
 test('always uses the highest version', async function () {
@@ -143,10 +151,7 @@ test('always uses the highest version', async function () {
 
     await getMergedPullRequests(anyRepo, defaultPrLogConfig);
 
-    assert.partialDeepStrictEqual(getFirstParentCommitLogs, {
-        callCount: 1,
-        firstCall: { args: [ '2.0.0' ] }
-    });
+    assertSpyCalls(getFirstParentCommitLogs, [ [ '2.0.0' ] ]);
 });
 
 test('ignores prerelease versions', async function () {
@@ -156,10 +161,7 @@ test('ignores prerelease versions', async function () {
 
     await getMergedPullRequests(anyRepo, defaultPrLogConfig);
 
-    assert.partialDeepStrictEqual(getFirstParentCommitLogs, {
-        callCount: 1,
-        firstCall: { args: [ '2.0.0' ] }
-    });
+    assertSpyCalls(getFirstParentCommitLogs, [ [ '2.0.0' ] ]);
 });
 
 test('throws when the pull request cannot be extracted from the commit message', async function () {
@@ -191,10 +193,7 @@ test('falls back to the GitHub API when the commit log does not have a body', as
 
     const pullRequests = await getMergedPullRequests(anyRepo, defaultPrLogConfig);
 
-    assert.partialDeepStrictEqual(get, {
-        callCount: 1,
-        firstCall: { args: [ { owner: 'any', repo: 'repo', pull_number: 1 } ] }
-    });
+    assertSpyCalls(get, [ [ { owner: 'any', repo: 'repo', pull_number: 1 } ] ]);
     assert.deepStrictEqual(pullRequests, [ { id: 1, title: 'pull request title from github', label: 'bug' } ]);
 });
 
@@ -313,11 +312,10 @@ test('waits between pull request label lookups', async function () {
 
     await getMergedPullRequests(anyRepo, { ...defaultPrLogConfig, labelLookupIntervalMilliseconds });
 
-    assert.partialDeepStrictEqual(waitForMilliseconds, {
-        callCount: expectedWaitForMillisecondsCallCount,
-        firstCall: { args: [ labelLookupIntervalMilliseconds ] },
-        secondCall: { args: [ labelLookupIntervalMilliseconds ] }
-    });
+    assertSpyCalls(waitForMilliseconds, [
+        [ labelLookupIntervalMilliseconds ],
+        [ labelLookupIntervalMilliseconds ]
+    ]);
 });
 
 test('ignores first-parent commits that are not merge commits', async function () {

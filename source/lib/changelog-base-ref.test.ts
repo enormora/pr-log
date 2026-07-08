@@ -80,7 +80,12 @@ test('throws when the selected base ref is missing', async function () {
     await assert.rejects(resolveChangelogBaseRef(packageInput, gitRefReaderFactory([])), function (error: unknown) {
         const missingBaseRefError = error as MissingChangelogBaseRefError;
 
-        assert.partialDeepStrictEqual(missingBaseRefError, {
+        assert.deepStrictEqual({
+            name: missingBaseRefError.name,
+            packageName: missingBaseRefError.packageName,
+            ref: missingBaseRefError.ref,
+            reason: missingBaseRefError.reason
+        }, {
             name: 'MissingChangelogBaseRefError',
             packageName: '@scope/package',
             ref: 'explicit-ref',

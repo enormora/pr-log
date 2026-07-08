@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { stub } from 'sinon';
+import { stub, type SinonSpy } from 'sinon';
 import type _prependFile from 'prepend-file';
 import type { Logger } from 'loglevel';
 import { Factory, type DeepPartial } from 'fishery';
@@ -38,6 +38,18 @@ function createCli(dependencies: Partial<CliRunnerDependencies> = {}): CliRunner
     return createCliRunner({
         ...createDefaultCliDependencies(),
         ...dependencies
+    });
+}
+
+function assertSpyCalls(sinonSpy: SinonSpy, calls: readonly (readonly unknown[])[]): void {
+    assert.deepStrictEqual({
+        callCount: sinonSpy.callCount,
+        calls: sinonSpy.getCalls().map(function (call): readonly unknown[] {
+            return call.args as readonly unknown[];
+        })
+    }, {
+        callCount: calls.length,
+        calls
     });
 }
 
@@ -147,10 +159,7 @@ test('does not throw if the repository is dirty', async function () {
 
     await cli.run(options);
 
-    assert.partialDeepStrictEqual(prependFile, {
-        callCount: 1,
-        firstCall: { args: [ '/foo/CHANGELOG.md', 'sloppy changelog\n\n' ] }
-    });
+    assertSpyCalls(prependFile, [ [ '/foo/CHANGELOG.md', 'sloppy changelog\n\n' ] ]);
 });
 
 test('uses custom labels if they are provided in package.json', async function () {
@@ -181,10 +190,7 @@ test('uses custom labels if they are provided in package.json', async function (
 
     await cli.run(cliRunOptionsFactory.build());
 
-    assert.partialDeepStrictEqual(getMergedPullRequests, {
-        callCount: 1,
-        firstCall: { args: [ 'foo/bar', expectedConfig ] }
-    });
+    assertSpyCalls(getMergedPullRequests, [ [ 'foo/bar', expectedConfig ] ]);
 
     assert.strictEqual(renderChangelogMarkdown.callCount, 1);
     assert.deepStrictEqual(renderChangelogMarkdown.firstCall.args[0], {
@@ -225,10 +231,7 @@ test('calls ensureCleanLocalGitState with correct parameters', async function ()
 
     await cli.run(options);
 
-    assert.partialDeepStrictEqual(ensureCleanLocalGitState, {
-        callCount: 1,
-        firstCall: { args: [ expectedGithubRepo ] }
-    });
+    assertSpyCalls(ensureCleanLocalGitState, [ [ expectedGithubRepo ] ]);
 });
 
 test('calls getMergedPullRequests with the correct repo', async function () {
@@ -274,10 +277,7 @@ test('reports the generated changelog to stdout and not to a file when stdout is
 
     assert.strictEqual(prependFile.callCount, 0);
 
-    assert.partialDeepStrictEqual(log, {
-        callCount: 1,
-        firstCall: { args: [ 'generated changelog' ] }
-    });
+    assertSpyCalls(log, [ [ 'generated changelog' ] ]);
 });
 
 test('reports the generated changelog to a file when stdout is set to false', async function () {
@@ -304,10 +304,7 @@ test('reports the generated changelog to a file when stdout is set to false', as
         versionNumber: '1.2.3'
     });
 
-    assert.partialDeepStrictEqual(prependFile, {
-        callCount: 1,
-        firstCall: { args: [ '/foo/CHANGELOG.md', 'generated changelog\n\n' ] }
-    });
+    assertSpyCalls(prependFile, [ [ '/foo/CHANGELOG.md', 'generated changelog\n\n' ] ]);
 });
 
 test('reports the generated unreleased changelog to a file when stdout is set to false', async function () {
@@ -339,10 +336,7 @@ test('reports the generated unreleased changelog to a file when stdout is set to
         versionNumber: undefined
     });
 
-    assert.partialDeepStrictEqual(prependFile, {
-        callCount: 1,
-        firstCall: { args: [ '/foo/CHANGELOG.md', 'generated changelog\n\n' ] }
-    });
+    assertSpyCalls(prependFile, [ [ '/foo/CHANGELOG.md', 'generated changelog\n\n' ] ]);
 });
 
 test('derives the version number automatically from merged pull request labels', async function () {
