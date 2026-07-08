@@ -17,14 +17,20 @@ function gitCommandRunnerFactory(overrides: Overrides = {}): GitCommandRunner {
     return createGitCommandRunner(fakeDependencies);
 }
 
+function assertExecutedCommand(execute: SinonSpy, command: string): void {
+    assert.partialDeepStrictEqual(execute, {
+        callCount: 1,
+        firstCall: { args: [ command ] }
+    });
+}
+
 test('getShortStatus() executes "git status" with correct options', async function () {
     const execute = fake.resolves({ stdout: '' });
     const runner = gitCommandRunnerFactory({ execute });
 
     await runner.getShortStatus();
 
-    assert.strictEqual(execute.callCount, 1);
-    assert.deepStrictEqual(execute.firstCall.args, [ 'git status --short' ]);
+    assertExecutedCommand(execute, 'git status --short');
 });
 
 test('getShortStatus() returns the command output without leading or trailing whitespace', async function () {
@@ -42,8 +48,7 @@ test('getCurrentBranchName() executes "git rev-parse" with correct options', asy
 
     await runner.getCurrentBranchName();
 
-    assert.strictEqual(execute.callCount, 1);
-    assert.deepStrictEqual(execute.firstCall.args, [ 'git rev-parse --abbrev-ref HEAD' ]);
+    assertExecutedCommand(execute, 'git rev-parse --abbrev-ref HEAD');
 });
 
 test('getCurrentBranchName() returns the command output without leading or trailing whitespace', async function () {
@@ -61,8 +66,7 @@ test('fetchRemote() executes "git fetch" with the given remote', async function 
 
     await runner.fetchRemote('foo');
 
-    assert.strictEqual(execute.callCount, 1);
-    assert.deepStrictEqual(execute.firstCall.args, [ 'git fetch foo' ]);
+    assertExecutedCommand(execute, 'git fetch foo');
 });
 
 test('getSymmetricDifferencesBetweenBranches() executes "git rev-list" with correct options', async function () {
@@ -71,8 +75,7 @@ test('getSymmetricDifferencesBetweenBranches() executes "git rev-list" with corr
 
     await runner.getSymmetricDifferencesBetweenBranches('a', 'b');
 
-    assert.strictEqual(execute.callCount, 1);
-    assert.deepStrictEqual(execute.firstCall.args, [ 'git rev-list --left-right a...b' ]);
+    assertExecutedCommand(execute, 'git rev-list --left-right a...b');
 });
 
 test('getSymmetricDifferencesBetweenBranches() returns the command output splitted as individual lines', async function () {
@@ -90,8 +93,7 @@ test('getRemoteAliases() executes "git remote -v"', async function () {
 
     await runner.getRemoteAliases();
 
-    assert.strictEqual(execute.callCount, 1);
-    assert.deepStrictEqual(execute.firstCall.args, [ 'git remote -v' ]);
+    assertExecutedCommand(execute, 'git remote -v');
 });
 
 test('getRemoteAliases() returns the parsed command output', async function () {
@@ -121,8 +123,7 @@ test('listTags() executes "git tag" with correct options', async function () {
 
     await runner.listTags();
 
-    assert.strictEqual(execute.callCount, 1);
-    assert.deepStrictEqual(execute.firstCall.args, [ 'git tag --list' ]);
+    assertExecutedCommand(execute, 'git tag --list');
 });
 
 test('listTags() returns the command output splitted as individual lines', async function () {
@@ -140,8 +141,7 @@ test('hasRef() executes "git rev-parse" with the given ref', async function () {
 
     await runner.hasRef('foo');
 
-    assert.strictEqual(execute.callCount, 1);
-    assert.deepStrictEqual(execute.firstCall.args, [ 'git rev-parse --verify --quiet foo^{commit}' ]);
+    assertExecutedCommand(execute, 'git rev-parse --verify --quiet foo^{commit}');
 });
 
 test('hasRef() returns true when git finds the ref', async function () {
@@ -168,10 +168,10 @@ test('getMergeCommitLogs() executes "git log" with the correct options', async f
 
     await runner.getMergeCommitLogs('foo');
 
-    assert.strictEqual(execute.callCount, 1);
-    assert.deepStrictEqual(execute.firstCall.args, [
+    assertExecutedCommand(
+        execute,
         'git log --first-parent --no-color --pretty=format:%s__||__%b##$$@@$$## --merges foo..HEAD'
-    ]);
+    );
 });
 
 test('getMergeCommitLogs() returns the parsed command output', async function () {
@@ -234,10 +234,10 @@ test('getFirstParentCommitLogs() executes "git log" with the correct options', a
 
     await runner.getFirstParentCommitLogs('foo');
 
-    assert.strictEqual(execute.callCount, 1);
-    assert.deepStrictEqual(execute.firstCall.args, [
+    assertExecutedCommand(
+        execute,
         'git log --first-parent --no-color --pretty=format:%H__||__%s__||__%b##$$@@$$## foo..HEAD'
-    ]);
+    );
 });
 
 test('getFirstParentCommitLogs() returns the parsed command output', async function () {

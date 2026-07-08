@@ -20,22 +20,24 @@ test('reads changelog config from package info', function () {
         }
     });
 
-    assert.deepStrictEqual(config.validLabels, new Map([ [ 'custom', 'Custom Changes' ] ]));
-    assert.deepStrictEqual(config.ignoredLabels, [ 'release' ]);
-    assert.deepStrictEqual(config.versionBumps, { major: [], minor: [ 'custom' ], patch: [] });
-    assert.strictEqual(config.dateFormat, 'dd.MM.yyyy');
-    assert.deepStrictEqual(config.collapseRules, [
-        {
-            label: 'custom',
-            pattern: /^Custom (?<dependency>.+) from (?<from>.+) to (?<to>.+)$/u,
-            replace: 'Custom $<dependency> from $<from> to $<to>',
-            keyGroup: 'dependency',
-            fromGroup: 'from',
-            toGroup: 'to'
-        }
-    ]);
-    assert.strictEqual(config.labelLookupIntervalMilliseconds, defaultPrLogConfig.labelLookupIntervalMilliseconds);
-    assert.strictEqual(config.maximumRateLimitRetryCount, defaultPrLogConfig.maximumRateLimitRetryCount);
+    assert.partialDeepStrictEqual(config, {
+        validLabels: new Map([ [ 'custom', 'Custom Changes' ] ]),
+        ignoredLabels: [ 'release' ],
+        versionBumps: { major: [], minor: [ 'custom' ], patch: [] },
+        dateFormat: 'dd.MM.yyyy',
+        collapseRules: [
+            {
+                label: 'custom',
+                pattern: /^Custom (?<dependency>.+) from (?<from>.+) to (?<to>.+)$/u,
+                replace: 'Custom $<dependency> from $<from> to $<to>',
+                keyGroup: 'dependency',
+                fromGroup: 'from',
+                toGroup: 'to'
+            }
+        ],
+        labelLookupIntervalMilliseconds: defaultPrLogConfig.labelLookupIntervalMilliseconds,
+        maximumRateLimitRetryCount: defaultPrLogConfig.maximumRateLimitRetryCount
+    });
 });
 
 test('uses fallback config values when package info has no changelog config', function () {

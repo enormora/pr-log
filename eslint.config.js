@@ -1,5 +1,5 @@
 import { baseConfig } from '@enormora/eslint-config-base';
-import { mochaConfig } from '@enormora/eslint-config-mocha';
+import { mochaNodeAssertConfig } from '@enormora/eslint-config-mocha-node-assert';
 import { nodeConfig, nodeConfigFileConfig, nodeEntryPointFileConfig } from '@enormora/eslint-config-node';
 import { typescriptConfig } from '@enormora/eslint-config-typescript';
 
@@ -27,7 +27,7 @@ export default [
         files: [ 'eslint.config.js', 'mocha.config.json', 'packtory.config.js' ]
     },
     {
-        ...mochaConfig,
+        ...mochaNodeAssertConfig,
         files: [ '**/*.test.ts' ],
         languageOptions: {
             globals: {

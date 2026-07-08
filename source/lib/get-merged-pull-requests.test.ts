@@ -130,8 +130,10 @@ test('ignores non-semver tag', async function () {
 
     await getMergedPullRequests(anyRepo, defaultPrLogConfig);
 
-    assert.strictEqual(getFirstParentCommitLogs.callCount, 1);
-    assert.deepStrictEqual(getFirstParentCommitLogs.firstCall.args, [ '0.0.2' ]);
+    assert.partialDeepStrictEqual(getFirstParentCommitLogs, {
+        callCount: 1,
+        firstCall: { args: [ '0.0.2' ] }
+    });
 });
 
 test('always uses the highest version', async function () {
@@ -141,8 +143,10 @@ test('always uses the highest version', async function () {
 
     await getMergedPullRequests(anyRepo, defaultPrLogConfig);
 
-    assert.strictEqual(getFirstParentCommitLogs.callCount, 1);
-    assert.deepStrictEqual(getFirstParentCommitLogs.firstCall.args, [ '2.0.0' ]);
+    assert.partialDeepStrictEqual(getFirstParentCommitLogs, {
+        callCount: 1,
+        firstCall: { args: [ '2.0.0' ] }
+    });
 });
 
 test('ignores prerelease versions', async function () {
@@ -152,8 +156,10 @@ test('ignores prerelease versions', async function () {
 
     await getMergedPullRequests(anyRepo, defaultPrLogConfig);
 
-    assert.strictEqual(getFirstParentCommitLogs.callCount, 1);
-    assert.deepStrictEqual(getFirstParentCommitLogs.firstCall.args, [ '2.0.0' ]);
+    assert.partialDeepStrictEqual(getFirstParentCommitLogs, {
+        callCount: 1,
+        firstCall: { args: [ '2.0.0' ] }
+    });
 });
 
 test('throws when the pull request cannot be extracted from the commit message', async function () {
@@ -185,8 +191,10 @@ test('falls back to the GitHub API when the commit log does not have a body', as
 
     const pullRequests = await getMergedPullRequests(anyRepo, defaultPrLogConfig);
 
-    assert.strictEqual(get.callCount, 1);
-    assert.deepStrictEqual(get.firstCall.args, [ { owner: 'any', repo: 'repo', pull_number: 1 } ]);
+    assert.partialDeepStrictEqual(get, {
+        callCount: 1,
+        firstCall: { args: [ { owner: 'any', repo: 'repo', pull_number: 1 } ] }
+    });
     assert.deepStrictEqual(pullRequests, [ { id: 1, title: 'pull request title from github', label: 'bug' } ]);
 });
 
@@ -305,9 +313,11 @@ test('waits between pull request label lookups', async function () {
 
     await getMergedPullRequests(anyRepo, { ...defaultPrLogConfig, labelLookupIntervalMilliseconds });
 
-    assert.strictEqual(waitForMilliseconds.callCount, expectedWaitForMillisecondsCallCount);
-    assert.deepStrictEqual(waitForMilliseconds.firstCall.args, [ labelLookupIntervalMilliseconds ]);
-    assert.deepStrictEqual(waitForMilliseconds.secondCall.args, [ labelLookupIntervalMilliseconds ]);
+    assert.partialDeepStrictEqual(waitForMilliseconds, {
+        callCount: expectedWaitForMillisecondsCallCount,
+        firstCall: { args: [ labelLookupIntervalMilliseconds ] },
+        secondCall: { args: [ labelLookupIntervalMilliseconds ] }
+    });
 });
 
 test('ignores first-parent commits that are not merge commits', async function () {

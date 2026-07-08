@@ -147,8 +147,10 @@ test('does not throw if the repository is dirty', async function () {
 
     await cli.run(options);
 
-    assert.strictEqual(prependFile.callCount, 1);
-    assert.deepStrictEqual(prependFile.firstCall.args, [ '/foo/CHANGELOG.md', 'sloppy changelog\n\n' ]);
+    assert.partialDeepStrictEqual(prependFile, {
+        callCount: 1,
+        firstCall: { args: [ '/foo/CHANGELOG.md', 'sloppy changelog\n\n' ] }
+    });
 });
 
 test('uses custom labels if they are provided in package.json', async function () {
@@ -179,8 +181,10 @@ test('uses custom labels if they are provided in package.json', async function (
 
     await cli.run(cliRunOptionsFactory.build());
 
-    assert.strictEqual(getMergedPullRequests.callCount, 1);
-    assert.deepStrictEqual(getMergedPullRequests.firstCall.args, [ 'foo/bar', expectedConfig ]);
+    assert.partialDeepStrictEqual(getMergedPullRequests, {
+        callCount: 1,
+        firstCall: { args: [ 'foo/bar', expectedConfig ] }
+    });
 
     assert.strictEqual(renderChangelogMarkdown.callCount, 1);
     assert.deepStrictEqual(renderChangelogMarkdown.firstCall.args[0], {
@@ -221,8 +225,10 @@ test('calls ensureCleanLocalGitState with correct parameters', async function ()
 
     await cli.run(options);
 
-    assert.strictEqual(ensureCleanLocalGitState.callCount, 1);
-    assert.deepStrictEqual(ensureCleanLocalGitState.firstCall.args, [ expectedGithubRepo ]);
+    assert.partialDeepStrictEqual(ensureCleanLocalGitState, {
+        callCount: 1,
+        firstCall: { args: [ expectedGithubRepo ] }
+    });
 });
 
 test('calls getMergedPullRequests with the correct repo', async function () {
@@ -268,8 +274,10 @@ test('reports the generated changelog to stdout and not to a file when stdout is
 
     assert.strictEqual(prependFile.callCount, 0);
 
-    assert.strictEqual(log.callCount, 1);
-    assert.deepStrictEqual(log.firstCall.args, [ 'generated changelog' ]);
+    assert.partialDeepStrictEqual(log, {
+        callCount: 1,
+        firstCall: { args: [ 'generated changelog' ] }
+    });
 });
 
 test('reports the generated changelog to a file when stdout is set to false', async function () {
@@ -296,8 +304,10 @@ test('reports the generated changelog to a file when stdout is set to false', as
         versionNumber: '1.2.3'
     });
 
-    assert.strictEqual(prependFile.callCount, 1);
-    assert.deepStrictEqual(prependFile.firstCall.args, [ '/foo/CHANGELOG.md', 'generated changelog\n\n' ]);
+    assert.partialDeepStrictEqual(prependFile, {
+        callCount: 1,
+        firstCall: { args: [ '/foo/CHANGELOG.md', 'generated changelog\n\n' ] }
+    });
 });
 
 test('reports the generated unreleased changelog to a file when stdout is set to false', async function () {
@@ -329,8 +339,10 @@ test('reports the generated unreleased changelog to a file when stdout is set to
         versionNumber: undefined
     });
 
-    assert.strictEqual(prependFile.callCount, 1);
-    assert.deepStrictEqual(prependFile.firstCall.args, [ '/foo/CHANGELOG.md', 'generated changelog\n\n' ]);
+    assert.partialDeepStrictEqual(prependFile, {
+        callCount: 1,
+        firstCall: { args: [ '/foo/CHANGELOG.md', 'generated changelog\n\n' ] }
+    });
 });
 
 test('derives the version number automatically from merged pull request labels', async function () {

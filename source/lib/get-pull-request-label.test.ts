@@ -117,8 +117,10 @@ test('requests the labels for the correct repo and pull request', async function
         maximumRateLimitRetryCount
     });
 
-    assert.strictEqual(listLabelsOnIssue.callCount, 1);
-    assert.deepStrictEqual(listLabelsOnIssue.firstCall.args, [ { owner: 'any', repo: 'repo', issue_number: 123 } ]);
+    assert.partialDeepStrictEqual(listLabelsOnIssue, {
+        callCount: 1,
+        firstCall: { args: [ { owner: 'any', repo: 'repo', issue_number: 123 } ] }
+    });
 });
 
 test('fulfills with the correct label name', async function () {
@@ -247,8 +249,10 @@ test('retries using the retry-after header', async function () {
 
     assert.strictEqual(labelName, 'bug');
     assert.strictEqual(listLabelsOnIssue.callCount, expectedRequestAttemptCount);
-    assert.strictEqual(waitForMilliseconds.callCount, 1);
-    assert.deepStrictEqual(waitForMilliseconds.firstCall.args, [ expectedRetryAfterDelayMilliseconds ]);
+    assert.partialDeepStrictEqual(waitForMilliseconds, {
+        callCount: 1,
+        firstCall: { args: [ expectedRetryAfterDelayMilliseconds ] }
+    });
 });
 
 test('retries using the rate limit reset header when retry-after is missing', async function () {
@@ -273,8 +277,10 @@ test('retries using the rate limit reset header when retry-after is missing', as
 
     assert.strictEqual(labelName, 'bug');
     assert.strictEqual(listLabelsOnIssue.callCount, expectedRequestAttemptCount);
-    assert.strictEqual(waitForMilliseconds.callCount, 1);
-    assert.deepStrictEqual(waitForMilliseconds.firstCall.args, [ expectedRateLimitResetDelayMilliseconds ]);
+    assert.partialDeepStrictEqual(waitForMilliseconds, {
+        callCount: 1,
+        firstCall: { args: [ expectedRateLimitResetDelayMilliseconds ] }
+    });
 });
 
 test('rejects immediately when a non-error value was thrown', async function () {
