@@ -7,7 +7,7 @@
     "automergeType": "pr",
     "dependencyDashboard": false,
     "constraints": {
-        "npm": "10.9.8"
+        "npm": "11.18.0"
     },
     "lockFileMaintenance": {
         "enabled": true
