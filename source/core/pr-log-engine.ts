@@ -30,9 +30,13 @@ import {
     renderGroupedTargetChangelogMarkdown,
     renderChangelogMarkdown,
     renderTargetChangelogMarkdown,
+    extractChangelogReleaseSection as extractChangelogReleaseSectionValue,
+    type ExtractChangelogReleaseSectionInput as ExtractChangelogReleaseSectionInputValue,
+    type ExtractChangelogReleaseSectionResult as ExtractChangelogReleaseSectionResultValue,
     type RenderChangelogMarkdownInput as RenderChangelogMarkdownInputValue,
     type RenderGroupedTargetChangelogMarkdownInput as RenderGroupedTargetChangelogMarkdownInputValue,
     type RenderTargetChangelogMarkdownInput as RenderTargetChangelogMarkdownInputValue,
+    type ReleaseSectionNotFound as ReleaseSectionNotFoundValue,
     updateChangelogMarkdown,
     type TargetChangelogSection as TargetChangelogSectionValue,
     type UpdateChangelogMarkdownInput as UpdateChangelogMarkdownInputValue
@@ -78,6 +82,9 @@ export type PrLogEngine = {
     filterPullRequestsByTargetFiles: (input: FilterPullRequestsByTargetFilesInputValue) => readonly PullRequestValue[];
     resolvePullRequestLabels: (input: ResolvePullRequestLabelsOptions) => Promise<readonly PullRequestWithLabelValue[]>;
     resolveVersionNumber: (input: ResolveVersionNumberInput) => string;
+    extractChangelogReleaseSection: (
+        input: ExtractChangelogReleaseSectionInputValue
+    ) => ExtractChangelogReleaseSectionResultValue;
     renderChangelog: (input: RenderChangelogMarkdownInputValue) => string;
     renderTargetChangelog: (input: RenderTargetChangelogMarkdownInputValue) => string;
     renderGroupedTargetChangelog: (input: RenderGroupedTargetChangelogMarkdownInputValue) => string;
@@ -248,6 +255,7 @@ export function createPrLogEngineWithDependencies(dependencies: PrLogEngineDepen
             );
         },
 
+        extractChangelogReleaseSection: extractChangelogReleaseSectionValue,
         renderChangelog: renderChangelogMarkdown,
         renderTargetChangelog: renderTargetChangelogMarkdown,
         renderGroupedTargetChangelog: renderGroupedTargetChangelogMarkdown,
@@ -256,6 +264,8 @@ export function createPrLogEngineWithDependencies(dependencies: PrLogEngineDepen
 }
 
 export type ChangelogBaseRef = ChangelogBaseRefValue;
+export type ExtractChangelogReleaseSectionInput = ExtractChangelogReleaseSectionInputValue;
+export type ExtractChangelogReleaseSectionResult = ExtractChangelogReleaseSectionResultValue;
 export type FilterPullRequestsByTargetFilesInput = FilterPullRequestsByTargetFilesInputValue;
 export type PackageChangelogBaseRefInput = PackageChangelogBaseRefInputValue;
 export type PullRequest = PullRequestValue;
@@ -264,5 +274,6 @@ export type PrLogConfig = PrLogConfigValue;
 export type RenderGroupedTargetChangelogMarkdownInput = RenderGroupedTargetChangelogMarkdownInputValue;
 export type RenderChangelogMarkdownInput = RenderChangelogMarkdownInputValue;
 export type RenderTargetChangelogMarkdownInput = RenderTargetChangelogMarkdownInputValue;
+export type ReleaseSectionNotFound = ReleaseSectionNotFoundValue;
 export type TargetChangelogSection = TargetChangelogSectionValue;
 export type UpdateChangelogInput = UpdateChangelogMarkdownInputValue;

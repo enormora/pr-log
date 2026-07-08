@@ -18,6 +18,8 @@ import {
     createPrLogEngineWithDependencies,
     type ChangelogBaseRef as ChangelogBaseRefValue,
     type CollectMergedPullRequestsOptions as CollectMergedPullRequestsOptionsValue,
+    type ExtractChangelogReleaseSectionInput as ExtractChangelogReleaseSectionInputValue,
+    type ExtractChangelogReleaseSectionResult as ExtractChangelogReleaseSectionResultValue,
     type FilterPullRequestsByTargetFilesInput as FilterPullRequestsByTargetFilesInputValue,
     type PackageChangelogBaseRefInput as PackageChangelogBaseRefInputValue,
     type PrLogEngine as PrLogEngineValue,
@@ -28,6 +30,7 @@ import {
     type RenderGroupedTargetChangelogMarkdownInput as RenderGroupedTargetChangelogMarkdownInputValue,
     type RenderChangelogMarkdownInput as RenderChangelogMarkdownInputValue,
     type RenderTargetChangelogMarkdownInput as RenderTargetChangelogMarkdownInputValue,
+    type ReleaseSectionNotFound as ReleaseSectionNotFoundValue,
     type ResolveVersionNumberInput as ResolveVersionNumberInputValue,
     type ResolvePullRequestLabelsOptions as ResolvePullRequestLabelsOptionsValue,
     type TargetChangelogSection as TargetChangelogSectionValue,
@@ -72,6 +75,8 @@ export const defaultPrLogConfig: PrLogConfigValue = defaultPrLogConfigValue;
 export type ChangelogBaseRef = ChangelogBaseRefValue;
 export type CollapseRule = CollapseRuleValue;
 export type CollectMergedPullRequestsOptions = CollectMergedPullRequestsOptionsValue;
+export type ExtractChangelogReleaseSectionInput = ExtractChangelogReleaseSectionInputValue;
+export type ExtractChangelogReleaseSectionResult = ExtractChangelogReleaseSectionResultValue;
 export type FilterPullRequestsByTargetFilesInput = FilterPullRequestsByTargetFilesInputValue;
 export type MissingChangelogBaseRefError = MissingChangelogBaseRefErrorValue;
 export type MissingChangelogBaseRefReason = MissingChangelogBaseRefReasonValue;
@@ -85,6 +90,7 @@ export type ReadPullRequestLabelsOptions = ReadPullRequestLabelsOptionsValue;
 export type RenderGroupedTargetChangelogMarkdownInput = RenderGroupedTargetChangelogMarkdownInputValue;
 export type RenderChangelogMarkdownInput = RenderChangelogMarkdownInputValue;
 export type RenderTargetChangelogMarkdownInput = RenderTargetChangelogMarkdownInputValue;
+export type ReleaseSectionNotFound = ReleaseSectionNotFoundValue;
 export type ResolvePullRequestLabelsOptions = ResolvePullRequestLabelsOptionsValue;
 export type ResolveVersionNumberInput = ResolveVersionNumberInputValue;
 export type TargetChangelogSection = TargetChangelogSectionValue;
