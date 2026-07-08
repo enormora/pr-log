@@ -1,4 +1,5 @@
 import { nothing } from 'true-myth/maybe';
+import { err, ok, type Result } from 'true-myth/result';
 import { createChangelogFactory, formatChangelogDate } from './create-changelog.ts';
 import type { PrLogConfig } from './pr-log-config.ts';
 import type { PullRequestWithLabel } from './resolve-pull-request-labels.ts';
@@ -55,6 +56,106 @@ export type UpdateChangelogMarkdownInput = {
     readonly existingChangelogMarkdown: string;
     readonly generatedChangelogMarkdown: string;
 };
+
+export type ExtractChangelogReleaseSectionInput = {
+    readonly changelogMarkdown: string;
+    readonly targetName: string | undefined;
+    readonly versionNumber: string;
+};
+
+export type ReleaseSectionNotFound = {
+    readonly reason: 'release-section-not-found';
+    readonly targetName: string | undefined;
+    readonly versionNumber: string;
+};
+
+export type ExtractChangelogReleaseSectionResult = Result<string, ReleaseSectionNotFound>;
+
+type ChangelogReleaseHeading = {
+    readonly startIndex: number;
+    readonly endIndex: number;
+    readonly markdown: string;
+};
+
+const releaseVersionPattern = String.raw`\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?`;
+const releasePackagePattern = String.raw`(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*`;
+const releaseHeadingPattern = new RegExp(
+    String.raw`^## (?:${releaseVersionPattern}|${releasePackagePattern} ${releaseVersionPattern}) \(.+\)\s*$`,
+    'gimu'
+);
+
+function createReleaseSectionNotFound(input: ExtractChangelogReleaseSectionInput): ReleaseSectionNotFound {
+    return {
+        reason: 'release-section-not-found',
+        targetName: input.targetName,
+        versionNumber: input.versionNumber
+    };
+}
+
+function readReleaseHeadings(changelogMarkdown: string): readonly ChangelogReleaseHeading[] {
+    return Array.from(changelogMarkdown.matchAll(releaseHeadingPattern), function (match) {
+        return {
+            startIndex: match.index,
+            endIndex: match.index + match[0].length,
+            markdown: match[0]
+        };
+    });
+}
+
+function isRequestedReleaseHeading(
+    input: ExtractChangelogReleaseSectionInput,
+    heading: ChangelogReleaseHeading
+): boolean {
+    const requestedHeadingStart = input.targetName === undefined
+        ? `## ${input.versionNumber} (`
+        : `## ${input.targetName} ${input.versionNumber} (`;
+
+    return heading.markdown.trimEnd().startsWith(requestedHeadingStart);
+}
+
+function sectionEndIndex(
+    changelogMarkdown: string,
+    headings: readonly ChangelogReleaseHeading[],
+    headingIndex: number
+): number {
+    return headings[headingIndex + 1]?.startIndex ?? changelogMarkdown.length;
+}
+
+function extractMatchingReleaseSection(
+    input: ExtractChangelogReleaseSectionInput,
+    releaseHeadings: readonly ChangelogReleaseHeading[],
+    headingIndex: number,
+    heading: ChangelogReleaseHeading
+): string | undefined {
+    if (!isRequestedReleaseHeading(input, heading)) {
+        return undefined;
+    }
+
+    const endIndex = sectionEndIndex(input.changelogMarkdown, releaseHeadings, headingIndex);
+    const sectionBody = input.changelogMarkdown.slice(heading.endIndex, endIndex);
+
+    if (sectionBody.trim().length === 0) {
+        return undefined;
+    }
+
+    return input.changelogMarkdown.slice(heading.startIndex, endIndex).trimEnd();
+}
+
+export function extractChangelogReleaseSection(
+    input: ExtractChangelogReleaseSectionInput
+): ExtractChangelogReleaseSectionResult {
+    const releaseHeadings = readReleaseHeadings(input.changelogMarkdown);
+
+    for (const [ headingIndex, heading ] of releaseHeadings.entries()) {
+        const releaseSection = extractMatchingReleaseSection(input, releaseHeadings, headingIndex, heading);
+
+        if (releaseSection !== undefined) {
+            return ok(releaseSection);
+        }
+    }
+
+    return err(createReleaseSectionNotFound(input));
+}
 
 export function renderChangelogMarkdown(input: RenderChangelogMarkdownInput): string {
     const createChangelog = createChangelogFactory({

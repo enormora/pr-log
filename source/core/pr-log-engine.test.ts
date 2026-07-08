@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { fake } from 'sinon';
+import { ok } from 'true-myth/result';
 import { defaultPrLogConfig, type PrLogConfig } from '../lib/pr-log-config.ts';
 import type { GitCommandRunner } from '../lib/git-command-runner.ts';
 import type { GetPullRequestLabels } from '../lib/get-pull-request-label.ts';
@@ -469,4 +470,17 @@ test('updates changelog markdown', function () {
     });
 
     assert.strictEqual(changelog, '## 1.0.0\n\n* New change\n\n## 0.9.0\n\n* Older change\n');
+});
+
+test('extracts changelog release sections', function () {
+    const engine = createEngine();
+
+    const releaseSection = engine.extractChangelogReleaseSection({
+        changelogMarkdown:
+            '## 1.0.0 (January 1, 1970)\n\n* New change\n\n## 0.9.0 (December 31, 1969)\n\n* Older change\n',
+        targetName: undefined,
+        versionNumber: '1.0.0'
+    });
+
+    assert.deepStrictEqual(releaseSection, ok('## 1.0.0 (January 1, 1970)\n\n* New change'));
 });
