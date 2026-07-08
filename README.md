@@ -7,5 +7,5 @@
 
 ## Packages
 
-- [`pr-log`](packages/pr-log/README.md) [![NPM Version](https://img.shields.io/npm/v/pr-log.svg?style=flat)](https://www.npmjs.org/package/pr-log): command-line changelog generator.
-- [`@pr-log/core`](packages/core/README.md) [![NPM Version](https://img.shields.io/npm/v/%40pr-log%2Fcore.svg?style=flat)](https://www.npmjs.org/package/@pr-log/core): reusable changelog generation API.
+- [`pr-log`](source/packages/command-line-interface/README.md) [![NPM Version](https://img.shields.io/npm/v/pr-log.svg?style=flat)](https://www.npmjs.org/package/pr-log): command-line changelog generator.
+- [`@pr-log/core`](source/packages/core/README.md) [![NPM Version](https://img.shields.io/npm/v/%40pr-log%2Fcore.svg?style=flat)](https://www.npmjs.org/package/@pr-log/core): reusable changelog generation API.

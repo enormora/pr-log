@@ -5,8 +5,8 @@ import path from 'node:path';
 const projectFolder = process.cwd();
 const sourcesFolder = path.join(projectFolder, 'target/packtory/source');
 const licensePath = path.join(projectFolder, 'LICENSE');
-const coreReadmePath = path.join(projectFolder, 'packages/core/README.md');
-const cliReadmePath = path.join(projectFolder, 'packages/pr-log/README.md');
+const coreReadmePath = path.join(projectFolder, 'source/packages/core/README.md');
+const cliReadmePath = path.join(projectFolder, 'source/packages/command-line-interface/README.md');
 
 async function readPackageInfo() {
     const packageJsonContent = await fs.readFile(path.join(projectFolder, 'package.json'), { encoding: 'utf8' });
