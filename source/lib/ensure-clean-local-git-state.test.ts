@@ -88,8 +88,15 @@ test('fetches the remote repository', async function () {
 
     await ensureCleanLocalGitState(githubRepo);
 
-    assert.strictEqual(fetchRemote.callCount, 1);
-    assert.deepStrictEqual(fetchRemote.firstCall.args, [ 'origin' ]);
+    assert.deepStrictEqual({
+        callCount: fetchRemote.callCount,
+        calls: fetchRemote.getCalls().map(function (call): readonly unknown[] {
+            return call.args as readonly unknown[];
+        })
+    }, {
+        callCount: 1,
+        calls: [ [ 'origin' ] ]
+    });
 });
 
 test('fulfills if the local git state is clean', async function () {
@@ -98,6 +105,13 @@ test('fulfills if the local git state is clean', async function () {
 
     await ensureCleanLocalGitState(githubRepo);
 
-    assert.strictEqual(getSymmetricDifferencesBetweenBranches.callCount, 1);
-    assert.deepStrictEqual(getSymmetricDifferencesBetweenBranches.firstCall.args, [ 'master', 'origin/master' ]);
+    assert.deepStrictEqual({
+        callCount: getSymmetricDifferencesBetweenBranches.callCount,
+        calls: getSymmetricDifferencesBetweenBranches.getCalls().map(function (call): readonly unknown[] {
+            return call.args as readonly unknown[];
+        })
+    }, {
+        callCount: 1,
+        calls: [ [ 'master', 'origin/master' ] ]
+    });
 });

@@ -52,6 +52,18 @@ const expectedRateLimitResetDelayMilliseconds = 4000;
 const rateLimitResetSeconds = (currentTimeMilliseconds + expectedRateLimitResetDelayMilliseconds) /
     millisecondsPerSecond;
 
+function assertSpyCalls(sinonSpy: SinonSpy, calls: readonly (readonly unknown[])[]): void {
+    assert.deepStrictEqual({
+        callCount: sinonSpy.callCount,
+        calls: sinonSpy.getCalls().map(function (call): readonly unknown[] {
+            return call.args as readonly unknown[];
+        })
+    }, {
+        callCount: calls.length,
+        calls
+    });
+}
+
 function createGitHubRateLimitError(
     message: string,
     headers: Readonly<Record<string, number | string>>
@@ -117,8 +129,7 @@ test('requests the labels for the correct repo and pull request', async function
         maximumRateLimitRetryCount
     });
 
-    assert.strictEqual(listLabelsOnIssue.callCount, 1);
-    assert.deepStrictEqual(listLabelsOnIssue.firstCall.args, [ { owner: 'any', repo: 'repo', issue_number: 123 } ]);
+    assertSpyCalls(listLabelsOnIssue, [ [ { owner: 'any', repo: 'repo', issue_number: 123 } ] ]);
 });
 
 test('fulfills with the correct label name', async function () {
@@ -247,8 +258,7 @@ test('retries using the retry-after header', async function () {
 
     assert.strictEqual(labelName, 'bug');
     assert.strictEqual(listLabelsOnIssue.callCount, expectedRequestAttemptCount);
-    assert.strictEqual(waitForMilliseconds.callCount, 1);
-    assert.deepStrictEqual(waitForMilliseconds.firstCall.args, [ expectedRetryAfterDelayMilliseconds ]);
+    assertSpyCalls(waitForMilliseconds, [ [ expectedRetryAfterDelayMilliseconds ] ]);
 });
 
 test('retries using the rate limit reset header when retry-after is missing', async function () {
@@ -273,8 +283,7 @@ test('retries using the rate limit reset header when retry-after is missing', as
 
     assert.strictEqual(labelName, 'bug');
     assert.strictEqual(listLabelsOnIssue.callCount, expectedRequestAttemptCount);
-    assert.strictEqual(waitForMilliseconds.callCount, 1);
-    assert.deepStrictEqual(waitForMilliseconds.firstCall.args, [ expectedRateLimitResetDelayMilliseconds ]);
+    assertSpyCalls(waitForMilliseconds, [ [ expectedRateLimitResetDelayMilliseconds ] ]);
 });
 
 test('rejects immediately when a non-error value was thrown', async function () {
