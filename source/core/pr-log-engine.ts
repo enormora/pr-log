@@ -19,6 +19,7 @@ import type { GetPullRequestLabels, GitHubPullRequestLabelClient } from '../lib/
 import type { PrLogConfig as PrLogConfigValue } from '../lib/pr-log-config.ts';
 import {
     fetchPullRequestChangedFiles as fetchPullRequestChangedFilesValue,
+    type PullRequestChangedFile as PullRequestChangedFileValue,
     type PullRequestChangedFilesReader
 } from '../lib/pull-request-changed-files.ts';
 import { proposeVersionNumber as proposeVersionNumberValue } from '../lib/propose-version-number.ts';
@@ -77,7 +78,7 @@ export type PrLogEngine = {
     collectMergedPullRequests: (input: CollectMergedPullRequestsOptions) => Promise<readonly PullRequestValue[]>;
     readPullRequestChangedFiles: (
         input: ReadPullRequestChangedFilesOptions
-    ) => Promise<ReadonlyMap<number, readonly string[]>>;
+    ) => Promise<ReadonlyMap<number, readonly PullRequestChangedFileValue[]>>;
     readPullRequestLabels: (input: ReadPullRequestLabelsOptions) => Promise<ReadonlyMap<number, readonly string[]>>;
     filterPullRequestsByTargetFiles: (input: FilterPullRequestsByTargetFilesInputValue) => readonly PullRequestValue[];
     resolvePullRequestLabels: (input: ResolvePullRequestLabelsOptions) => Promise<readonly PullRequestWithLabelValue[]>;
@@ -269,6 +270,7 @@ export type ExtractChangelogReleaseSectionResult = ExtractChangelogReleaseSectio
 export type FilterPullRequestsByTargetFilesInput = FilterPullRequestsByTargetFilesInputValue;
 export type PackageChangelogBaseRefInput = PackageChangelogBaseRefInputValue;
 export type PullRequest = PullRequestValue;
+export type PullRequestChangedFile = PullRequestChangedFileValue;
 export type PullRequestWithLabel = PullRequestWithLabelValue;
 export type PrLogConfig = PrLogConfigValue;
 export type RenderGroupedTargetChangelogMarkdownInput = RenderGroupedTargetChangelogMarkdownInputValue;

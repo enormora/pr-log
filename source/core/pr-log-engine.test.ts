@@ -4,7 +4,7 @@ import { ok } from 'true-myth/result';
 import { defaultPrLogConfig, type PrLogConfig } from '../lib/pr-log-config.ts';
 import type { GitCommandRunner } from '../lib/git-command-runner.ts';
 import type { GetPullRequestLabels } from '../lib/get-pull-request-label.ts';
-import type { PullRequestChangedFilesReader } from '../lib/pull-request-changed-files.ts';
+import type { PullRequestChangedFile, PullRequestChangedFilesReader } from '../lib/pull-request-changed-files.ts';
 import {
     createPrLogEngineWithDependencies,
     type PrLogEngine,
@@ -15,6 +15,17 @@ const githubRepo = 'owner/repo';
 const pullRequestId = 1;
 const documentationPullRequestId = 2;
 const waitDurationMilliseconds = 25;
+
+function changedFile(path: string): PullRequestChangedFile {
+    return {
+        path,
+        previousPath: undefined,
+        status: 'modified',
+        additions: 1,
+        deletions: 0,
+        changes: 1
+    };
+}
 
 type EngineOverrides = {
     readonly gitCommandRunner?: GitCommandRunner;
@@ -70,7 +81,7 @@ function createDefaultEngineOverrides(): Required<EngineOverrides> {
             }
         },
         pullRequestChangedFilesReader: {
-            getChangedFiles: fake.resolves([ 'source/index.ts' ])
+            getChangedFiles: fake.resolves([ changedFile('source/index.ts') ])
         },
         async getPullRequestLabels() {
             return [ 'bug' ];
@@ -181,7 +192,7 @@ test('reads pull request changed files', async function () {
             githubRepo,
             pullRequests: [ { id: pullRequestId, title: 'Fix bug' } ]
         }),
-        new Map([ [ pullRequestId, [ 'source/index.ts' ] ] ])
+        new Map([ [ pullRequestId, [ changedFile('source/index.ts') ] ] ])
     );
 });
 
@@ -197,8 +208,8 @@ test('filters pull requests by target files', function () {
                 { id: documentationPullRequestId, title: 'Add docs' }
             ],
             changedFilesByPullRequest: new Map([
-                [ pullRequestId, [ 'source/index.ts' ] ],
-                [ documentationPullRequestId, [ 'README.md' ] ]
+                [ pullRequestId, [ changedFile('source/index.ts') ] ],
+                [ documentationPullRequestId, [ changedFile('README.md') ] ]
             ]),
             ignoredAttributionPaths: []
         }),
