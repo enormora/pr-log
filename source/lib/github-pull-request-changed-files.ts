@@ -1,6 +1,6 @@
 import type { Octokit } from '@octokit/rest';
 import { splitByString } from './split.ts';
-import type { PullRequestChangedFilesReader } from './pull-request-changed-files.ts';
+import type { PullRequestChangedFile, PullRequestChangedFilesReader } from './pull-request-changed-files.ts';
 
 type PullRequestFile = Readonly<Awaited<ReturnType<Octokit['pulls']['listFiles']>>['data'][number]>;
 
@@ -18,7 +18,7 @@ async function getPullRequestChangedFiles(
     githubClient: Readonly<Octokit>,
     githubRepo: string,
     pullRequestId: number
-): Promise<readonly string[]> {
+): Promise<readonly PullRequestChangedFile[]> {
     const [ owner, repo ] = determineRepoDetails(githubRepo);
     const files = (await githubClient.paginate(githubClient.pulls.listFiles, {
         owner,
@@ -27,7 +27,14 @@ async function getPullRequestChangedFiles(
     })) as PullRequestFile[];
 
     return files.map(function (file) {
-        return file.filename;
+        return {
+            path: file.filename,
+            previousPath: file.previous_filename ?? undefined,
+            status: file.status,
+            additions: file.additions,
+            deletions: file.deletions,
+            changes: file.changes
+        };
     });
 }
 

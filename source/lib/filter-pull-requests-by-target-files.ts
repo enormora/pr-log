@@ -1,10 +1,11 @@
 import type { PullRequest } from './collect-merged-pull-requests.ts';
+import type { PullRequestChangedFile } from './pull-request-changed-files.ts';
 
 export type FilterPullRequestsByTargetFilesInput = {
     readonly targetName: string;
     readonly targetSourceFiles: readonly string[];
     readonly pullRequests: readonly PullRequest[];
-    readonly changedFilesByPullRequest: ReadonlyMap<number, readonly string[]>;
+    readonly changedFilesByPullRequest: ReadonlyMap<number, readonly PullRequestChangedFile[]>;
     readonly ignoredAttributionPaths: readonly string[];
 };
 
@@ -17,18 +18,27 @@ function createNormalizedPathSet(paths: readonly string[]): ReadonlySet<string> 
 }
 
 type TargetFileChangeInput = {
-    readonly changedFiles: readonly string[];
+    readonly changedFiles: readonly PullRequestChangedFile[];
     readonly targetSourceFiles: ReadonlySet<string>;
     readonly ignoredAttributionPaths: ReadonlySet<string>;
 };
+
+function changedFilePaths(changedFile: PullRequestChangedFile): readonly string[] {
+    if (changedFile.previousPath === undefined) {
+        return [ changedFile.path ];
+    }
+    return [ changedFile.path, changedFile.previousPath ];
+}
 
 function hasTargetFileChange(options: TargetFileChangeInput): boolean {
     const { changedFiles, targetSourceFiles, ignoredAttributionPaths } = options;
 
     return changedFiles.some(function (changedFile) {
-        const normalizedChangedFile = normalizeRepositoryPath(changedFile);
+        const normalizedChangedFiles = changedFilePaths(changedFile).map(normalizeRepositoryPath);
 
-        return targetSourceFiles.has(normalizedChangedFile) && !ignoredAttributionPaths.has(normalizedChangedFile);
+        return normalizedChangedFiles.some(function (normalizedChangedFile) {
+            return targetSourceFiles.has(normalizedChangedFile) && !ignoredAttributionPaths.has(normalizedChangedFile);
+        });
     });
 }
 

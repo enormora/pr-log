@@ -26,6 +26,7 @@ import {
     type LinklessChangelogEntry as LinklessChangelogEntryValue,
     type PrLogEngine as PrLogEngineValue,
     type PullRequest as PullRequestValue,
+    type PullRequestChangedFile as PullRequestChangedFileValue,
     type PullRequestWithLabel as PullRequestWithLabelValue,
     type ReadPullRequestChangedFilesOptions as ReadPullRequestChangedFilesOptionsValue,
     type ReadPullRequestLabelsOptions as ReadPullRequestLabelsOptionsValue,
@@ -88,6 +89,7 @@ export type LinklessChangelogEntry = LinklessChangelogEntryValue;
 export type PrLogEngine = PrLogEngineValue;
 export type PrLogConfig = PrLogConfigValue;
 export type PullRequest = PullRequestValue;
+export type PullRequestChangedFile = PullRequestChangedFileValue;
 export type PullRequestWithLabel = PullRequestWithLabelValue;
 export type ReadPullRequestChangedFilesOptions = ReadPullRequestChangedFilesOptionsValue;
 export type ReadPullRequestLabelsOptions = ReadPullRequestLabelsOptionsValue;

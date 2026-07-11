@@ -7,7 +7,25 @@ const pullRequestId = 123;
 
 test('creates a GitHub changed files reader', async function () {
     const listFiles = fake();
-    const paginate = fake.resolves([ { filename: 'source/a.ts' }, { filename: 'README.md' } ]);
+    const paginate = fake.resolves([
+        {
+            filename: 'source/a.ts',
+            previous_filename: 'src/a.ts',
+            status: 'renamed',
+            additions: 2,
+            deletions: 1,
+            changes: 3,
+            patch: 'ignored'
+        },
+        {
+            filename: 'README.md',
+            status: 'modified',
+            additions: 1,
+            deletions: 0,
+            changes: 1,
+            patch: 'ignored'
+        }
+    ]);
     const githubClient = {
         paginate,
         pulls: { listFiles }
@@ -20,7 +38,24 @@ test('creates a GitHub changed files reader', async function () {
         listFiles,
         { owner: 'owner', repo: 'repo', pull_number: pullRequestId }
     ]);
-    assert.deepStrictEqual(changedFiles, [ 'source/a.ts', 'README.md' ]);
+    assert.deepStrictEqual(changedFiles, [
+        {
+            path: 'source/a.ts',
+            previousPath: 'src/a.ts',
+            status: 'renamed',
+            additions: 2,
+            deletions: 1,
+            changes: 3
+        },
+        {
+            path: 'README.md',
+            previousPath: undefined,
+            status: 'modified',
+            additions: 1,
+            deletions: 0,
+            changes: 1
+        }
+    ]);
 });
 
 test('throws when the GitHub repo cannot be split', async function () {
