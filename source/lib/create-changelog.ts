@@ -3,7 +3,7 @@ import { isArray } from '@sindresorhus/is';
 import { enUS as enLocale } from 'date-fns/locale/en-US';
 import type { Just, Nothing } from 'true-myth/maybe';
 import type { CollapseRule, PrLogConfig } from './pr-log-config.ts';
-import type { PullRequestWithLabel } from './resolve-pull-request-labels.ts';
+import type { ChangelogEntryInput } from './render-changelog-markdown.ts';
 
 function formatLinkToPullRequest(pullRequestId: number, repo: string): string {
     return `[#${pullRequestId}](https://github.com/${repo}/pull/${pullRequestId})`;
@@ -14,10 +14,14 @@ type ChangelogEntry = {
     readonly pullRequestIds: readonly number[];
 };
 
-function formatPullRequest(entry: ChangelogEntry, repo: string): string {
+function formatChangelogEntry(entry: ChangelogEntry, repo: string): string {
     const formattedLinks = entry.pullRequestIds.map(function (pullRequestId) {
         return formatLinkToPullRequest(pullRequestId, repo);
     });
+
+    if (formattedLinks.length === 0) {
+        return `* ${entry.title}\n`;
+    }
 
     return `* ${entry.title} (${formattedLinks.join(', ')})\n`;
 }
@@ -25,7 +29,7 @@ function formatPullRequest(entry: ChangelogEntry, repo: string): string {
 function formatListOfPullRequests(entries: readonly ChangelogEntry[], repo: string): string {
     return entries
         .map(function (entry) {
-            return formatPullRequest(entry, repo);
+            return formatChangelogEntry(entry, repo);
         })
         .join('');
 }
@@ -43,8 +47,8 @@ export function formatChangelogDate(dateFormat: string | undefined, date: Readon
     return formatDate(date, resolvedDateFormat, { locale: enLocale });
 }
 
-function groupByLabel(pullRequests: readonly PullRequestWithLabel[]): Record<string, PullRequestWithLabel[]> {
-    return pullRequests.reduce(function (groupedObject: Readonly<Record<string, PullRequestWithLabel[]>>, pullRequest) {
+function groupByLabel(pullRequests: readonly ChangelogEntryInput[]): Record<string, ChangelogEntryInput[]> {
+    return pullRequests.reduce(function (groupedObject: Readonly<Record<string, ChangelogEntryInput[]>>, pullRequest) {
         const { label } = pullRequest;
         const group = groupedObject[label];
 
@@ -93,11 +97,11 @@ type CollapseChainContext = {
     readonly ruleMatch: RuleMatch;
 };
 
-function createChangelogEntries(pullRequests: readonly PullRequestWithLabel[]): readonly ChangelogEntryWithLabel[] {
+function createChangelogEntries(pullRequests: readonly ChangelogEntryInput[]): readonly ChangelogEntryWithLabel[] {
     return pullRequests.map(function (pullRequest) {
         return {
             title: pullRequest.title,
-            pullRequestIds: [ pullRequest.id ],
+            pullRequestIds: pullRequest.id === undefined ? [] : [ pullRequest.id ],
             label: pullRequest.label
         };
     });
@@ -287,14 +291,14 @@ type Dependencies = {
 type ChangelogOptionsUnreleased = {
     readonly unreleased: true;
     readonly versionNumber: Nothing<string>;
-    readonly mergedPullRequests: readonly PullRequestWithLabel[];
+    readonly mergedPullRequests: readonly ChangelogEntryInput[];
     readonly githubRepo: string;
 };
 
 type ChangelogOptionsReleased = {
     readonly unreleased: false;
     readonly versionNumber: Just<string>;
-    readonly mergedPullRequests: readonly PullRequestWithLabel[];
+    readonly mergedPullRequests: readonly ChangelogEntryInput[];
     readonly githubRepo: string;
 };
 

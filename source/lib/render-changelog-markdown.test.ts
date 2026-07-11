@@ -49,6 +49,22 @@ test('renders target changelog markdown', function () {
     assert.ok(changelog.includes('* Fix bug ([#1](https://github.com/owner/repo/pull/1))'));
 });
 
+test('renders linkless changelog entries', function () {
+    const changelog = renderTargetChangelogMarkdown({
+        config: defaultPrLogConfig,
+        currentDate: new Date(0),
+        targetName: 'pkg-a',
+        mergedPullRequests: [ { id: undefined, title: 'Update dependency to 1.2.3', label: 'bug' } ],
+        githubRepo: 'owner/repo',
+        unreleased: true,
+        versionNumber: undefined
+    });
+
+    assert.ok(changelog.includes('* Update dependency to 1.2.3\n'));
+    assert.ok(!changelog.includes('pull/undefined'));
+    assert.ok(!changelog.includes('(https://github.com/owner/repo/pull/'));
+});
+
 test('renders grouped target changelog markdown', function () {
     const changelog = renderGroupedTargetChangelogMarkdown({
         config: defaultPrLogConfig,
