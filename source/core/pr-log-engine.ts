@@ -2,6 +2,8 @@ import {
     resolveChangelogBaseRef as resolveChangelogBaseRefValue,
     resolveLatestSemverTagBaseRef as resolveLatestSemverTagBaseRefValue,
     type ChangelogBaseRef as ChangelogBaseRefValue,
+    type MissingChangelogBaseRefError as MissingChangelogBaseRefErrorValue,
+    type MissingChangelogBaseRefReason as MissingChangelogBaseRefReasonValue,
     type PackageChangelogBaseRefInput as PackageChangelogBaseRefInputValue
 } from '../lib/changelog-base-ref.ts';
 import {
@@ -49,6 +51,9 @@ export type CollectMergedPullRequestsOptions = {
     readonly githubRepo: string;
     readonly baseRef: string;
 };
+
+export type MissingChangelogBaseRefError = MissingChangelogBaseRefErrorValue;
+export type MissingChangelogBaseRefReason = MissingChangelogBaseRefReasonValue;
 
 export type ReadPullRequestChangedFilesOptions = {
     readonly githubRepo: string;

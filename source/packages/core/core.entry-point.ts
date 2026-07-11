@@ -9,10 +9,6 @@ import {
     type CollapseRule as CollapseRuleValue,
     type PrLogConfig as PrLogConfigValue
 } from '../../lib/pr-log-config.ts';
-import type {
-    MissingChangelogBaseRefError as MissingChangelogBaseRefErrorValue,
-    MissingChangelogBaseRefReason as MissingChangelogBaseRefReasonValue
-} from '../../lib/changelog-base-ref.ts';
 import { defaultValidLabels as defaultValidLabelsValue } from '../../lib/valid-labels.ts';
 import {
     createPrLogEngineWithDependencies,
@@ -22,6 +18,8 @@ import {
     type ExtractChangelogReleaseSectionInput as ExtractChangelogReleaseSectionInputValue,
     type ExtractChangelogReleaseSectionResult as ExtractChangelogReleaseSectionResultValue,
     type FilterPullRequestsByTargetFilesInput as FilterPullRequestsByTargetFilesInputValue,
+    type MissingChangelogBaseRefError as MissingChangelogBaseRefErrorValue,
+    type MissingChangelogBaseRefReason as MissingChangelogBaseRefReasonValue,
     type PackageChangelogBaseRefInput as PackageChangelogBaseRefInputValue,
     type LinklessChangelogEntry as LinklessChangelogEntryValue,
     type PrLogEngine as PrLogEngineValue,
@@ -39,9 +37,13 @@ import {
     type TargetChangelogSection as TargetChangelogSectionValue,
     type UpdateChangelogInput as UpdateChangelogInputValue
 } from '../../core/pr-log-engine.ts';
+import {
+    createGitHubClient,
+    type GitHubClientDependencies,
+    type GitHubClientOptions
+} from './github-client.ts';
 
-export type PrLogEngineOptions = {
-    readonly githubToken: string | undefined;
+export type PrLogEngineOptions = GitHubClientOptions & {
     readonly workingDirectory: string;
     readonly config: PrLogConfigValue;
 };
@@ -50,12 +52,10 @@ function createCurrentDate(): Readonly<Date> {
     return new Date();
 }
 
-function createGitHubClient(options: Readonly<PrLogEngineOptions>): Readonly<Octokit> {
-    return new Octokit({ auth: options.githubToken });
-}
+const gitHubClientDependencies: GitHubClientDependencies = { Octokit };
 
 export function createPrLogEngine(options: Readonly<PrLogEngineOptions>): PrLogEngineValue {
-    const githubClient = createGitHubClient(options);
+    const githubClient = createGitHubClient(gitHubClientDependencies, options);
     const execute: GitCommandExecutor = async function (command) {
         return execaCommand(command, { cwd: options.workingDirectory });
     };
