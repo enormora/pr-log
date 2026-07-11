@@ -1,0 +1,13 @@
+{
+    "diff": true,
+    "forbid-pending": true,
+    "extension": ["ts"],
+    "spec": ["./integration-tests/github-api/**/*.test.ts"],
+    "exclude": [],
+    "jobs": 1,
+    "parallel": false,
+    "reporter": "dot",
+    "slow": 75,
+    "timeout": 2000,
+    "ui": "tdd"
+}

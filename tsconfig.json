@@ -1,4 +1,4 @@
 {
     "files": [],
-    "references": [{ "path": "./source" }]
+    "references": [{ "path": "./source" }, { "path": "./integration-tests/github-api" }]
 }

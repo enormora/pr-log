@@ -1,0 +1,10 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "tsBuildInfoFile": "../../target/buildcache/github-api-integration-tests.tsbuildinfo",
+        "rootDir": "../..",
+        "types": ["node", "mocha"]
+    },
+    "references": [{ "path": "../../source/tsconfig.sources.json" }],
+    "include": ["./**/*.ts"]
+}
