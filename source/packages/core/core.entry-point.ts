@@ -18,10 +18,12 @@ import {
     createPrLogEngineWithDependencies,
     type ChangelogBaseRef as ChangelogBaseRefValue,
     type CollectMergedPullRequestsOptions as CollectMergedPullRequestsOptionsValue,
+    type ChangelogEntryInput as ChangelogEntryInputValue,
     type ExtractChangelogReleaseSectionInput as ExtractChangelogReleaseSectionInputValue,
     type ExtractChangelogReleaseSectionResult as ExtractChangelogReleaseSectionResultValue,
     type FilterPullRequestsByTargetFilesInput as FilterPullRequestsByTargetFilesInputValue,
     type PackageChangelogBaseRefInput as PackageChangelogBaseRefInputValue,
+    type LinklessChangelogEntry as LinklessChangelogEntryValue,
     type PrLogEngine as PrLogEngineValue,
     type PullRequest as PullRequestValue,
     type PullRequestWithLabel as PullRequestWithLabelValue,
@@ -73,6 +75,7 @@ export const defaultValidLabels: ReadonlyMap<string, string> = new Map(defaultVa
 export const defaultPrLogConfig: PrLogConfigValue = defaultPrLogConfigValue;
 
 export type ChangelogBaseRef = ChangelogBaseRefValue;
+export type ChangelogEntryInput = ChangelogEntryInputValue;
 export type CollapseRule = CollapseRuleValue;
 export type CollectMergedPullRequestsOptions = CollectMergedPullRequestsOptionsValue;
 export type ExtractChangelogReleaseSectionInput = ExtractChangelogReleaseSectionInputValue;
@@ -81,6 +84,7 @@ export type FilterPullRequestsByTargetFilesInput = FilterPullRequestsByTargetFil
 export type MissingChangelogBaseRefError = MissingChangelogBaseRefErrorValue;
 export type MissingChangelogBaseRefReason = MissingChangelogBaseRefReasonValue;
 export type PackageChangelogBaseRefInput = PackageChangelogBaseRefInputValue;
+export type LinklessChangelogEntry = LinklessChangelogEntryValue;
 export type PrLogEngine = PrLogEngineValue;
 export type PrLogConfig = PrLogConfigValue;
 export type PullRequest = PullRequestValue;

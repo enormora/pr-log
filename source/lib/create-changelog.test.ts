@@ -272,6 +272,44 @@ test('collapses repeated pull requests when a matching collapse rule is configur
     assert.ok(changelog.includes(expectedChangelog));
 });
 
+test('collapses linkless changelog entries without rendering pull request links', function () {
+    const validLabels = new Map([ [ 'upgrade', 'Dependency Upgrades' ] ]);
+    const createChangelog = createChangelogWithConfig({
+        ...createPrLogConfigFromPackageInfo(createUpgradeCollapseRulePackageInfo()),
+        validLabels,
+        versionBumps: { major: [], minor: [], patch: [ 'upgrade' ] }
+    });
+    const mergedPullRequests = [
+        {
+            id: undefined,
+            title: 'Update foo from 2 to 3',
+            label: 'upgrade'
+        },
+        {
+            id: undefined,
+            title: 'Update foo from 1 to 2',
+            label: 'upgrade'
+        }
+    ] as const;
+
+    const expectedChangelog = [
+        '### Dependency Upgrades',
+        '',
+        '* Update foo from 1 to 3',
+        ''
+    ]
+        .join('\n');
+
+    const options = changelogOptionsFactory.build({
+        mergedPullRequests,
+        githubRepo: 'any/repo'
+    });
+    const changelog = createChangelog(options);
+
+    assert.ok(changelog.includes(expectedChangelog));
+    assert.ok(!changelog.includes('pull/undefined'));
+});
+
 test('does not collapse pull requests when the configured version chain is incomplete', function () {
     const validLabels = new Map([ [ 'upgrade', 'Dependency Upgrades' ] ]);
     const createChangelog = createChangelogWithConfig({

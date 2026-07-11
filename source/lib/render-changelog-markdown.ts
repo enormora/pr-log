@@ -5,10 +5,18 @@ import type { PrLogConfig } from './pr-log-config.ts';
 import type { PullRequestWithLabel } from './resolve-pull-request-labels.ts';
 import { createVersionNumber } from './version-number.ts';
 
+export type LinklessChangelogEntry = {
+    readonly id: undefined;
+    readonly title: string;
+    readonly label: string;
+};
+
+export type ChangelogEntryInput = LinklessChangelogEntry | PullRequestWithLabel;
+
 type RenderChangelogMarkdownInputBase = {
     readonly config: PrLogConfig;
     readonly currentDate: Readonly<Date>;
-    readonly mergedPullRequests: readonly PullRequestWithLabel[];
+    readonly mergedPullRequests: readonly ChangelogEntryInput[];
     readonly githubRepo: string;
 };
 
@@ -28,7 +36,7 @@ export type RenderChangelogMarkdownInput =
 
 type TargetChangelogSectionBase = {
     readonly targetName: string;
-    readonly mergedPullRequests: readonly PullRequestWithLabel[];
+    readonly mergedPullRequests: readonly ChangelogEntryInput[];
 };
 
 type ReleasedTargetChangelogSection = TargetChangelogSectionBase & {

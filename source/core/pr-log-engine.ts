@@ -31,8 +31,10 @@ import {
     renderChangelogMarkdown,
     renderTargetChangelogMarkdown,
     extractChangelogReleaseSection as extractChangelogReleaseSectionValue,
+    type ChangelogEntryInput as ChangelogEntryInputValue,
     type ExtractChangelogReleaseSectionInput as ExtractChangelogReleaseSectionInputValue,
     type ExtractChangelogReleaseSectionResult as ExtractChangelogReleaseSectionResultValue,
+    type LinklessChangelogEntry as LinklessChangelogEntryValue,
     type RenderChangelogMarkdownInput as RenderChangelogMarkdownInputValue,
     type RenderGroupedTargetChangelogMarkdownInput as RenderGroupedTargetChangelogMarkdownInputValue,
     type RenderTargetChangelogMarkdownInput as RenderTargetChangelogMarkdownInputValue,
@@ -267,6 +269,8 @@ export type ChangelogBaseRef = ChangelogBaseRefValue;
 export type ExtractChangelogReleaseSectionInput = ExtractChangelogReleaseSectionInputValue;
 export type ExtractChangelogReleaseSectionResult = ExtractChangelogReleaseSectionResultValue;
 export type FilterPullRequestsByTargetFilesInput = FilterPullRequestsByTargetFilesInputValue;
+export type ChangelogEntryInput = ChangelogEntryInputValue;
+export type LinklessChangelogEntry = LinklessChangelogEntryValue;
 export type PackageChangelogBaseRefInput = PackageChangelogBaseRefInputValue;
 export type PullRequest = PullRequestValue;
 export type PullRequestWithLabel = PullRequestWithLabelValue;
