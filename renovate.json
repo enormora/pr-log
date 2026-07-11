@@ -7,7 +7,7 @@
     "automergeType": "pr",
     "dependencyDashboard": false,
     "constraints": {
-        "npm": "12.0.1"
+        "npm": "10.9.8"
     },
     "lockFileMaintenance": {
         "enabled": true
@@ -16,6 +16,11 @@
         {
             "matchPackagePatterns": ["^@enormora/eslint-config", "^eslint$"],
             "groupName": "eslint"
+        },
+        {
+            "matchDatasources": ["npm"],
+            "matchPackageNames": ["npm"],
+            "allowedVersions": "<11.0.0"
         }
     ]
 }
