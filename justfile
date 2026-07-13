@@ -42,5 +42,12 @@ publish-dry-run: prepare-packtory-source
 test-unit:
     mocha --config mocha.config.json
 
-test:
+test-unit-with-coverage:
     c8 just test-unit
+
+test-integration:
+    mocha --config integration-tests/github-api/mocha.config.json
+
+test:
+    just test-unit-with-coverage
+    just test-integration
