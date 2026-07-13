@@ -1,3 +1,19 @@
+## 0.0.4 (July 13, 2026)
+
+### Features
+
+* Add configurable GitHub API base URL ([#645](https://github.com/enormora/pr-log/pull/645))
+* Support changelog entries without PR links ([#646](https://github.com/enormora/pr-log/pull/646))
+* Add `extractChangelogReleaseSection` to `@pr-log/core` ([#637](https://github.com/enormora/pr-log/pull/637))
+
+### Enhancements
+
+* Expose pull request changed file metadata ([#647](https://github.com/enormora/pr-log/pull/647))
+
+### Code Refactoring
+
+* Move package READMEs into `source/packages` ([#634](https://github.com/enormora/pr-log/pull/634))
+
 ## 0.0.3 (July 7, 2026)
 
 ### Enhancements

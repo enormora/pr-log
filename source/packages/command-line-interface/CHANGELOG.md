@@ -1,3 +1,9 @@
+## 6.4.1 (July 13, 2026)
+
+### Dependency Upgrades
+
+* Update @pr-log/core to 0.0.4
+
 ## 6.4.0 (July 7, 2026)
 
 ### Features
