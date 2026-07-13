@@ -51,11 +51,14 @@ jobs:
                   GH_TOKEN: ${{ github.token }}
               run: npx just publish-dry-run
             - name: Coveralls
+              if: matrix.node-version == 24
+              continue-on-error: true
+              timeout-minutes: 2
               uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2.3.7
               with:
                   github-token: ${{ secrets.GITHUB_TOKEN }}
                   path-to-lcov: ./target/coverage/lcov.info
-                  parallel: true
+                  fail-on-error: false
 
     workflow-security:
         runs-on: ubuntu-latest
@@ -169,16 +172,3 @@ jobs:
               env:
                   GH_TOKEN: ${{ github.token }}
               run: npx just prepare-release
-
-    coverage:
-        needs: build
-        runs-on: ubuntu-latest
-        name: Coveralls Finished
-        permissions:
-            contents: read # required by coverallsapp/github-action
-        steps:
-            - name: Coveralls Finished
-              uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2.3.7
-              with:
-                  github-token: ${{ secrets.GITHUB_TOKEN }}
-                  parallel-finished: true
