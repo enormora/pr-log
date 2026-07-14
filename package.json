@@ -31,7 +31,7 @@
         "@enormora/eslint-config-mocha-node-assert": "0.0.5",
         "@enormora/eslint-config-node": "0.0.37",
         "@enormora/eslint-config-typescript": "0.0.58",
-        "@packtory/cli": "0.0.66",
+        "@packtory/cli": "0.0.67",
         "@types/common-tags": "1.8.4",
         "@types/mocha": "10.0.10",
         "@types/node": "24.13.3",
