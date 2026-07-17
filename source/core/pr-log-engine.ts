@@ -117,6 +117,8 @@ type PullRequestTitleResponse = {
     };
 };
 
+const repositoryPathPartLimit = 2;
+
 export type PrLogEngineDependencies = {
     readonly gitCommandRunner: GitCommandRunner;
     readonly githubClient: GitHubPullRequestLabelClient & PullRequestTitleGitHubClient;
@@ -128,7 +130,7 @@ export type PrLogEngineDependencies = {
 };
 
 function determineRepoDetails(githubRepo: string): Readonly<[owner: string, repo: string]> {
-    const [ owner, repo ] = githubRepo.split('/');
+    const [ owner, repo ] = githubRepo.split('/', repositoryPathPartLimit);
 
     if (owner === undefined || repo === undefined) {
         throw new TypeError('Could not find a repository');

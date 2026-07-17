@@ -161,7 +161,7 @@ async function waitForRateLimitResetIfRetryable(
     }
 
     const delayMilliseconds = determineRateLimitDelayMilliseconds(githubClientError, getCurrentDate());
-    if (retryCount >= maximumRateLimitRetryCount || delayMilliseconds === undefined) {
+    if (delayMilliseconds === undefined || retryCount >= maximumRateLimitRetryCount) {
         return false;
     }
 
