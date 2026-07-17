@@ -31,8 +31,10 @@ export type GetMergedPullRequests = (
 
 type PullRequestData = Readonly<Awaited<ReturnType<Octokit['pulls']['get']>>['data']>;
 
+const repositoryPathPartLimit = 2;
+
 function determineRepoDetails(githubRepo: string): Readonly<[owner: string, repo: string]> {
-    const [ owner, repo ] = githubRepo.split('/');
+    const [ owner, repo ] = githubRepo.split('/', repositoryPathPartLimit);
 
     if (owner === undefined || repo === undefined) {
         throw new TypeError('Could not find a repository');
