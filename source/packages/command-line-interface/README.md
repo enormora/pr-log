@@ -49,6 +49,11 @@ To use `pr-log` your GitHub project needs some small configuration:
 - Set the correct label on your pull requests. You need to set exactly one label. Multiple labels or one that is not recognized will throw an error.
 - Use correct semver versioning for your tags, for example `2.4.7`.
 
+`pr-log` collects pull requests from the first-parent Git history.
+It supports standard GitHub merge commits and single-parent commits whose subject ends with `(#123)`.
+For those suffix commits, `pr-log` verifies that GitHub reports the pull request as merged and that its `merge_commit_sha` matches the commit hash.
+Two-parent commits with custom `Title (#123)` messages are ignored.
+
 ### Project
 
 As `pr-log` reads repository information from your project you have to add the `repository` information in your `package.json`.

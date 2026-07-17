@@ -63,7 +63,14 @@ function createGitCommandRunner(overrides: Partial<GitCommandRunner> = {}): GitC
             return [];
         },
         async getFirstParentCommitLogs() {
-            return [ { hash: 'hash-1', subject: 'Merge pull request #1 from branch', body: 'Fix bug' } ];
+            return [
+                {
+                    hash: 'hash-1',
+                    parents: [ 'parent-1', 'parent-2' ],
+                    subject: 'Merge pull request #1 from branch',
+                    body: 'Fix bug'
+                }
+            ];
         },
         ...overrides
     };
@@ -74,7 +81,14 @@ function createDefaultEngineOverrides(): Required<EngineOverrides> {
         gitCommandRunner: createGitCommandRunner(),
         githubClient: {
             pulls: {
-                get: fake.resolves({ data: { title: 'GitHub title' } })
+                get: fake.resolves({
+                    data: {
+                        title: 'GitHub title',
+                        merged: true,
+                        merge_commit_sha: 'hash-1',
+                        labels: [ { name: 'bug' } ]
+                    }
+                })
             },
             issues: {
                 listLabelsOnIssue: fake.resolves({ data: [] })
@@ -144,7 +158,14 @@ test('collects merged pull requests', async function () {
 });
 
 test('reads fallback pull request titles from github', async function () {
-    const getPullRequest = fake.resolves({ data: { title: 'GitHub title' } });
+    const getPullRequest = fake.resolves({
+        data: {
+            title: 'GitHub title',
+            merged: true,
+            merge_commit_sha: 'hash-1',
+            labels: [ { name: 'bug' } ]
+        }
+    });
     const githubClient: PrLogEngineDependencies['githubClient'] = {
         pulls: {
             get: getPullRequest
@@ -157,7 +178,12 @@ test('reads fallback pull request titles from github', async function () {
         githubClient,
         gitCommandRunner: createGitCommandRunner({
             getFirstParentCommitLogs: fake.resolves([
-                { hash: 'hash-1', subject: 'Merge pull request #1 from branch', body: undefined }
+                {
+                    hash: 'hash-1',
+                    parents: [ 'parent-1', 'parent-2' ],
+                    subject: 'Merge pull request #1 from branch',
+                    body: undefined
+                }
             ])
         })
     });
@@ -170,11 +196,41 @@ test('reads fallback pull request titles from github', async function () {
     ]);
 });
 
+test('reuses verified pull request data when reading labels', async function () {
+    const getPullRequestLabels = fake.resolves([ 'bug' ]);
+    const engine = createEngine({
+        getPullRequestLabels,
+        gitCommandRunner: createGitCommandRunner({
+            getFirstParentCommitLogs: fake.resolves([
+                {
+                    hash: 'hash-1',
+                    parents: [ 'parent-1' ],
+                    subject: 'Open the starlit gate (#731)',
+                    body: undefined
+                }
+            ])
+        })
+    });
+
+    const pullRequests = await engine.collectMergedPullRequests({ githubRepo, baseRef: '1.0.0' });
+
+    assert.deepStrictEqual(
+        await engine.readPullRequestLabels({ githubRepo, pullRequests }),
+        new Map([ [ 731, [ 'bug' ] ] ])
+    );
+    assert.strictEqual(getPullRequestLabels.callCount, 0);
+});
+
 test('rejects fallback pull request titles without repo details', async function () {
     const engine = createEngine({
         gitCommandRunner: createGitCommandRunner({
             getFirstParentCommitLogs: fake.resolves([
-                { hash: 'hash-1', subject: 'Merge pull request #1 from branch', body: undefined }
+                {
+                    hash: 'hash-1',
+                    parents: [ 'parent-1', 'parent-2' ],
+                    subject: 'Merge pull request #1 from branch',
+                    body: undefined
+                }
             ])
         })
     });

@@ -1,4 +1,170 @@
-import { isUndefined } from '@sindresorhus/is';
+import { isError, isFiniteNumber, isUndefined } from '@sindresorhus/is';
+import { splitByString } from './split.ts';
+
+type PullRequestDataRequest = {
+    readonly owner: string;
+    readonly repo: string;
+    readonly pull_number: number;
+};
+
+type GitHubLabel = {
+    readonly name: string;
+};
+
+type GitHubPullRequestData = {
+    readonly title: string;
+    readonly merged: boolean;
+    readonly merge_commit_sha: string | null;
+    readonly labels: readonly GitHubLabel[];
+};
+
+type PullRequestDataResponse = {
+    readonly data: GitHubPullRequestData;
+};
+
+export type PullRequestDataGitHubClient = {
+    readonly pulls: {
+        readonly get: (request: PullRequestDataRequest) => Promise<PullRequestDataResponse>;
+    };
+};
+
+export type PullRequestData = {
+    readonly title: string;
+    readonly merged: boolean;
+    readonly mergeCommitSha: string | null;
+    readonly labels: readonly string[];
+};
+
+export type PullRequestDataReader = {
+    readonly readPullRequestData: (
+        githubRepo: string,
+        pullRequestId: number
+    ) => Promise<PullRequestData | undefined>;
+    readonly readCachedPullRequestLabels: (
+        githubRepo: string,
+        pullRequestId: number
+    ) => readonly string[] | undefined;
+};
+
+type GitHubClientError = {
+    readonly status: number | undefined;
+};
+
+type ErrorStatusCarrier = Readonly<Record<'status', unknown>>;
+
+const notFoundStatusCode = 404;
+
+function determineRepoDetails(githubRepo: string): Readonly<[owner: string, repo: string]> {
+    const [ owner, repo ] = splitByString(githubRepo, '/');
+
+    if (repo === undefined) {
+        throw new TypeError('Could not find a repository');
+    }
+
+    return [ owner, repo ];
+}
+
+function createCacheKey(githubRepo: string, pullRequestId: number): string {
+    return `${githubRepo}#${pullRequestId}`;
+}
+
+function hasErrorStatus(error: unknown): error is ErrorStatusCarrier {
+    return isError(error) && Object.hasOwn(error, 'status');
+}
+
+function getGitHubClientError(error: unknown): GitHubClientError | undefined {
+    if (!isError(error)) {
+        return undefined;
+    }
+
+    const status = hasErrorStatus(error) ? error.status : undefined;
+    return { status: isFiniteNumber(status) ? status : undefined };
+}
+
+function createPullRequestData(data: GitHubPullRequestData): PullRequestData {
+    return {
+        title: data.title,
+        merged: data.merged,
+        mergeCommitSha: data.merge_commit_sha,
+        labels: data.labels.map(function (label) {
+            return label.name;
+        })
+    };
+}
+
+async function fetchPullRequestData(
+    githubClient: PullRequestDataGitHubClient,
+    githubRepo: string,
+    pullRequestId: number
+): Promise<PullRequestData | undefined> {
+    const [ owner, repo ] = determineRepoDetails(githubRepo);
+
+    try {
+        const { data } = await githubClient.pulls.get({
+            owner,
+            repo,
+            pull_number: pullRequestId
+        });
+        return createPullRequestData(data);
+    } catch (error) {
+        const githubClientError = getGitHubClientError(error);
+        if (githubClientError?.status === notFoundStatusCode) {
+            return undefined;
+        }
+
+        throw error;
+    }
+}
+
+export function createPullRequestDataReader(
+    githubClient: PullRequestDataGitHubClient
+): PullRequestDataReader {
+    const resolvedPullRequestData = new Map<string, PullRequestData | undefined>();
+    const pendingPullRequestData = new Map<string, Promise<PullRequestData | undefined>>();
+
+    async function readUncachedPullRequestData(
+        cacheKey: string,
+        githubRepo: string,
+        pullRequestId: number
+    ): Promise<PullRequestData | undefined> {
+        try {
+            const pullRequestData = await fetchPullRequestData(githubClient, githubRepo, pullRequestId);
+            resolvedPullRequestData.set(cacheKey, pullRequestData);
+            return pullRequestData;
+        } finally {
+            pendingPullRequestData.delete(cacheKey);
+        }
+    }
+
+    async function readPullRequestData(
+        githubRepo: string,
+        pullRequestId: number
+    ): Promise<PullRequestData | undefined> {
+        const cacheKey = createCacheKey(githubRepo, pullRequestId);
+        if (resolvedPullRequestData.has(cacheKey)) {
+            return resolvedPullRequestData.get(cacheKey);
+        }
+
+        const pendingData = pendingPullRequestData.get(cacheKey);
+        if (pendingData !== undefined) {
+            return pendingData;
+        }
+
+        const data = readUncachedPullRequestData(cacheKey, githubRepo, pullRequestId);
+        pendingPullRequestData.set(cacheKey, data);
+
+        return data;
+    }
+
+    function readCachedPullRequestLabels(
+        githubRepo: string,
+        pullRequestId: number
+    ): readonly string[] | undefined {
+        return resolvedPullRequestData.get(createCacheKey(githubRepo, pullRequestId))?.labels;
+    }
+
+    return { readPullRequestData, readCachedPullRequestLabels };
+}
 
 export type PullRequest = {
     readonly id: number;
@@ -7,6 +173,7 @@ export type PullRequest = {
 
 export type FirstParentCommitLogEntry = {
     readonly hash: string;
+    readonly parents: readonly string[];
     readonly subject: string;
     readonly body: string | undefined;
 };
@@ -15,15 +182,11 @@ export type GitRangeReader = {
     getFirstParentCommitLogs: (baseRef: string) => Promise<readonly FirstParentCommitLogEntry[]>;
 };
 
-export type PullRequestTitleReader = {
-    getTitle: (githubRepo: string, pullRequestId: number) => Promise<string>;
-};
-
 export type CollectMergedPullRequestsInput = {
     readonly githubRepo: string;
     readonly baseRef: string;
     readonly git: GitRangeReader;
-    readonly pullRequestTitleReader: PullRequestTitleReader;
+    readonly pullRequestDataReader: PullRequestDataReader;
 };
 
 type MergedPullRequestCommit = {
@@ -37,7 +200,22 @@ type RevertedPullRequestCommit = {
     readonly id: number;
 };
 
-type PullRequestCommit = MergedPullRequestCommit | RevertedPullRequestCommit;
+type PullRequestSubjectCommit = {
+    readonly type: 'pull-request-subject';
+    readonly id: number;
+    readonly title: string;
+    readonly hash: string;
+    readonly parentCount: number;
+};
+
+type PullRequestSubjectMatch = {
+    readonly pullRequestIdentifier: string;
+    readonly title: string;
+};
+
+type PullRequestCommit = MergedPullRequestCommit | PullRequestSubjectCommit | RevertedPullRequestCommit;
+
+const singleParentCommitParentCount = 1;
 
 function parsePullRequestId(value: string): number {
     return Number.parseInt(value, 10);
@@ -71,6 +249,36 @@ function extractRevertedPullRequestId(subject: string): number | undefined {
     }
 
     return parsePullRequestId(pullRequestIdentifier);
+}
+
+function getPullRequestSubjectMatch(subject: string): PullRequestSubjectMatch | undefined {
+    const groups = /^(?<title>.+) \(#(?<pullRequestIdentifier>\d+)\)$/u.exec(subject)?.groups;
+    const pullRequestIdentifier = groups?.pullRequestIdentifier;
+    const title = groups?.title;
+
+    if (isUndefined(pullRequestIdentifier) || isUndefined(title)) {
+        return undefined;
+    }
+
+    return { pullRequestIdentifier, title };
+}
+
+function extractPullRequestSubjectCommit(
+    firstParentCommitLog: FirstParentCommitLogEntry
+): PullRequestSubjectCommit | undefined {
+    const match = getPullRequestSubjectMatch(firstParentCommitLog.subject);
+
+    if (match === undefined) {
+        return undefined;
+    }
+
+    return {
+        type: 'pull-request-subject',
+        id: parsePullRequestId(match.pullRequestIdentifier),
+        title: match.title,
+        hash: firstParentCommitLog.hash,
+        parentCount: firstParentCommitLog.parents.length
+    };
 }
 
 function extractRevertedCommitHash(commitBody: string | undefined): string | undefined {
@@ -119,11 +327,49 @@ function createPullRequestCommit(firstParentCommitLog: FirstParentCommitLogEntry
         return { type: 'revert', id: revertedPullRequestId };
     }
 
-    return undefined;
+    return extractPullRequestSubjectCommit(firstParentCommitLog);
+}
+
+async function readPullRequestTitle(
+    input: Pick<CollectMergedPullRequestsInput, 'githubRepo' | 'pullRequestDataReader'>,
+    pullRequestId: number
+): Promise<string> {
+    const pullRequestData = await input.pullRequestDataReader.readPullRequestData(input.githubRepo, pullRequestId);
+    if (pullRequestData === undefined) {
+        throw new TypeError(`Pull Request #${pullRequestId} was not found`);
+    }
+
+    return pullRequestData.title;
+}
+
+async function createPullRequestFromSubjectCommit(
+    input: Pick<
+        CollectMergedPullRequestsInput,
+        'githubRepo' | 'pullRequestDataReader'
+    >,
+    pullRequestCommit: PullRequestSubjectCommit
+): Promise<PullRequest | undefined> {
+    if (pullRequestCommit.parentCount !== singleParentCommitParentCount) {
+        return undefined;
+    }
+
+    const pullRequestData = await input.pullRequestDataReader.readPullRequestData(
+        input.githubRepo,
+        pullRequestCommit.id
+    );
+    if (pullRequestData === undefined) {
+        return undefined;
+    }
+
+    if (!pullRequestData.merged || pullRequestData.mergeCommitSha !== pullRequestCommit.hash) {
+        return undefined;
+    }
+
+    return { id: pullRequestCommit.id, title: pullRequestCommit.title };
 }
 
 async function createPullRequest(
-    input: Pick<CollectMergedPullRequestsInput, 'githubRepo' | 'pullRequestTitleReader'>,
+    input: Pick<CollectMergedPullRequestsInput, 'githubRepo' | 'pullRequestDataReader'>,
     firstParentCommitLog: FirstParentCommitLogEntry
 ): Promise<PullRequest | undefined> {
     const pullRequestCommit = createPullRequestCommit(firstParentCommitLog);
@@ -133,12 +379,16 @@ async function createPullRequest(
     }
 
     if (pullRequestCommit.type === 'revert') {
-        const title = await input.pullRequestTitleReader.getTitle(input.githubRepo, pullRequestCommit.id);
+        const title = await readPullRequestTitle(input, pullRequestCommit.id);
         return { id: pullRequestCommit.id, title: `Revert "${title}"` };
     }
 
+    if (pullRequestCommit.type === 'pull-request-subject') {
+        return createPullRequestFromSubjectCommit(input, pullRequestCommit);
+    }
+
     const title = pullRequestCommit.title ??
-        await input.pullRequestTitleReader.getTitle(input.githubRepo, pullRequestCommit.id);
+        await readPullRequestTitle(input, pullRequestCommit.id);
 
     return { id: pullRequestCommit.id, title };
 }
