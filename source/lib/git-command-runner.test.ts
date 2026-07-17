@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import { fake, type SinonSpy } from 'sinon';
 import {
+    createCommandStringExecutor,
     createGitCommandRunner,
     type GitCommandRunner,
     type GitCommandRunnerDependencies
@@ -28,6 +29,36 @@ function assertExecutedCommand(execute: SinonSpy, command: string): void {
         calls: [ [ command ] ]
     });
 }
+
+function assertSpyCalls(sinonSpy: SinonSpy, calls: readonly (readonly unknown[])[]): void {
+    assert.deepStrictEqual({
+        callCount: sinonSpy.callCount,
+        calls: sinonSpy.getCalls().map(function (call): readonly unknown[] {
+            return call.args as readonly unknown[];
+        })
+    }, {
+        callCount: calls.length,
+        calls
+    });
+}
+
+test('command string executor executes a parsed command string in the configured working directory', async function () {
+    const executeFile = fake.resolves({ stdout: 'result' });
+    const execute = createCommandStringExecutor({ executeFile, workingDirectory: '/repo' });
+
+    const result = await execute('git log foo\\ bar');
+
+    assert.strictEqual(result.stdout, 'result');
+    assertSpyCalls(executeFile, [ [ 'git', [ 'log', 'foo bar' ], { cwd: '/repo' } ] ]);
+});
+
+test('command string executor throws when the command string is empty', async function () {
+    const executeFile = fake.resolves({ stdout: 'result' });
+    const execute = createCommandStringExecutor({ executeFile, workingDirectory: '/repo' });
+
+    await assert.rejects(execute(''), { message: 'Cannot execute an empty command' });
+    assertSpyCalls(executeFile, []);
+});
 
 test('getShortStatus() executes "git status" with correct options', async function () {
     const execute = fake.resolves({ stdout: '' });
