@@ -114,6 +114,16 @@ export async function buildConfig() {
         registrySettings: registrySettings(),
         changelog: {
             packageTagFormat: '{packageName}@{version}',
+            prLog: {
+                ignoredLabels: [ 'release' ],
+                collapseRules: [
+                    {
+                        label: 'upgrade',
+                        pattern: '^⬆️ Update dependency (?<dependency>.+?) from (?<from>.+?) to (?<to>.+?)$',
+                        replace: '⬆️ Update dependency $<dependency> from $<from> to $<to>'
+                    }
+                ]
+            },
             outputs: [
                 {
                     kind: 'package-file',
