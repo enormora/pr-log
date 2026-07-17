@@ -1,7 +1,13 @@
 {
-    "extends": ["config:base", "helpers:pinGitHubActionDigests"],
+    "extends": [
+        "config:base",
+        "helpers:pinGitHubActionDigests"
+    ],
     "commitMessagePrefix": "⬆️ ",
-    "labels": ["renovate", "upgrade"],
+    "labels": [
+        "renovate",
+        "upgrade"
+    ],
     "rebaseStalePrs": true,
     "automerge": true,
     "automergeType": "pr",
@@ -14,13 +20,22 @@
     },
     "packageRules": [
         {
-            "matchPackagePatterns": ["^@enormora/eslint-config", "^eslint$"],
+            "matchPackagePatterns": [
+                "^@enormora/eslint-config",
+                "^eslint$"
+            ],
             "groupName": "eslint"
         },
         {
-            "matchDatasources": ["npm"],
-            "matchPackageNames": ["npm"],
+            "matchDatasources": [
+                "npm"
+            ],
+            "matchPackageNames": [
+                "npm"
+            ],
             "allowedVersions": "<11.0.0"
         }
-    ]
+    ],
+    "platformAutomerge": true,
+    "automergeStrategy": "merge-commit"
 }
