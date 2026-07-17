@@ -1,13 +1,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Octokit } from '@octokit/rest';
+import { execa } from 'execa';
 import prependFile from 'prepend-file';
 import loglevel from 'loglevel';
 import { createCliRunner, type CliRunnerDependencies } from '../../lib/cli.ts';
-import { createCommandStringExecutor } from '../../lib/command-string-executor.ts';
 import { ensureCleanLocalGitStateFactory } from '../../lib/ensure-clean-local-git-state.ts';
 import { findRemoteAliasFactory } from '../../lib/find-remote-alias.ts';
-import { createGitCommandRunner } from '../../lib/git-command-runner.ts';
+import { createCommandStringExecutor, createGitCommandRunner } from '../../lib/git-command-runner.ts';
 import { createLocalGitState } from '../../lib/local-git-state.ts';
 import {
     createChangelogMarkdownRenderer,
@@ -45,7 +45,7 @@ const labelLookupIntervalMilliseconds = 250;
 const maximumRateLimitRetryCount = 3;
 
 const changelogPath = path.join(process.cwd(), 'CHANGELOG.md');
-const executeCommandString = createCommandStringExecutor({ workingDirectory: process.cwd() });
+const executeCommandString = createCommandStringExecutor({ executeFile: execa, workingDirectory: process.cwd() });
 const gitCommandRunner = createGitCommandRunner({ execute: executeCommandString });
 const localGitState = createLocalGitState({ gitCommandRunner });
 const remoteAliasReader = createRemoteAliasReader({ gitCommandRunner });

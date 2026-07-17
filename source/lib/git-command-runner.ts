@@ -1,4 +1,5 @@
 import { oneLine } from 'common-tags';
+import { parseCommandString } from 'execa';
 import { splitByString, splitByPattern } from './split.ts';
 
 export type RemoteAlias = {
@@ -32,7 +33,7 @@ export type GitCommandRunner = {
     getFirstParentCommitLogs: (from: string) => Promise<readonly FirstParentCommitLogEntry[]>;
 };
 
-type GitCommandResult = {
+export type GitCommandResult = {
     readonly stdout: string;
 };
 
@@ -41,6 +42,21 @@ export type GitCommandExecutor = (command: string) => Promise<GitCommandResult>;
 export type GitCommandRunnerDependencies = {
     readonly execute: GitCommandExecutor;
 };
+
+type CommandStringExecutorParameters = {
+    readonly executeFile: CommandStringFileExecutor;
+    readonly workingDirectory: string;
+};
+
+type CommandStringFileExecutorOptions = {
+    readonly cwd: string;
+};
+
+type CommandStringFileExecutor = (
+    file: string,
+    commandArguments: readonly string[],
+    options: CommandStringFileExecutorOptions
+) => Promise<GitCommandResult>;
 
 function trim(value: string): string {
     return value.trim();
@@ -173,6 +189,18 @@ async function readFirstParentCommitLogs(
         const [ hash, subject, body ] = parseFirstParentCommitLogFields(log);
         return { hash, subject, body: body === '' ? undefined : body };
     });
+}
+
+export function createCommandStringExecutor(parameters: CommandStringExecutorParameters): GitCommandExecutor {
+    return async function executeCommandString(command) {
+        const [ file, ...commandArguments ] = parseCommandString(command);
+
+        if (file === undefined) {
+            throw new TypeError('Cannot execute an empty command');
+        }
+
+        return parameters.executeFile(file, commandArguments, { cwd: parameters.workingDirectory });
+    };
 }
 
 export function createGitCommandRunner(dependencies: GitCommandRunnerDependencies): GitCommandRunner {
