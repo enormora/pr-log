@@ -42,7 +42,7 @@
         "eslint": "10.7.0",
         "fishery": "2.4.0",
         "mocha": "11.7.6",
-        "rust-just": "1.56.0",
+        "rust-just": "1.57.0",
         "sinon": "22.0.0",
         "typescript": "6.0.3"
     },
