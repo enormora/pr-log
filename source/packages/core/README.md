@@ -26,6 +26,11 @@ Set `githubApiBaseUrl` only when GitHub API requests must be routed to a compati
 `@pr-log/core` owns Git/GitHub range resolution, pull request collection, label resolution, changed-file lookup, changelog rendering, release-section extraction, and changelog Markdown merging.
 Target impact and release planning stay outside pr-log. Consumers pass target source files into pr-log when they need target-specific changelogs.
 
+Pull request collection reads first-parent Git history.
+It supports standard GitHub merge commits and single-parent commits whose subject ends with `(#123)`.
+For those suffix commits, pr-log verifies that GitHub reports the pull request as merged and that its `merge_commit_sha` matches the commit hash.
+Two-parent commits with custom `Title (#123)` messages are ignored.
+
 A target-aware integration usually follows this flow:
 
 1. Compute release targets and their source files.

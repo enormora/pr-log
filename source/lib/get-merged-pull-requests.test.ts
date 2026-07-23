@@ -55,7 +55,14 @@ function createDefaultFactoryDependencies(): FactoryDependencies {
         getPullRequestLabels: fake.resolves([ 'bug' ]),
         githubClient: {
             pulls: {
-                get: fake.resolves({ data: { title: 'pull-request-title' } })
+                get: fake.resolves({
+                    data: {
+                        title: 'pull-request-title',
+                        merged: true,
+                        merge_commit_sha: 'hash-1',
+                        labels: [ { name: 'bug' } ]
+                    }
+                })
             }
         } as unknown as Octokit,
         waitForMilliseconds: fake.resolves(undefined)
@@ -168,6 +175,7 @@ test('throws when the pull request cannot be extracted from the commit message',
     const getFirstParentCommitLogs = fake.resolves([
         {
             hash: 'hash-1',
+            parents: [ 'parent-1', 'parent-2' ],
             subject: 'Merge pull request foo from branch',
             body: 'pr-1 message'
         }
@@ -180,20 +188,30 @@ test('throws when the pull request cannot be extracted from the commit message',
 });
 
 test('falls back to the GitHub API when the commit log does not have a body', async function () {
-    const get = fake.resolves({ data: { title: 'pull request title from github' } });
+    const get = fake.resolves({
+        data: {
+            title: 'pull request title from github',
+            merged: true,
+            merge_commit_sha: 'hash-1',
+            labels: [ { name: 'bug' } ]
+        }
+    });
     const githubClient = { pulls: { get } } as unknown as Octokit;
+    const getPullRequestLabels = fake.resolves([ 'documentation' ]);
     const getFirstParentCommitLogs = fake.resolves([
         {
             hash: 'hash-1',
+            parents: [ 'parent-1', 'parent-2' ],
             subject: 'Merge pull request #1 from branch',
             body: undefined
         }
     ]);
-    const getMergedPullRequests = factory({ getFirstParentCommitLogs, githubClient });
+    const getMergedPullRequests = factory({ getFirstParentCommitLogs, getPullRequestLabels, githubClient });
 
     const pullRequests = await getMergedPullRequests(anyRepo, defaultPrLogConfig);
 
     assertSpyCalls(get, [ [ { owner: 'any', repo: 'repo', pull_number: 1 } ] ]);
+    assert.strictEqual(getPullRequestLabels.callCount, 0);
     assert.deepStrictEqual(pullRequests, [ { id: 1, title: 'pull request title from github', label: 'bug' } ]);
 });
 
@@ -206,6 +224,7 @@ test('throws when the title is missing in the commit log and the GitHub API requ
     const getFirstParentCommitLogs = fake.resolves([
         {
             hash: 'hash-1',
+            parents: [ 'parent-1', 'parent-2' ],
             subject: 'Merge pull request #1 from branch',
             body: undefined
         }
@@ -221,6 +240,7 @@ test('throws when the title is missing in the commit log and the repo is invalid
     const getFirstParentCommitLogs = fake.resolves([
         {
             hash: 'hash-1',
+            parents: [ 'parent-1', 'parent-2' ],
             subject: 'Merge pull request #1 from branch',
             body: undefined
         }
@@ -239,10 +259,16 @@ test('extracts id, title and label for merged pull requests', async function () 
     const getFirstParentCommitLogs = fake.resolves([
         {
             hash: 'hash-1',
+            parents: [ 'parent-1', 'parent-2' ],
             subject: 'Merge pull request #1 from branch',
             body: 'pr-1 message'
         },
-        { hash: 'hash-2', subject: 'Merge pull request #2 from other', body: 'pr-2 message' }
+        {
+            hash: 'hash-2',
+            parents: [ 'parent-3', 'parent-4' ],
+            subject: 'Merge pull request #2 from other',
+            body: 'pr-2 message'
+        }
     ]);
     const getMergedPullRequests = factory({ getFirstParentCommitLogs, getPullRequestLabels });
 
@@ -264,10 +290,16 @@ test('looks up pull request labels sequentially', async function () {
     const getFirstParentCommitLogs = fake.resolves([
         {
             hash: 'hash-1',
+            parents: [ 'parent-1', 'parent-2' ],
             subject: 'Merge pull request #1 from branch',
             body: 'pr-1 message'
         },
-        { hash: 'hash-2', subject: 'Merge pull request #2 from other', body: 'pr-2 message' }
+        {
+            hash: 'hash-2',
+            parents: [ 'parent-3', 'parent-4' ],
+            subject: 'Merge pull request #2 from other',
+            body: 'pr-2 message'
+        }
     ]);
     const { getPullRequestLabels, firstLabelLookupStarted, resolveFirstLabelLookup } = createControlledLabelLookup();
     const getMergedPullRequests = factory({ getFirstParentCommitLogs, getPullRequestLabels });
@@ -297,11 +329,22 @@ test('waits between pull request label lookups', async function () {
     const getFirstParentCommitLogs = fake.resolves([
         {
             hash: 'hash-1',
+            parents: [ 'parent-1', 'parent-2' ],
             subject: 'Merge pull request #1 from branch',
             body: 'pr-1 message'
         },
-        { hash: 'hash-2', subject: 'Merge pull request #2 from other', body: 'pr-2 message' },
-        { hash: 'hash-3', subject: 'Merge pull request #3 from third', body: 'pr-3 message' }
+        {
+            hash: 'hash-2',
+            parents: [ 'parent-3', 'parent-4' ],
+            subject: 'Merge pull request #2 from other',
+            body: 'pr-2 message'
+        },
+        {
+            hash: 'hash-3',
+            parents: [ 'parent-5', 'parent-6' ],
+            subject: 'Merge pull request #3 from third',
+            body: 'pr-3 message'
+        }
     ]);
     const waitForMilliseconds = fake.resolves(undefined);
     const labelLookupIntervalMilliseconds = 123;
@@ -320,8 +363,13 @@ test('waits between pull request label lookups', async function () {
 
 test('ignores first-parent commits that are not merge commits', async function () {
     const getFirstParentCommitLogs = fake.resolves([
-        { hash: 'hash-2', subject: 'chore: prepare release', body: 'release housekeeping' },
-        { hash: 'hash-1', subject: 'Merge pull request #1 from branch', body: 'pr-1 message' }
+        { hash: 'hash-2', parents: [ 'parent-1' ], subject: 'chore: prepare release', body: 'release housekeeping' },
+        {
+            hash: 'hash-1',
+            parents: [ 'parent-2', 'parent-3' ],
+            subject: 'Merge pull request #1 from branch',
+            body: 'pr-1 message'
+        }
     ]);
     const getPullRequestLabels = fake.resolves([ 'bug' ]);
     const getMergedPullRequests = factory({ getFirstParentCommitLogs, getPullRequestLabels });
@@ -332,20 +380,80 @@ test('ignores first-parent commits that are not merge commits', async function (
     assert.deepStrictEqual(pullRequests, [ { id: 1, title: 'pr-1 message', label: 'bug' } ]);
 });
 
+test('collects verified single-parent pull request subject commits', async function () {
+    const get = fake.resolves({
+        data: {
+            title: 'Unused GitHub title',
+            merged: true,
+            merge_commit_sha: 'quest-hash',
+            labels: [ { name: 'feature' } ]
+        }
+    });
+    const getPullRequestLabels = fake.resolves([ 'bug' ]);
+    const githubClient = { pulls: { get } } as unknown as Octokit;
+    const getFirstParentCommitLogs = fake.resolves([
+        {
+            hash: 'quest-hash',
+            parents: [ 'parent-1' ],
+            subject: 'Open the starlit gate (#731)',
+            body: undefined
+        }
+    ]);
+    const getMergedPullRequests = factory({ getFirstParentCommitLogs, getPullRequestLabels, githubClient });
+
+    const pullRequests = await getMergedPullRequests(anyRepo, defaultPrLogConfig);
+
+    assert.strictEqual(getPullRequestLabels.callCount, 0);
+    assert.deepStrictEqual(pullRequests, [ { id: 731, title: 'Open the starlit gate', label: 'feature' } ]);
+});
+
+test('ignores two-parent pull request subject commits without reading GitHub data', async function () {
+    const get = fake.resolves({
+        data: {
+            title: 'Unused GitHub title',
+            merged: true,
+            merge_commit_sha: 'quest-hash',
+            labels: [ { name: 'feature' } ]
+        }
+    });
+    const githubClient = { pulls: { get } } as unknown as Octokit;
+    const getFirstParentCommitLogs = fake.resolves([
+        {
+            hash: 'quest-hash',
+            parents: [ 'parent-1', 'parent-2' ],
+            subject: 'Chart the hidden realm (#274)',
+            body: undefined
+        }
+    ]);
+    const getMergedPullRequests = factory({ getFirstParentCommitLogs, githubClient });
+
+    const pullRequests = await getMergedPullRequests(anyRepo, defaultPrLogConfig);
+
+    assert.strictEqual(get.callCount, 0);
+    assert.deepStrictEqual(pullRequests, []);
+});
+
 test('ignores merge commits that were reverted later', async function () {
     const revertedMergeCommitHash = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const getFirstParentCommitLogs = fake.resolves([
         {
             hash: 'cccccccccccccccccccccccccccccccccccccccc',
+            parents: [ 'parent-1' ],
             subject: 'Revert "Merge pull request #1 from branch"',
             body: `This reverts commit ${revertedMergeCommitHash}.`
         },
         {
             hash: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+            parents: [ 'parent-2', 'parent-3' ],
             subject: 'Merge pull request #2 from other',
             body: 'pr-2 message'
         },
-        { hash: revertedMergeCommitHash, subject: 'Merge pull request #1 from branch', body: 'pr-1 message' }
+        {
+            hash: revertedMergeCommitHash,
+            parents: [ 'parent-4', 'parent-5' ],
+            subject: 'Merge pull request #1 from branch',
+            body: 'pr-1 message'
+        }
     ]);
     const getPullRequestLabels = fake.resolves([ 'bug' ]);
     const getMergedPullRequests = factory({ getFirstParentCommitLogs, getPullRequestLabels });
@@ -366,15 +474,22 @@ test('includes a merge commit again when its revert was reverted later', async f
     const getFirstParentCommitLogs = fake.resolves([
         {
             hash: 'cccccccccccccccccccccccccccccccccccccccc',
+            parents: [ 'parent-1' ],
             subject: 'Revert "Revert \\"Merge pull request #1 from branch\\""',
             body: `This reverts commit ${revertCommitHash}.`
         },
         {
             hash: revertCommitHash,
+            parents: [ 'parent-2' ],
             subject: 'Revert "Merge pull request #1 from branch"',
             body: `This reverts commit ${revertedMergeCommitHash}.`
         },
-        { hash: revertedMergeCommitHash, subject: 'Merge pull request #1 from branch', body: 'pr-1 message' }
+        {
+            hash: revertedMergeCommitHash,
+            parents: [ 'parent-3', 'parent-4' ],
+            subject: 'Merge pull request #1 from branch',
+            body: 'pr-1 message'
+        }
     ]);
     const getPullRequestLabels = fake.resolves([ 'bug' ]);
     const getMergedPullRequests = factory({ getFirstParentCommitLogs, getPullRequestLabels });
@@ -386,11 +501,19 @@ test('includes a merge commit again when its revert was reverted later', async f
 });
 
 test('includes a revert commit when the reverted merge was already released', async function () {
-    const get = fake.resolves({ data: { title: 'pr-1 message' } });
+    const get = fake.resolves({
+        data: {
+            title: 'pr-1 message',
+            merged: true,
+            merge_commit_sha: 'hash-1',
+            labels: [ { name: 'bug' } ]
+        }
+    });
     const githubClient = { pulls: { get } } as unknown as Octokit;
     const getFirstParentCommitLogs = fake.resolves([
         {
             hash: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+            parents: [ 'parent-1' ],
             subject: 'Revert "Merge pull request #1 from branch"',
             body: 'This reverts commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.'
         }
@@ -401,7 +524,6 @@ test('includes a revert commit when the reverted merge was already released', as
     const pullRequests = await getMergedPullRequests(anyRepo, defaultPrLogConfig);
 
     assert.deepStrictEqual(get.firstCall.args, [ { owner: 'any', repo: 'repo', pull_number: 1 } ]);
-    assert.strictEqual(getPullRequestLabels.callCount, 1);
-    assert.deepStrictEqual(getPullRequestLabels.firstCall.args.slice(0, comparedArgumentCount), [ 'any/repo', 1 ]);
+    assert.strictEqual(getPullRequestLabels.callCount, 0);
     assert.deepStrictEqual(pullRequests, [ { id: 1, title: 'Revert "pr-1 message"', label: 'bug' } ]);
 });

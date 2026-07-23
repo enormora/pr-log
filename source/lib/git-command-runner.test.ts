@@ -272,68 +272,88 @@ test('getFirstParentCommitLogs() executes "git log" with the correct options', a
 
     assertExecutedCommand(
         execute,
-        'git log --first-parent --no-color --pretty=format:%H__||__%s__||__%b##$$@@$$## foo..HEAD'
+        'git log --first-parent --no-color --pretty=format:%H__||__%P__||__%s__||__%b##$$@@$$## foo..HEAD'
     );
 });
 
 test('getFirstParentCommitLogs() returns the parsed command output', async function () {
     const execute = fake.resolves({
-        stdout: 'hash-1__||__foo__||__bar##$$@@$$##\nhash-2__||__baz__||__qux##$$@@$$##\n\n'
+        stdout: [
+            'hash-1__||__parent-1__||__foo__||__bar##$$@@$$##',
+            'hash-2__||__parent-2 parent-3__||__baz__||__qux##$$@@$$##',
+            '',
+            ''
+        ]
+            .join('\n')
     });
     const runner = gitCommandRunnerFactory({ execute });
 
     const result = await runner.getFirstParentCommitLogs('');
 
     assert.deepStrictEqual(result, [
-        { hash: 'hash-1', subject: 'foo', body: 'bar' },
-        { hash: 'hash-2', subject: 'baz', body: 'qux' }
+        { hash: 'hash-1', parents: [ 'parent-1' ], subject: 'foo', body: 'bar' },
+        { hash: 'hash-2', parents: [ 'parent-2', 'parent-3' ], subject: 'baz', body: 'qux' }
     ]);
 });
 
 test('getFirstParentCommitLogs() parses multi-line message bodies correctly', async function () {
     const execute = fake.resolves({
-        stdout: 'hash-1__||__foo__||__bar\nbaz\nqux##$$@@$$##\nhash-2__||__baz__||__qux##$$@@$$##\n\n'
+        stdout: [
+            'hash-1__||__parent-1__||__foo__||__bar',
+            'baz',
+            'qux##$$@@$$##',
+            'hash-2__||__parent-2__||__baz__||__qux##$$@@$$##',
+            '',
+            ''
+        ]
+            .join('\n')
     });
     const runner = gitCommandRunnerFactory({ execute });
 
     const result = await runner.getFirstParentCommitLogs('');
 
     assert.deepStrictEqual(result, [
-        { hash: 'hash-1', subject: 'foo', body: 'bar\nbaz\nqux' },
-        { hash: 'hash-2', subject: 'baz', body: 'qux' }
+        { hash: 'hash-1', parents: [ 'parent-1' ], subject: 'foo', body: 'bar\nbaz\nqux' },
+        { hash: 'hash-2', parents: [ 'parent-2' ], subject: 'baz', body: 'qux' }
     ]);
 });
 
 test('getFirstParentCommitLogs() parses multi-line bodies correctly when it doesn’t end with a line break', async function () {
     const execute = fake.resolves({
-        stdout: 'hash-1__||__foo__||__bar\nbaz\nqux##$$@@$$##\nhash-2__||__baz__||__qux##$$@@$$##'
+        stdout: [
+            'hash-1__||__parent-1__||__foo__||__bar',
+            'baz',
+            'qux##$$@@$$##',
+            'hash-2__||__parent-2__||__baz__||__qux##$$@@$$##'
+        ]
+            .join('\n')
     });
     const runner = gitCommandRunnerFactory({ execute });
 
     const result = await runner.getFirstParentCommitLogs('');
 
     assert.deepStrictEqual(result, [
-        { hash: 'hash-1', subject: 'foo', body: 'bar\nbaz\nqux' },
-        { hash: 'hash-2', subject: 'baz', body: 'qux' }
+        { hash: 'hash-1', parents: [ 'parent-1' ], subject: 'foo', body: 'bar\nbaz\nqux' },
+        { hash: 'hash-2', parents: [ 'parent-2' ], subject: 'baz', body: 'qux' }
     ]);
 });
 
 test('getFirstParentCommitLogs() falls back to undefined when the body couldn’t be extracted', async function () {
-    const execute = fake.resolves({ stdout: 'hash-1__||__foo##$$@@$$##\n\n\n' });
+    const execute = fake.resolves({ stdout: 'hash-1__||__parent-1__||__foo##$$@@$$##\n\n\n' });
     const runner = gitCommandRunnerFactory({ execute });
 
     const result = await runner.getFirstParentCommitLogs('');
 
-    assert.deepStrictEqual(result, [ { hash: 'hash-1', subject: 'foo', body: undefined } ]);
+    assert.deepStrictEqual(result, [ { hash: 'hash-1', parents: [ 'parent-1' ], subject: 'foo', body: undefined } ]);
 });
 
 test('getFirstParentCommitLogs() falls back to undefined when the body is an empty string', async function () {
-    const execute = fake.resolves({ stdout: 'hash-1__||__foo__||__##$$@@$$##\n\n\n' });
+    const execute = fake.resolves({ stdout: 'hash-1__||__parent-1__||__foo__||__##$$@@$$##\n\n\n' });
     const runner = gitCommandRunnerFactory({ execute });
 
     const result = await runner.getFirstParentCommitLogs('');
 
-    assert.deepStrictEqual(result, [ { hash: 'hash-1', subject: 'foo', body: undefined } ]);
+    assert.deepStrictEqual(result, [ { hash: 'hash-1', parents: [ 'parent-1' ], subject: 'foo', body: undefined } ]);
 });
 
 test('getFirstParentCommitLogs() throws when the commit subject cannot be determined', async function () {

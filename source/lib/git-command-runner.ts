@@ -14,12 +14,23 @@ type MergeCommitLogEntry = {
 
 type FirstParentCommitLogEntry = {
     readonly hash: string;
+    readonly parents: readonly string[];
     readonly subject: string;
     readonly body: string | undefined;
 };
 
-type FirstParentCommitLogFields = readonly [hash: string, subject: string, body: string | undefined];
-type FirstParentCommitLogParts = readonly [hash: string, subject: string, ...remainingFields: readonly string[]];
+type FirstParentCommitLogFields = readonly [
+    hash: string,
+    parents: readonly string[],
+    subject: string,
+    body: string | undefined
+];
+type FirstParentCommitLogParts = readonly [
+    hash: string,
+    parents: string,
+    subject: string,
+    ...remainingFields: readonly string[]
+];
 
 export type GitCommandRunner = {
     getShortStatus: () => Promise<string>;
@@ -72,8 +83,8 @@ function splitLines(value: string, lineSeparator = '\n'): readonly string[] {
 
 const lineSeparator = '##$$@@$$##';
 const fieldSeparator = '__||__';
-const minimumCommitLogFieldCount = 2;
-const bodyFieldIndex = 2;
+const minimumCommitLogFieldCount = 3;
+const bodyFieldIndex = 3;
 
 function createParsableMergeGitLogFormat(): string {
     const subjectPlaceholder = '%s';
@@ -85,9 +96,10 @@ function createParsableMergeGitLogFormat(): string {
 
 function createParsableFirstParentGitLogFormat(): string {
     const hashPlaceholder = '%H';
+    const parentPlaceholder = '%P';
     const subjectPlaceholder = '%s';
     const bodyPlaceholder = '%b';
-    const fields = [ hashPlaceholder, subjectPlaceholder, bodyPlaceholder ];
+    const fields = [ hashPlaceholder, parentPlaceholder, subjectPlaceholder, bodyPlaceholder ];
 
     return `${fields.join(fieldSeparator)}${lineSeparator}`;
 }
@@ -113,10 +125,11 @@ function parseFirstParentCommitLogFields(log: string): FirstParentCommitLogField
         throw new TypeError('Failed to determine git commit log entry');
     }
 
-    const [ hash, subject ] = parts;
+    const [ hash, parentsField, subject ] = parts;
     const body = parts[bodyFieldIndex];
+    const parents = splitByString(parentsField, ' ').filter(isNonEmptyString);
 
-    return [ hash, subject, body ];
+    return [ hash, parents, subject, body ];
 }
 
 async function readShortStatus(execute: GitCommandExecutor): Promise<string> {
@@ -186,8 +199,8 @@ async function readFirstParentCommitLogs(
 
     const logs = splitLines(result.stdout, lineSeparator);
     return logs.map(function (log) {
-        const [ hash, subject, body ] = parseFirstParentCommitLogFields(log);
-        return { hash, subject, body: body === '' ? undefined : body };
+        const [ hash, parents, subject, body ] = parseFirstParentCommitLogFields(log);
+        return { hash, parents, subject, body: body === '' ? undefined : body };
     });
 }
 

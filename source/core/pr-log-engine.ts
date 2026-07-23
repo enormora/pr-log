@@ -8,9 +8,11 @@ import {
 } from '../lib/changelog-base-ref.ts';
 import {
     collectMergedPullRequests as collectMergedPullRequestsValue,
+    createPullRequestDataReader,
     type GitRangeReader,
     type PullRequest as PullRequestValue,
-    type PullRequestTitleReader
+    type PullRequestDataGitHubClient,
+    type PullRequestDataReader
 } from '../lib/collect-merged-pull-requests.ts';
 import {
     filterPullRequestsByTargetFiles as filterPullRequestsByTargetFilesValue,
@@ -99,29 +101,9 @@ export type PrLogEngine = {
     updateChangelog: (input: UpdateChangelogMarkdownInputValue) => string;
 };
 
-export type PullRequestTitleGitHubClient = {
-    readonly pulls: {
-        readonly get: (options: PullRequestTitleRequest) => Promise<PullRequestTitleResponse>;
-    };
-};
-
-type PullRequestTitleRequest = {
-    readonly owner: string;
-    readonly repo: string;
-    readonly pull_number: number;
-};
-
-type PullRequestTitleResponse = {
-    readonly data: {
-        readonly title: string;
-    };
-};
-
-const repositoryPathPartLimit = 2;
-
 export type PrLogEngineDependencies = {
     readonly gitCommandRunner: GitCommandRunner;
-    readonly githubClient: GitHubPullRequestLabelClient & PullRequestTitleGitHubClient;
+    readonly githubClient: GitHubPullRequestLabelClient & PullRequestDataGitHubClient;
     readonly pullRequestChangedFilesReader: PullRequestChangedFilesReader;
     readonly getPullRequestLabels: GetPullRequestLabels;
     readonly waitForMilliseconds: (durationMilliseconds: number) => Promise<void>;
@@ -129,49 +111,22 @@ export type PrLogEngineDependencies = {
     readonly config: PrLogConfigValue;
 };
 
-function determineRepoDetails(githubRepo: string): Readonly<[owner: string, repo: string]> {
-    const [ owner, repo ] = githubRepo.split('/', repositoryPathPartLimit);
-
-    if (owner === undefined || repo === undefined) {
-        throw new TypeError('Could not find a repository');
-    }
-
-    return [ owner, repo ];
-}
-
-async function fetchPullRequestTitle(
-    githubClient: PullRequestTitleGitHubClient,
-    githubRepo: string,
-    pullRequestId: number
-): Promise<string> {
-    const [ owner, repo ] = determineRepoDetails(githubRepo);
-    const { data: pullRequest } = await githubClient.pulls.get({
-        owner,
-        repo,
-        pull_number: pullRequestId
-    });
-
-    return pullRequest.title;
-}
-
-function createPullRequestTitleReader(githubClient: PullRequestTitleGitHubClient): PullRequestTitleReader {
-    return {
-        async getTitle(githubRepo, pullRequestId) {
-            return fetchPullRequestTitle(githubClient, githubRepo, pullRequestId);
-        }
-    };
-}
-
 type EnginePullRequestLabelReader = {
     getLabels: (githubRepo: string, pullRequestId: number) => Promise<readonly string[]>;
 };
 
 function createPullRequestLabelReader(
     dependencies: PrLogEngineDependencies,
-    config: PrLogConfigValue
+    config: PrLogConfigValue,
+    pullRequestDataReader: PullRequestDataReader
 ): EnginePullRequestLabelReader {
     return {
         async getLabels(githubRepo: string, pullRequestId: number) {
+            const cachedLabels = pullRequestDataReader.readCachedPullRequestLabels(githubRepo, pullRequestId);
+            if (cachedLabels !== undefined) {
+                return cachedLabels;
+            }
+
             const labels = await dependencies.getPullRequestLabels(githubRepo, pullRequestId, {
                 githubClient: dependencies.githubClient,
                 waitForMilliseconds: dependencies.waitForMilliseconds,
@@ -193,10 +148,15 @@ async function waitBetweenLabelReads(dependencies: PrLogEngineDependencies, pull
 
 async function readPullRequestLabels(
     dependencies: PrLogEngineDependencies,
+    pullRequestDataReader: PullRequestDataReader,
     input: ReadPullRequestLabelsOptions
 ): Promise<ReadonlyMap<number, readonly string[]>> {
     const pullRequestLabels = new Map<number, readonly string[]>();
-    const pullRequestLabelReader = createPullRequestLabelReader(dependencies, dependencies.config);
+    const pullRequestLabelReader = createPullRequestLabelReader(
+        dependencies,
+        dependencies.config,
+        pullRequestDataReader
+    );
 
     for (const [ pullRequestIndex, pullRequest ] of input.pullRequests.entries()) {
         await waitBetweenLabelReads(dependencies, pullRequestIndex);
@@ -209,7 +169,7 @@ async function readPullRequestLabels(
 export function createPrLogEngineWithDependencies(dependencies: PrLogEngineDependencies): PrLogEngine {
     const { gitCommandRunner, githubClient, pullRequestChangedFilesReader } = dependencies;
     const gitRangeReader: GitRangeReader = gitCommandRunner;
-    const pullRequestTitleReader = createPullRequestTitleReader(githubClient);
+    const pullRequestDataReader = createPullRequestDataReader(githubClient);
 
     return {
         async resolveLatestSemverChangelogBaseRef() {
@@ -225,7 +185,7 @@ export function createPrLogEngineWithDependencies(dependencies: PrLogEngineDepen
                 githubRepo: input.githubRepo,
                 baseRef: input.baseRef,
                 git: gitRangeReader,
-                pullRequestTitleReader
+                pullRequestDataReader
             });
         },
 
@@ -238,7 +198,7 @@ export function createPrLogEngineWithDependencies(dependencies: PrLogEngineDepen
         },
 
         async readPullRequestLabels(input) {
-            return readPullRequestLabels(dependencies, input);
+            return readPullRequestLabels(dependencies, pullRequestDataReader, input);
         },
 
         filterPullRequestsByTargetFiles: filterPullRequestsByTargetFilesValue,
@@ -249,7 +209,11 @@ export function createPrLogEngineWithDependencies(dependencies: PrLogEngineDepen
                 validLabels: input.config.validLabels,
                 ignoredLabels: input.config.ignoredLabels,
                 pullRequests: input.pullRequests,
-                pullRequestLabelReader: createPullRequestLabelReader(dependencies, input.config),
+                pullRequestLabelReader: createPullRequestLabelReader(
+                    dependencies,
+                    input.config,
+                    pullRequestDataReader
+                ),
                 waitForMilliseconds: dependencies.waitForMilliseconds,
                 labelLookupIntervalMilliseconds: input.config.labelLookupIntervalMilliseconds,
                 targetName: input.targetName,

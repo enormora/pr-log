@@ -4,8 +4,9 @@ import type { GitCommandRunner } from './git-command-runner.ts';
 import { resolveLatestSemverTagBaseRef } from './changelog-base-ref.ts';
 import {
     collectMergedPullRequests,
-    type PullRequest as PullRequestValue,
-    type PullRequestTitleReader
+    createPullRequestDataReader,
+    type PullRequestDataReader,
+    type PullRequest as PullRequestValue
 } from './collect-merged-pull-requests.ts';
 import {
     resolvePullRequestLabels,
@@ -29,37 +30,9 @@ export type GetMergedPullRequests = (
     config: PrLogConfig
 ) => Promise<readonly PullRequestWithLabel[]>;
 
-type PullRequestData = Readonly<Awaited<ReturnType<Octokit['pulls']['get']>>['data']>;
-
-const repositoryPathPartLimit = 2;
-
-function determineRepoDetails(githubRepo: string): Readonly<[owner: string, repo: string]> {
-    const [ owner, repo ] = githubRepo.split('/', repositoryPathPartLimit);
-
-    if (owner === undefined || repo === undefined) {
-        throw new TypeError('Could not find a repository');
-    }
-
-    return [ owner, repo ];
-}
-
-async function fetchPullRequestTitle(
-    githubClient: Readonly<Octokit>,
-    githubRepo: string,
-    pullRequestId: number
-): Promise<string> {
-    const [ owner, repo ] = determineRepoDetails(githubRepo);
-    const { data: pullRequest } = await githubClient.pulls.get({
-        owner,
-        repo,
-        pull_number: pullRequestId
-    });
-
-    return (pullRequest as PullRequestData).title;
-}
-
 export function getMergedPullRequestsFactory(dependencies: GetMergedPullRequestsDependencies): GetMergedPullRequests {
     const { gitCommandRunner, getPullRequestLabels, githubClient, waitForMilliseconds } = dependencies;
+    const pullRequestDataReader = createPullRequestDataReader(githubClient);
 
     async function getLatestVersionTag(): Promise<string> {
         const tags = await gitCommandRunner.listTags();
@@ -67,17 +40,28 @@ export function getMergedPullRequestsFactory(dependencies: GetMergedPullRequests
     }
 
     async function getPullRequests(fromTag: string, githubRepo: string): Promise<readonly PullRequest[]> {
-        const pullRequestTitleReader: PullRequestTitleReader = {
-            async getTitle(repo, pullRequestId) {
-                return fetchPullRequestTitle(githubClient, repo, pullRequestId);
-            }
-        };
-
         return collectMergedPullRequests({
             githubRepo,
             baseRef: fromTag,
             git: gitCommandRunner,
-            pullRequestTitleReader
+            pullRequestDataReader
+        });
+    }
+
+    async function readLabels(
+        config: PrLogConfig,
+        githubRepo: string,
+        pullRequestId: number,
+        reader: PullRequestDataReader
+    ): Promise<readonly string[]> {
+        const cachedLabels = reader.readCachedPullRequestLabels(githubRepo, pullRequestId);
+        if (cachedLabels !== undefined) {
+            return cachedLabels;
+        }
+
+        return getPullRequestLabels(githubRepo, pullRequestId, {
+            ...dependencies,
+            maximumRateLimitRetryCount: config.maximumRateLimitRetryCount
         });
     }
 
@@ -98,10 +82,7 @@ export function getMergedPullRequestsFactory(dependencies: GetMergedPullRequests
             targetScopedLabelPattern: undefined,
             pullRequestLabelReader: {
                 async getLabels(repo, pullRequestId) {
-                    return getPullRequestLabels(repo, pullRequestId, {
-                        ...dependencies,
-                        maximumRateLimitRetryCount: config.maximumRateLimitRetryCount
-                    });
+                    return readLabels(config, repo, pullRequestId, pullRequestDataReader);
                 }
             }
         });
