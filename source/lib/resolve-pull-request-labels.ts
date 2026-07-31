@@ -1,4 +1,7 @@
-import type { PullRequest } from './collect-merged-pull-requests.ts';
+type PullRequest = {
+    readonly id: number;
+    readonly title: string;
+};
 
 export type PullRequestWithLabel = PullRequest & {
     readonly label: string;
