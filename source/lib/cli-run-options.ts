@@ -1,13 +1,13 @@
-import { nothing, of } from 'true-myth/maybe';
+import { nothing, of, type Just, type Nothing } from 'true-myth/maybe';
 import { err, ok, type Result } from 'true-myth/result';
 import { isString } from '@sindresorhus/is';
 import { InvalidArgumentError } from 'commander';
-import { createVersionNumber, type MissingVersionNumber, type VersionNumber } from './version-number.ts';
+import { createVersionNumber } from './version-number.ts';
 
 type CliRunOptionsUnreleased = {
     readonly unreleased: true;
     readonly autoVersion: false;
-    readonly versionNumber: MissingVersionNumber;
+    readonly versionNumber: Nothing<string>;
     readonly changelogPath: string;
     readonly sloppy: boolean;
     readonly stdout: boolean;
@@ -16,7 +16,7 @@ type CliRunOptionsUnreleased = {
 type CliRunOptionsReleasedExplicit = {
     readonly unreleased: false;
     readonly autoVersion: false;
-    readonly versionNumber: VersionNumber;
+    readonly versionNumber: Just<string>;
     readonly changelogPath: string;
     readonly sloppy: boolean;
     readonly stdout: boolean;
@@ -25,7 +25,7 @@ type CliRunOptionsReleasedExplicit = {
 type CliRunOptionsReleasedAuto = {
     readonly unreleased: false;
     readonly autoVersion: true;
-    readonly versionNumber: MissingVersionNumber;
+    readonly versionNumber: Nothing<string>;
     readonly changelogPath: string;
     readonly sloppy: boolean;
     readonly stdout: boolean;

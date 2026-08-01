@@ -1,5 +1,5 @@
 import { nothing } from 'true-myth/maybe';
-import { err, ok } from 'true-myth/result';
+import { err, ok, type Result } from 'true-myth/result';
 import { createChangelogFactory, formatChangelogDate } from './create-changelog.ts';
 import type { PrLogConfig } from './pr-log-config.ts';
 import type { PullRequestWithLabel } from './resolve-pull-request-labels.ts';
@@ -77,21 +77,7 @@ export type ReleaseSectionNotFound = {
     readonly versionNumber: string;
 };
 
-type SuccessfulResult<Value> = {
-    readonly isOk: true;
-    readonly isErr: false;
-    readonly value: Value;
-};
-
-type FailedResult<ErrorValue> = {
-    readonly isOk: false;
-    readonly isErr: true;
-    readonly error: ErrorValue;
-};
-
-export type ExtractChangelogReleaseSectionResult =
-    | FailedResult<ReleaseSectionNotFound>
-    | SuccessfulResult<string>;
+export type ExtractChangelogReleaseSectionResult = Result<string, ReleaseSectionNotFound>;
 
 type ChangelogReleaseHeading = {
     readonly startIndex: number;

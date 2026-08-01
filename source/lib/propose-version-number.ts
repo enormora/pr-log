@@ -1,12 +1,6 @@
 import semver from 'semver';
-
-type VersionBumpLevel = 'major' | 'minor' | 'patch';
-type VersionBumpConfig = Readonly<Record<VersionBumpLevel, readonly string[]>>;
-type PullRequestWithLabel = {
-    readonly id: number | undefined;
-    readonly title: string;
-    readonly label: string;
-};
+import type { PullRequestWithLabel } from './get-merged-pull-requests.ts';
+import type { VersionBumpConfig, VersionBumpLevel } from './version-bump-config.ts';
 
 const orderedVersionBumpLevels: readonly VersionBumpLevel[] = [ 'major', 'minor', 'patch' ];
 
