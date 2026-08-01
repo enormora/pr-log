@@ -1,9 +1,9 @@
 import { format as formatDate } from 'date-fns';
 import { isArray } from '@sindresorhus/is';
 import { enUS as enLocale } from 'date-fns/locale/en-US';
-import type { Just, Nothing } from 'true-myth/maybe';
 import type { CollapseRule, PrLogConfig } from './pr-log-config.ts';
 import type { ChangelogEntryInput } from './render-changelog-markdown.ts';
+import type { MissingVersionNumber, VersionNumber } from './version-number.ts';
 
 function formatLinkToPullRequest(pullRequestId: number, repo: string): string {
     return `[#${pullRequestId}](https://github.com/${repo}/pull/${pullRequestId})`;
@@ -290,14 +290,14 @@ type Dependencies = {
 
 type ChangelogOptionsUnreleased = {
     readonly unreleased: true;
-    readonly versionNumber: Nothing<string>;
+    readonly versionNumber: MissingVersionNumber;
     readonly mergedPullRequests: readonly ChangelogEntryInput[];
     readonly githubRepo: string;
 };
 
 type ChangelogOptionsReleased = {
     readonly unreleased: false;
-    readonly versionNumber: Just<string>;
+    readonly versionNumber: VersionNumber;
     readonly mergedPullRequests: readonly ChangelogEntryInput[];
     readonly githubRepo: string;
 };

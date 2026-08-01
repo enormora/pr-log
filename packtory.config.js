@@ -137,7 +137,7 @@ export async function buildConfig() {
         },
         commonPackageSettings: commonPackageSettings(packageInfo),
         checks: {
-            areTheTypesWrong: { enabled: true, profile: 'esm-only' },
+            typeScriptIntegrity: { enabled: true, declarations: 'all' },
             noDuplicatedFiles: { enabled: true, allowList: [ licensePath ] },
             requiredFiles: { enabled: true, files: [ 'LICENSE', 'README.md' ] },
             maxBundleSize: { enabled: true },

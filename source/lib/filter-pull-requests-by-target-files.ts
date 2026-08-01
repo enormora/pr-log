@@ -1,5 +1,12 @@
-import type { PullRequest } from './collect-merged-pull-requests.ts';
-import type { PullRequestChangedFile } from './pull-request-changed-files.ts';
+type PullRequest = {
+    readonly id: number;
+    readonly title: string;
+};
+
+type PullRequestChangedFile = {
+    readonly path: string;
+    readonly previousPath: string | undefined;
+};
 
 export type FilterPullRequestsByTargetFilesInput = {
     readonly targetName: string;
