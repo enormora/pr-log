@@ -1,10 +1,7 @@
 import { isError, isFiniteNumber, isString } from '@sindresorhus/is';
 import { of } from 'true-myth/maybe';
 import { splitByString } from './split.ts';
-
-type PullRequestLabelReader = {
-    getLabels: (githubRepo: string, pullRequestId: number) => Promise<readonly string[]>;
-};
+import type { PullRequestLabelReader } from './resolve-pull-request-labels.ts';
 
 export type GitHubPullRequestLabelReaderDependencies = {
     readonly githubClient: GitHubPullRequestLabelClient;

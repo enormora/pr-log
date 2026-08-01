@@ -2,12 +2,11 @@ import { isArray, isPlainObject, isString } from '@sindresorhus/is';
 import { defaultValidLabels } from './valid-labels.ts';
 import {
     createDefaultVersionBumpConfig,
-    parseVersionBumpConfig
+    parseVersionBumpConfig,
+    type VersionBumpConfig
 } from './version-bump-config.ts';
 
 type PackageInfo = Readonly<Record<string, unknown>>;
-type VersionBumpLevel = 'major' | 'minor' | 'patch';
-type VersionBumpConfig = Readonly<Record<VersionBumpLevel, readonly string[]>>;
 
 export type CollapseRule = {
     readonly label: string;

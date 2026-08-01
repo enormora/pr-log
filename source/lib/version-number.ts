@@ -1,38 +1,25 @@
 import assert from 'node:assert';
 import semver from 'semver';
-import { just } from 'true-myth/maybe';
-import { err, ok } from 'true-myth/result';
+import { just, type Just, type Nothing } from 'true-myth/maybe';
+import { err, ok, type Result } from 'true-myth/result';
 import { Unit } from 'true-myth/unit';
-
-export type MissingVersionNumber = {
-    readonly isJust: false;
-    readonly isNothing: true;
-    unwrapOr: (defaultValue: unknown) => unknown;
-};
-
-export type VersionNumber = {
-    readonly isJust: true;
-    readonly isNothing: false;
-    readonly value: string;
-    unwrapOr: (defaultValue: unknown) => unknown;
-};
 
 type ValidateVersionNumberOptionsUnreleased = {
     readonly unreleased: true;
     readonly autoVersion: false;
-    readonly versionNumber: MissingVersionNumber;
+    readonly versionNumber: Nothing<string>;
 };
 
 type ValidateVersionNumberOptionsAuto = {
     readonly unreleased: false;
     readonly autoVersion: true;
-    readonly versionNumber: MissingVersionNumber;
+    readonly versionNumber: Nothing<string>;
 };
 
 type ValidateVersionNumberOptionsReleased = {
     readonly unreleased: false;
     readonly autoVersion: false;
-    readonly versionNumber: VersionNumber;
+    readonly versionNumber: Just<string>;
 };
 
 export type ValidateVersionNumberOptions =
@@ -40,11 +27,7 @@ export type ValidateVersionNumberOptions =
     | ValidateVersionNumberOptionsReleased
     | ValidateVersionNumberOptionsUnreleased;
 
-type VersionNumberValidationResult = {
-    unwrapOrElse: (onError: (error: Error) => unknown) => unknown;
-};
-
-export function createVersionNumber(value: string): VersionNumber {
+export function createVersionNumber(value: string): Just<string> {
     const versionNumber = just(value);
 
     assert.ok(versionNumber.isJust);
@@ -52,7 +35,7 @@ export function createVersionNumber(value: string): VersionNumber {
     return versionNumber;
 }
 
-export function validateVersionNumber(options: ValidateVersionNumberOptions): VersionNumberValidationResult {
+export function validateVersionNumber(options: ValidateVersionNumberOptions): Result<Unit, Error> {
     if (options.unreleased || options.autoVersion) {
         return ok(Unit);
     }

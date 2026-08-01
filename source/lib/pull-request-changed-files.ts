@@ -1,7 +1,4 @@
-type PullRequest = {
-    readonly id: number;
-    readonly title: string;
-};
+import type { PullRequest } from './collect-merged-pull-requests.ts';
 
 export type PullRequestChangedFile = {
     readonly path: string;
