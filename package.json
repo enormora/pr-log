@@ -18,7 +18,7 @@
         "commander": "15.0.0",
         "common-tags": "1.8.2",
         "date-fns": "4.4.0",
-        "execa": "10.0.0",
+        "execa": "10.0.1",
         "git-url-parse": "16.1.0",
         "loglevel": "1.9.2",
         "parse-github-repo-url": "1.4.1",
