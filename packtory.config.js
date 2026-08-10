@@ -27,7 +27,6 @@ function commonPackageSettings(packageInfo) {
     return {
         sourcesFolder,
         mainPackageJson: { type: 'module', dependencies: packageInfo.dependencies },
-        additionalFiles: [ { sourceFilePath: licensePath, targetFilePath: 'LICENSE' } ],
         deadCodeElimination: { enabled: true },
         publishSettings: {
             access: 'public',
@@ -42,11 +41,18 @@ function registrySettings() {
     };
 }
 
+function publishedPackageFiles(readmePath) {
+    return [
+        { sourceFilePath: licensePath, targetFilePath: 'LICENSE' },
+        { sourceFilePath: readmePath, targetFilePath: 'README.md' }
+    ];
+}
+
 function corePackage(sharedAttributes) {
     return {
         name: '@pr-log/core',
         versioning: { automatic: true, minimumVersion: '0.0.1' },
-        additionalFiles: [ { sourceFilePath: coreReadmePath, targetFilePath: 'README.md' } ],
+        additionalFiles: publishedPackageFiles(coreReadmePath),
         roots: {
             main: {
                 js: 'packages/core/core.entry-point.js',
@@ -68,7 +74,7 @@ function cliPackage(packageInfo, sharedAttributes) {
             automatic: false,
             source: 'pull-request-labels'
         },
-        additionalFiles: [ { sourceFilePath: cliReadmePath, targetFilePath: 'README.md' } ],
+        additionalFiles: publishedPackageFiles(cliReadmePath),
         roots: {
             cli: {
                 js: 'packages/command-line-interface/bin.entry-point.js',
@@ -105,7 +111,7 @@ function releasePullRequestSettings() {
     };
 }
 
-/** @returns {Promise<import('@packtory/cli').PacktoryConfig & Record<string, unknown>>} */
+/** @returns {Promise<import('@packtory/cli').PacktoryConfig>} */
 export async function buildConfig() {
     const packageInfo = await readPackageInfo();
     const sharedAttributes = sharedPackageAttributes(packageInfo);
