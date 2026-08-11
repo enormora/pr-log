@@ -20,7 +20,8 @@ test('reads changelog config from package info', function () {
         }
     });
 
-    assert.partialDeepStrictEqual(config, {
+    assert.deepStrictEqual(config, {
+        ...defaultPrLogConfig,
         validLabels: new Map([ [ 'custom', 'Custom Changes' ] ]),
         ignoredLabels: [ 'release' ],
         versionBumps: { major: [], minor: [ 'custom' ], patch: [] },
@@ -34,9 +35,7 @@ test('reads changelog config from package info', function () {
                 fromGroup: 'from',
                 toGroup: 'to'
             }
-        ],
-        labelLookupIntervalMilliseconds: defaultPrLogConfig.labelLookupIntervalMilliseconds,
-        maximumRateLimitRetryCount: defaultPrLogConfig.maximumRateLimitRetryCount
+        ]
     });
 });
 
