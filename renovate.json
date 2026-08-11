@@ -4,5 +4,8 @@
         "github>enormora/renovate-config#1.0.0",
         "github>enormora/renovate-config:github-automerge#1.0.0",
         "github>enormora/renovate-config:node22#1.0.0"
+    ],
+    "postUpdateOptions": [
+        "npmInstallTwice"
     ]
 }
