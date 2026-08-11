@@ -101,7 +101,6 @@ function releasePullRequestSettings() {
             trigger: 'workflow-dispatch',
             workflowFile: 'continuous-integration.yml',
             requiredStatusContexts: [
-                'Node v22',
                 'Node v24',
                 'Node v26',
                 'Release PR policy',
