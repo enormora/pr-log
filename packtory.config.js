@@ -111,7 +111,9 @@ function releasePullRequestSettings() {
     };
 }
 
-/** @returns {Promise<import('@packtory/cli').PacktoryConfig>} */
+/**
+ * @returns {Promise<import('@packtory/cli').PacktoryConfig>}
+ */
 export async function buildConfig() {
     const packageInfo = await readPackageInfo();
     const sharedAttributes = sharedPackageAttributes(packageInfo);
