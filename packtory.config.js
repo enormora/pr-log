@@ -119,8 +119,10 @@ export async function buildConfig() {
     const sharedAttributes = sharedPackageAttributes(packageInfo);
     const versionedDependencyUpdatePattern =
         '^(?<prefix>⬆️ )?Update dependency (?<dependency>.+?) from (?<from>.+?) to (?<to>.+?)$';
+    const singleVersionDependencyUpdatePattern =
+        '^(?<prefix>⬆️ )?Update dependency `?(?<dependency>.+?)`? to `?(?<to>[^` ]+)`?(?<from>)$';
     const groupedDependencyUpdatePattern =
-        '^(?<prefix>⬆️ )?(?<dependency>Lock file maintenance|Update .+ dependencies)(?<from>)(?<to>)$';
+        '^(?<prefix>⬆️ )?(?<dependency>Lock file maintenance|Update (?:.+ dependencies|eslint))(?<from>)(?<to>)$';
 
     return {
         registrySettings: registrySettings(),
@@ -133,6 +135,12 @@ export async function buildConfig() {
                         label: 'upgrade',
                         pattern: versionedDependencyUpdatePattern,
                         replace: '$<prefix>Update dependency $<dependency> from $<from> to $<to>'
+                    },
+                    {
+                        label: 'upgrade',
+                        pattern: singleVersionDependencyUpdatePattern,
+                        replace: '$<prefix>Update dependency $<dependency> to $<to>',
+                        toGroup: 'from'
                     },
                     {
                         label: 'upgrade',
