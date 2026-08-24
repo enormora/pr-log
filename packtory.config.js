@@ -120,7 +120,7 @@ export async function buildConfig() {
     const versionedDependencyUpdatePattern =
         '^(?<prefix>⬆️ )?Update dependency (?<dependency>.+?) from (?<from>.+?) to (?<to>.+?)$';
     const singleVersionDependencyUpdatePattern =
-        '^(?<prefix>⬆️ )?Update dependency `?(?<dependency>.+?)`? to `?(?<to>[^` ]+)`?(?<from>)$';
+        '^(?<prefix>⬆️ )?Update (?:dependency )?`?(?<dependency>.+?)`? to `?(?<to>[^` ]+)`?(?<from>)$';
     const groupedDependencyUpdatePattern =
         '^(?<prefix>⬆️ )?(?<dependency>Lock file maintenance|Update (?:.+ dependencies|eslint))(?<from>)(?<to>)$';
 
