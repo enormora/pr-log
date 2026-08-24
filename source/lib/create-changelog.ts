@@ -7,6 +7,7 @@ import type {
     CollapseRule,
     HighestVersionCollapseRule,
     PrLogConfig,
+    SameTitleCollapseRule,
     VersionChainCollapseRule
 } from './pr-log-config.ts';
 import type { ChangelogEntryInput } from './render-changelog-markdown.ts';
@@ -91,6 +92,10 @@ type HighestVersionRuleMatch = CollapseMatch & {
     readonly version: string;
 };
 
+type SameTitleRuleMatch = CollapseMatch & {
+    readonly key: string;
+};
+
 type CollapseChain = {
     readonly firstIndex: number;
     readonly indexes: readonly number[];
@@ -124,6 +129,10 @@ function createChangelogEntries(pullRequests: readonly ChangelogEntryInput[]): r
 
 function isHighestVersionCollapseRule(rule: CollapseRule): rule is HighestVersionCollapseRule {
     return Object.hasOwn(rule, 'versionGroup');
+}
+
+function isSameTitleCollapseRule(rule: CollapseRule): rule is SameTitleCollapseRule {
+    return Object.hasOwn(rule, 'collapse');
 }
 
 function getRuleKey(match: CollapseMatch, rule: CollapseRule): string {
@@ -204,6 +213,22 @@ function getHighestVersionRuleMatch(
     const version = getSemverGroup({ groups }, rule);
 
     return { key, version, groups };
+}
+
+function getSameTitleRuleMatch(
+    entry: ChangelogEntryWithLabel,
+    rule: SameTitleCollapseRule
+): SameTitleRuleMatch | undefined {
+    const match = rule.pattern.exec(entry.title);
+
+    if (match?.groups === undefined) {
+        return undefined;
+    }
+
+    const groups = { ...match.groups };
+    const key = getRuleKey({ groups }, rule);
+
+    return { key, groups };
 }
 
 function createExtendedChain(
@@ -347,6 +372,57 @@ function createHighestVersionGroupsByKey(
     }, new Map<string, HighestVersionCollapseGroup>());
 }
 
+function createSameTitleCollapseGroup(
+    index: number,
+    entry: ChangelogEntryWithLabel,
+    ruleMatch: SameTitleRuleMatch
+): CollapseChain {
+    return createCollapseChain(index, entry, ruleMatch.groups);
+}
+
+function extendSameTitleCollapseGroup(
+    group: CollapseChain,
+    entry: ChangelogEntryWithLabel,
+    index: number
+): CollapseChain {
+    return {
+        ...group,
+        indexes: [ ...group.indexes, index ],
+        pullRequestIds: [ ...group.pullRequestIds, ...entry.pullRequestIds ]
+    };
+}
+
+function updateSameTitleGroupsByKey(
+    groupsByKey: ReadonlyMap<string, CollapseChain>,
+    entry: ChangelogEntryWithLabel,
+    index: number,
+    rule: SameTitleCollapseRule
+): ReadonlyMap<string, CollapseChain> {
+    const ruleMatch = getSameTitleRuleMatch(entry, rule);
+
+    if (ruleMatch === undefined) {
+        return groupsByKey;
+    }
+
+    const nextGroupsByKey = new Map(groupsByKey);
+    const group = groupsByKey.get(ruleMatch.key);
+    const nextGroup = group === undefined
+        ? createSameTitleCollapseGroup(index, entry, ruleMatch)
+        : extendSameTitleCollapseGroup(group, entry, index);
+
+    nextGroupsByKey.set(ruleMatch.key, nextGroup);
+    return nextGroupsByKey;
+}
+
+function createSameTitleGroupsByKey(
+    entries: readonly ChangelogEntryWithLabel[],
+    rule: SameTitleCollapseRule
+): ReadonlyMap<string, CollapseChain> {
+    return entries.reduce<ReadonlyMap<string, CollapseChain>>(function (groupsByKey, entry, index) {
+        return updateSameTitleGroupsByKey(groupsByKey, entry, index, rule);
+    }, new Map<string, CollapseChain>());
+}
+
 function createCollapsedEntriesByIndex(
     chainsByKey: ReadonlyMap<string, readonly CollapseChain[]>,
     rule: CollapseRule
@@ -378,9 +454,9 @@ function createCollapsedEntriesByIndex(
     return [ collapsedEntries, skippedIndexes ];
 }
 
-function createHighestVersionCollapsedEntriesByIndex(
-    groupsByKey: ReadonlyMap<string, HighestVersionCollapseGroup>,
-    rule: HighestVersionCollapseRule
+function createGroupedCollapsedEntriesByIndex(
+    groupsByKey: ReadonlyMap<string, CollapseChain>,
+    rule: HighestVersionCollapseRule | SameTitleCollapseRule
 ): Readonly<[Map<number, ChangelogEntryWithLabel>, Set<number>]> {
     const collapsedEntries = new Map<number, ChangelogEntryWithLabel>();
     const skippedIndexes = new Set<number>();
@@ -408,13 +484,32 @@ function createHighestVersionCollapsedEntriesByIndex(
     return [ collapsedEntries, skippedIndexes ];
 }
 
+function createCollapseResultForRule(
+    entries: readonly ChangelogEntryWithLabel[],
+    rule: CollapseRule
+): Readonly<[Map<number, ChangelogEntryWithLabel>, Set<number>]> {
+    if (isSameTitleCollapseRule(rule)) {
+        return createGroupedCollapsedEntriesByIndex(
+            createSameTitleGroupsByKey(entries, rule),
+            rule
+        );
+    }
+
+    if (isHighestVersionCollapseRule(rule)) {
+        return createGroupedCollapsedEntriesByIndex(
+            createHighestVersionGroupsByKey(entries, rule),
+            rule
+        );
+    }
+
+    return createCollapsedEntriesByIndex(createChainsByKey(entries, rule), rule);
+}
+
 function collapseEntriesForRule(
     entries: readonly ChangelogEntryWithLabel[],
     rule: CollapseRule
 ): readonly ChangelogEntryWithLabel[] {
-    const [ collapsedEntries, skippedIndexes ] = isHighestVersionCollapseRule(rule)
-        ? createHighestVersionCollapsedEntriesByIndex(createHighestVersionGroupsByKey(entries, rule), rule)
-        : createCollapsedEntriesByIndex(createChainsByKey(entries, rule), rule);
+    const [ collapsedEntries, skippedIndexes ] = createCollapseResultForRule(entries, rule);
 
     return entries.flatMap(function (entry, index) {
         if (skippedIndexes.has(index)) {

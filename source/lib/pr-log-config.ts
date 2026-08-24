@@ -24,7 +24,11 @@ export type HighestVersionCollapseRule = CollapseRuleBase & {
     readonly versionGroup: string;
 };
 
-export type CollapseRule = HighestVersionCollapseRule | VersionChainCollapseRule;
+export type SameTitleCollapseRule = CollapseRuleBase & {
+    readonly collapse: 'same';
+};
+
+export type CollapseRule = HighestVersionCollapseRule | SameTitleCollapseRule | VersionChainCollapseRule;
 
 export type PrLogConfig = {
     readonly validLabels: ReadonlyMap<string, string>;
@@ -106,18 +110,38 @@ function getRequiredStringField(rule: Readonly<Record<string, unknown>>, fieldNa
     return value;
 }
 
-function createCollapseRule(rule: Readonly<Record<string, unknown>>): CollapseRule {
+function createCollapseRuleBase(rule: Readonly<Record<string, unknown>>): CollapseRuleBase {
     const customKeyGroup = rule.keyGroup;
-    const customFromGroup = rule.fromGroup;
-    const customToGroup = rule.toGroup;
-    const customVersionGroup = rule.versionGroup;
-    const baseRule = {
+
+    return {
         label: getRequiredStringField(rule, 'label'),
         pattern: new RegExp(getRequiredStringField(rule, 'pattern'), 'u'),
         replace: getRequiredStringField(rule, 'replace'),
         keyGroup: isString(customKeyGroup) ? customKeyGroup : 'dependency'
     };
+}
 
+function createSameTitleCollapseRule(
+    baseRule: CollapseRuleBase,
+    customCollapse: unknown
+): SameTitleCollapseRule | undefined {
+    if (customCollapse === 'same') {
+        return {
+            ...baseRule,
+            collapse: customCollapse
+        };
+    }
+    if (customCollapse !== undefined) {
+        throw new TypeError('pr-log.collapseRules[].collapse must be "same"');
+    }
+
+    return undefined;
+}
+
+function createHighestVersionCollapseRule(
+    baseRule: CollapseRuleBase,
+    customVersionGroup: unknown
+): HighestVersionCollapseRule | undefined {
     if (isString(customVersionGroup)) {
         return {
             ...baseRule,
@@ -125,11 +149,29 @@ function createCollapseRule(rule: Readonly<Record<string, unknown>>): CollapseRu
         };
     }
 
+    return undefined;
+}
+
+function createVersionChainCollapseRule(
+    baseRule: CollapseRuleBase,
+    rule: Readonly<Record<string, unknown>>
+): VersionChainCollapseRule {
+    const customFromGroup = rule.fromGroup;
+    const customToGroup = rule.toGroup;
+
     return {
         ...baseRule,
         fromGroup: isString(customFromGroup) ? customFromGroup : 'from',
         toGroup: isString(customToGroup) ? customToGroup : 'to'
     };
+}
+
+function createCollapseRule(rule: Readonly<Record<string, unknown>>): CollapseRule {
+    const baseRule = createCollapseRuleBase(rule);
+    const sameTitleRule = createSameTitleCollapseRule(baseRule, rule.collapse);
+    const highestVersionRule = createHighestVersionCollapseRule(baseRule, rule.versionGroup);
+
+    return sameTitleRule ?? highestVersionRule ?? createVersionChainCollapseRule(baseRule, rule);
 }
 
 function getCollapseRules(packageInfo: PackageInfo): readonly CollapseRule[] {
