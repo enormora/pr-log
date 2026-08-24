@@ -8,14 +8,23 @@ import {
 
 type PackageInfo = Readonly<Record<string, unknown>>;
 
-export type CollapseRule = {
+type CollapseRuleBase = {
     readonly label: string;
     readonly pattern: RegExp;
     readonly replace: string;
     readonly keyGroup: string;
+};
+
+export type VersionChainCollapseRule = CollapseRuleBase & {
     readonly fromGroup: string;
     readonly toGroup: string;
 };
+
+export type HighestVersionCollapseRule = CollapseRuleBase & {
+    readonly versionGroup: string;
+};
+
+export type CollapseRule = HighestVersionCollapseRule | VersionChainCollapseRule;
 
 export type PrLogConfig = {
     readonly validLabels: ReadonlyMap<string, string>;
@@ -101,12 +110,23 @@ function createCollapseRule(rule: Readonly<Record<string, unknown>>): CollapseRu
     const customKeyGroup = rule.keyGroup;
     const customFromGroup = rule.fromGroup;
     const customToGroup = rule.toGroup;
-
-    return {
+    const customVersionGroup = rule.versionGroup;
+    const baseRule = {
         label: getRequiredStringField(rule, 'label'),
         pattern: new RegExp(getRequiredStringField(rule, 'pattern'), 'u'),
         replace: getRequiredStringField(rule, 'replace'),
-        keyGroup: isString(customKeyGroup) ? customKeyGroup : 'dependency',
+        keyGroup: isString(customKeyGroup) ? customKeyGroup : 'dependency'
+    };
+
+    if (isString(customVersionGroup)) {
+        return {
+            ...baseRule,
+            versionGroup: customVersionGroup
+        };
+    }
+
+    return {
+        ...baseRule,
         fromGroup: isString(customFromGroup) ? customFromGroup : 'from',
         toGroup: isString(customToGroup) ? customToGroup : 'to'
     };
