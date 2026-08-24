@@ -1,8 +1,14 @@
 import { format as formatDate } from 'date-fns';
 import { isArray } from '@sindresorhus/is';
 import { enUS as enLocale } from 'date-fns/locale/en-US';
+import semver from 'semver';
 import type { Just, Nothing } from 'true-myth/maybe';
-import type { CollapseRule, PrLogConfig } from './pr-log-config.ts';
+import type {
+    CollapseRule,
+    HighestVersionCollapseRule,
+    PrLogConfig,
+    VersionChainCollapseRule
+} from './pr-log-config.ts';
 import type { ChangelogEntryInput } from './render-changelog-markdown.ts';
 
 function formatLinkToPullRequest(pullRequestId: number, repo: string): string {
@@ -80,11 +86,20 @@ type RuleMatch = CollapseMatch & {
     readonly to: string;
 };
 
+type HighestVersionRuleMatch = CollapseMatch & {
+    readonly key: string;
+    readonly version: string;
+};
+
 type CollapseChain = {
     readonly firstIndex: number;
     readonly indexes: readonly number[];
     readonly groups: Readonly<Record<string, string>>;
     readonly pullRequestIds: readonly number[];
+};
+
+type HighestVersionCollapseGroup = CollapseChain & {
+    readonly version: string;
 };
 
 type CollapseChainUpdate = {
@@ -93,7 +108,7 @@ type CollapseChainUpdate = {
 };
 
 type CollapseChainContext = {
-    readonly rule: PrLogConfig['collapseRules'][number];
+    readonly rule: VersionChainCollapseRule;
     readonly ruleMatch: RuleMatch;
 };
 
@@ -107,14 +122,25 @@ function createChangelogEntries(pullRequests: readonly ChangelogEntryInput[]): r
     });
 }
 
-function getRuleGroups(match: CollapseMatch, rule: CollapseRule): Readonly<[string, string, string]> {
+function isHighestVersionCollapseRule(rule: CollapseRule): rule is HighestVersionCollapseRule {
+    return Object.hasOwn(rule, 'versionGroup');
+}
+
+function getRuleKey(match: CollapseMatch, rule: CollapseRule): string {
     const key = match.groups[rule.keyGroup];
-    const from = match.groups[rule.fromGroup];
-    const to = match.groups[rule.toGroup];
 
     if (key === undefined) {
         throw new TypeError(`Collapse rule for label "${rule.label}" requires capture group "${rule.keyGroup}"`);
     }
+
+    return key;
+}
+
+function getRuleGroups(match: CollapseMatch, rule: VersionChainCollapseRule): Readonly<[string, string, string]> {
+    const key = getRuleKey(match, rule);
+    const from = match.groups[rule.fromGroup];
+    const to = match.groups[rule.toGroup];
+
     if (from === undefined) {
         throw new TypeError(`Collapse rule for label "${rule.label}" requires capture group "${rule.fromGroup}"`);
     }
@@ -125,13 +151,33 @@ function getRuleGroups(match: CollapseMatch, rule: CollapseRule): Readonly<[stri
     return [ key, from, to ];
 }
 
+function getSemverGroup(match: CollapseMatch, rule: HighestVersionCollapseRule): string {
+    const version = match.groups[rule.versionGroup];
+
+    if (version === undefined) {
+        throw new TypeError(`Collapse rule for label "${rule.label}" requires capture group "${rule.versionGroup}"`);
+    }
+
+    const parsedVersion = semver.coerce(version);
+    if (parsedVersion === null) {
+        throw new TypeError(
+            `Collapse rule for label "${rule.label}" requires semver capture group "${rule.versionGroup}"`
+        );
+    }
+
+    return parsedVersion.version;
+}
+
 function renderCollapsedTitle(replace: string, groups: Readonly<Record<string, string>>): string {
     return replace.replaceAll(/\$<(?<groupName>[^>]+)>/gu, function (_match, groupName: string) {
         return groups[groupName] ?? '';
     });
 }
 
-function getRuleMatch(entry: ChangelogEntryWithLabel, rule: CollapseRule): RuleMatch | undefined {
+function getVersionChainRuleMatch(
+    entry: ChangelogEntryWithLabel,
+    rule: VersionChainCollapseRule
+): RuleMatch | undefined {
     const match = rule.pattern.exec(entry.title);
 
     if (match?.groups === undefined) {
@@ -141,6 +187,23 @@ function getRuleMatch(entry: ChangelogEntryWithLabel, rule: CollapseRule): RuleM
     const [ key, from, to ] = getRuleGroups({ groups: match.groups }, rule);
 
     return { key, from, to, groups: { ...match.groups } };
+}
+
+function getHighestVersionRuleMatch(
+    entry: ChangelogEntryWithLabel,
+    rule: HighestVersionCollapseRule
+): HighestVersionRuleMatch | undefined {
+    const match = rule.pattern.exec(entry.title);
+
+    if (match?.groups === undefined) {
+        return undefined;
+    }
+
+    const groups = { ...match.groups };
+    const key = getRuleKey({ groups }, rule);
+    const version = getSemverGroup({ groups }, rule);
+
+    return { key, version, groups };
 }
 
 function createExtendedChain(
@@ -199,9 +262,9 @@ function createUpdatedChainsByKey(
     chainsByKey: ReadonlyMap<string, readonly CollapseChain[]>,
     entry: ChangelogEntryWithLabel,
     index: number,
-    rule: CollapseRule
+    rule: VersionChainCollapseRule
 ): ReadonlyMap<string, readonly CollapseChain[]> {
-    const ruleMatch = getRuleMatch(entry, rule);
+    const ruleMatch = getVersionChainRuleMatch(entry, rule);
 
     if (ruleMatch === undefined) {
         return chainsByKey;
@@ -217,11 +280,71 @@ function createUpdatedChainsByKey(
 
 function createChainsByKey(
     entries: readonly ChangelogEntryWithLabel[],
-    rule: CollapseRule
+    rule: VersionChainCollapseRule
 ): ReadonlyMap<string, readonly CollapseChain[]> {
     return entries.reduce<ReadonlyMap<string, readonly CollapseChain[]>>(function (chainsByKey, entry, index) {
         return createUpdatedChainsByKey(chainsByKey, entry, index, rule);
     }, new Map<string, readonly CollapseChain[]>());
+}
+
+function createHighestVersionCollapseGroup(
+    index: number,
+    entry: ChangelogEntryWithLabel,
+    ruleMatch: HighestVersionRuleMatch
+): HighestVersionCollapseGroup {
+    return {
+        ...createCollapseChain(index, entry, ruleMatch.groups),
+        version: ruleMatch.version
+    };
+}
+
+function extendHighestVersionCollapseGroup(
+    group: HighestVersionCollapseGroup,
+    entry: ChangelogEntryWithLabel,
+    index: number,
+    ruleMatch: HighestVersionRuleMatch
+): HighestVersionCollapseGroup {
+    const highestVersionGroups = semver.gt(ruleMatch.version, group.version) ? ruleMatch.groups : group.groups;
+    const highestVersion = semver.gt(ruleMatch.version, group.version) ? ruleMatch.version : group.version;
+
+    return {
+        ...group,
+        indexes: [ ...group.indexes, index ],
+        groups: highestVersionGroups,
+        version: highestVersion,
+        pullRequestIds: [ ...group.pullRequestIds, ...entry.pullRequestIds ]
+    };
+}
+
+function updateHighestVersionGroupsByKey(
+    groupsByKey: ReadonlyMap<string, HighestVersionCollapseGroup>,
+    entry: ChangelogEntryWithLabel,
+    index: number,
+    rule: HighestVersionCollapseRule
+): ReadonlyMap<string, HighestVersionCollapseGroup> {
+    const ruleMatch = getHighestVersionRuleMatch(entry, rule);
+
+    if (ruleMatch === undefined) {
+        return groupsByKey;
+    }
+
+    const nextGroupsByKey = new Map(groupsByKey);
+    const group = groupsByKey.get(ruleMatch.key);
+    const nextGroup = group === undefined
+        ? createHighestVersionCollapseGroup(index, entry, ruleMatch)
+        : extendHighestVersionCollapseGroup(group, entry, index, ruleMatch);
+
+    nextGroupsByKey.set(ruleMatch.key, nextGroup);
+    return nextGroupsByKey;
+}
+
+function createHighestVersionGroupsByKey(
+    entries: readonly ChangelogEntryWithLabel[],
+    rule: HighestVersionCollapseRule
+): ReadonlyMap<string, HighestVersionCollapseGroup> {
+    return entries.reduce<ReadonlyMap<string, HighestVersionCollapseGroup>>(function (groupsByKey, entry, index) {
+        return updateHighestVersionGroupsByKey(groupsByKey, entry, index, rule);
+    }, new Map<string, HighestVersionCollapseGroup>());
 }
 
 function createCollapsedEntriesByIndex(
@@ -255,12 +378,43 @@ function createCollapsedEntriesByIndex(
     return [ collapsedEntries, skippedIndexes ];
 }
 
+function createHighestVersionCollapsedEntriesByIndex(
+    groupsByKey: ReadonlyMap<string, HighestVersionCollapseGroup>,
+    rule: HighestVersionCollapseRule
+): Readonly<[Map<number, ChangelogEntryWithLabel>, Set<number>]> {
+    const collapsedEntries = new Map<number, ChangelogEntryWithLabel>();
+    const skippedIndexes = new Set<number>();
+    const minimumGroupLength = 2;
+    const collapsedGroups = Array
+        .from(groupsByKey.values())
+        .filter(function (group) {
+            return group.indexes.length >= minimumGroupLength;
+        });
+
+    collapsedGroups.forEach(function (group) {
+        const [ , ...remainingIndexes ] = group.indexes;
+
+        collapsedEntries.set(group.firstIndex, {
+            title: renderCollapsedTitle(rule.replace, group.groups),
+            pullRequestIds: group.pullRequestIds,
+            label: rule.label
+        });
+
+        remainingIndexes.forEach(function (index) {
+            skippedIndexes.add(index);
+        });
+    });
+
+    return [ collapsedEntries, skippedIndexes ];
+}
+
 function collapseEntriesForRule(
     entries: readonly ChangelogEntryWithLabel[],
     rule: CollapseRule
 ): readonly ChangelogEntryWithLabel[] {
-    const chainsByKey = createChainsByKey(entries, rule);
-    const [ collapsedEntries, skippedIndexes ] = createCollapsedEntriesByIndex(chainsByKey, rule);
+    const [ collapsedEntries, skippedIndexes ] = isHighestVersionCollapseRule(rule)
+        ? createHighestVersionCollapsedEntriesByIndex(createHighestVersionGroupsByKey(entries, rule), rule)
+        : createCollapsedEntriesByIndex(createChainsByKey(entries, rule), rule);
 
     return entries.flatMap(function (entry, index) {
         if (skippedIndexes.has(index)) {

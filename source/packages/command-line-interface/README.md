@@ -91,7 +91,8 @@ Each collapse rule:
 - applies only to one label
 - matches pull request titles with a regular expression
 - groups entries by one named capture group
-- collapses only continuous chains where one entry ends with the version the next entry starts from
+- collapses continuous chains where one entry ends with the version the next entry starts from
+- can collapse entries without a previous version by selecting the highest semver capture group
 - renders the collapsed title with a replacement template
 
 ```json
@@ -121,6 +122,25 @@ become one changelog entry:
 The default capture group names are `dependency`, `from`, and `to`.
 If your title format uses different names, you can override them with `keyGroup`, `fromGroup`, and `toGroup`.
 Collapsed entries include links to all pull requests that contributed to the final line item.
+
+For title formats that only contain the new version, configure `versionGroup` instead of `fromGroup` and `toGroup`:
+
+```json
+{
+    "pr-log": {
+        "collapseRules": [
+            {
+                "label": "upgrade",
+                "pattern": "^Update dependency (?<dependency>.+?) to (?<to>.+?)$",
+                "replace": "Update dependency $<dependency> to $<to>",
+                "versionGroup": "to"
+            }
+        ]
+    }
+}
+```
+
+With that configuration, pr-log selects the highest semver value captured by `to` for each dependency.
 
 ## Usage
 
