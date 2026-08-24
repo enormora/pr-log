@@ -117,6 +117,10 @@ function releasePullRequestSettings() {
 export async function buildConfig() {
     const packageInfo = await readPackageInfo();
     const sharedAttributes = sharedPackageAttributes(packageInfo);
+    const versionedDependencyUpdatePattern =
+        '^(?<prefix>⬆️ )?Update dependency (?<dependency>.+?) from (?<from>.+?) to (?<to>.+?)$';
+    const groupedDependencyUpdatePattern =
+        '^(?<prefix>⬆️ )?(?<dependency>Lock file maintenance|Update .+ dependencies)(?<from>)(?<to>)$';
 
     return {
         registrySettings: registrySettings(),
@@ -127,13 +131,13 @@ export async function buildConfig() {
                 collapseRules: [
                     {
                         label: 'upgrade',
-                        pattern: '^⬆️ Update dependency (?<dependency>.+?) from (?<from>.+?) to (?<to>.+?)$',
-                        replace: '⬆️ Update dependency $<dependency> from $<from> to $<to>'
+                        pattern: versionedDependencyUpdatePattern,
+                        replace: '$<prefix>Update dependency $<dependency> from $<from> to $<to>'
                     },
                     {
                         label: 'upgrade',
-                        pattern: '^⬆️ (?<dependency>Lock file maintenance|Update .+ dependencies)(?<from>)(?<to>)$',
-                        replace: '⬆️ $<dependency>'
+                        pattern: groupedDependencyUpdatePattern,
+                        replace: '$<prefix>$<dependency>'
                     }
                 ]
             },
