@@ -72,6 +72,13 @@ const config = {
             replace: 'Update dependency $<dependency> to $<to>',
             keyGroup: 'dependency',
             versionGroup: 'to'
+        },
+        {
+            label: 'change',
+            pattern: /^⬆️ Update (?<dependency>.+?)$/u,
+            replace: '⬆️ Update $<dependency>',
+            keyGroup: 'dependency',
+            collapse: 'same'
         }
     ],
     versionBumps: {

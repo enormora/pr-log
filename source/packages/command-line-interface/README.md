@@ -93,6 +93,7 @@ Each collapse rule:
 - groups entries by one named capture group
 - collapses continuous chains where one entry ends with the version the next entry starts from
 - can collapse entries without a previous version by selecting the highest semver capture group
+- can collapse repeated entries without version captures
 - renders the collapsed title with a replacement template
 
 ```json
@@ -141,6 +142,26 @@ For title formats that only contain the new version, configure `versionGroup` in
 ```
 
 With that configuration, pr-log selects the highest semver value captured by `to` for each dependency.
+
+For grouped titles that contain no version, configure `collapse` as `same`:
+
+```json
+{
+    "pr-log": {
+        "collapseRules": [
+            {
+                "label": "upgrade",
+                "pattern": "^⬆️ Update (?<dependency>.+?)$",
+                "replace": "⬆️ Update $<dependency>",
+                "collapse": "same"
+            }
+        ]
+    }
+}
+```
+
+With that configuration, repeated titles such as `⬆️ Update eslint` are rendered once with all pull request links.
+The captured group can also include Renovate group names, such as `@overkill-dev dependencies`, `Linting-related dependencies`, or `group:monorepos`.
 
 ## Usage
 
