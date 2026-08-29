@@ -1,9 +1,9 @@
 import assert from 'node:assert';
 import { stub, type SinonSpy } from 'sinon';
-import type _prependFile from 'prepend-file';
 import type { Logger } from 'loglevel';
 import { Factory, type DeepPartial } from 'fishery';
 import { nothing } from 'true-myth/maybe';
+import type { PrependTextFile } from './prepend-text-file.ts';
 import { createCliRunner, type CliRunner, type CliRunnerDependencies } from './cli.ts';
 import type { CliRunOptions } from './cli-run-options.ts';
 import { defaultPrLogConfig } from './pr-log-config.ts';
@@ -28,7 +28,7 @@ function createDefaultCliDependencies(): CliRunnerDependencies {
         getMergedPullRequests: stub().resolves([]),
         renderChangelogMarkdown: stub().returns(''),
         getCurrentDate: stub().returns(new Date(0)),
-        prependFile: stub().resolves() as unknown as typeof _prependFile,
+        prependTextFile: stub().resolves() as PrependTextFile,
         packageInfo: { repository: { url: 'https://github.com/foo/bar.git' } },
         logger: { log: stub() } as unknown as Logger
     };
@@ -147,9 +147,9 @@ for (const throwsTestCase of throwsTestCases) {
 test('does not throw if the repository is dirty', async function () {
     const ensureCleanLocalGitState = stub().rejects(new Error('Local copy is not clean'));
     const renderChangelogMarkdown = stub().returns('sloppy changelog');
-    const prependFile = stub().resolves();
+    const prependTextFile = stub().resolves();
     const cli = createCli({
-        prependFile: prependFile as unknown as typeof _prependFile,
+        prependTextFile: prependTextFile as PrependTextFile,
         ensureCleanLocalGitState,
         renderChangelogMarkdown
     });
@@ -159,7 +159,7 @@ test('does not throw if the repository is dirty', async function () {
 
     await cli.run(options);
 
-    assertSpyCalls(prependFile, [ [ '/foo/CHANGELOG.md', 'sloppy changelog\n\n' ] ]);
+    assertSpyCalls(prependTextFile, [ [ '/foo/CHANGELOG.md', 'sloppy changelog\n\n' ] ]);
 });
 
 test('uses custom labels if they are provided in package.json', async function () {
@@ -250,12 +250,12 @@ test('calls getMergedPullRequests with the correct repo', async function () {
 
 test('reports the generated changelog to stdout and not to a file when stdout is set to true', async function () {
     const renderChangelogMarkdown = stub().returns('generated changelog');
-    const prependFile = stub().resolves();
+    const prependTextFile = stub().resolves();
     const log = stub();
 
     const cli = createCli({
         renderChangelogMarkdown,
-        prependFile: prependFile as unknown as typeof _prependFile,
+        prependTextFile: prependTextFile as PrependTextFile,
         logger: { log } as unknown as Logger
     });
 
@@ -275,18 +275,18 @@ test('reports the generated changelog to stdout and not to a file when stdout is
         versionNumber: '1.2.3'
     });
 
-    assert.strictEqual(prependFile.callCount, 0);
+    assert.strictEqual(prependTextFile.callCount, 0);
 
     assertSpyCalls(log, [ [ 'generated changelog' ] ]);
 });
 
 test('reports the generated changelog to a file when stdout is set to false', async function () {
     const renderChangelogMarkdown = stub().returns('generated changelog');
-    const prependFile = stub().resolves();
+    const prependTextFile = stub().resolves();
 
     const cli = createCli({
         renderChangelogMarkdown,
-        prependFile: prependFile as unknown as typeof _prependFile
+        prependTextFile: prependTextFile as PrependTextFile
     });
     const options = cliRunOptionsFactory.build({
         stdout: false
@@ -304,16 +304,16 @@ test('reports the generated changelog to a file when stdout is set to false', as
         versionNumber: '1.2.3'
     });
 
-    assertSpyCalls(prependFile, [ [ '/foo/CHANGELOG.md', 'generated changelog\n\n' ] ]);
+    assertSpyCalls(prependTextFile, [ [ '/foo/CHANGELOG.md', 'generated changelog\n\n' ] ]);
 });
 
 test('reports the generated unreleased changelog to a file when stdout is set to false', async function () {
     const renderChangelogMarkdown = stub().returns('generated changelog');
-    const prependFile = stub().resolves();
+    const prependTextFile = stub().resolves();
 
     const cli = createCli({
         renderChangelogMarkdown,
-        prependFile: prependFile as unknown as typeof _prependFile
+        prependTextFile: prependTextFile as PrependTextFile
     });
     const options: CliRunOptions = {
         unreleased: true,
@@ -336,17 +336,17 @@ test('reports the generated unreleased changelog to a file when stdout is set to
         versionNumber: undefined
     });
 
-    assertSpyCalls(prependFile, [ [ '/foo/CHANGELOG.md', 'generated changelog\n\n' ] ]);
+    assertSpyCalls(prependTextFile, [ [ '/foo/CHANGELOG.md', 'generated changelog\n\n' ] ]);
 });
 
 test('derives the version number automatically from merged pull request labels', async function () {
     const renderChangelogMarkdown = stub().returns('generated changelog');
-    const prependFile = stub().resolves();
+    const prependTextFile = stub().resolves();
     const getLatestVersionTag = stub().resolves('1.2.3');
     const getMergedPullRequests = stub().resolves([ { id: 1, title: 'Add thing', label: 'feature' } ]);
     const cli = createCli({
         renderChangelogMarkdown,
-        prependFile: prependFile as unknown as typeof _prependFile,
+        prependTextFile: prependTextFile as PrependTextFile,
         getLatestVersionTag,
         getMergedPullRequests
     });
@@ -374,7 +374,7 @@ test('derives the version number automatically from merged pull request labels',
 
 test('uses configured version bump labels for auto-versioning', async function () {
     const renderChangelogMarkdown = stub().returns('generated changelog');
-    const prependFile = stub().resolves();
+    const prependTextFile = stub().resolves();
     const getLatestVersionTag = stub().resolves('1.2.3');
     const getMergedPullRequests = stub().resolves([ { id: 1, title: 'Docs', label: 'documentation' } ]);
     const packageInfo = {
@@ -387,7 +387,7 @@ test('uses configured version bump labels for auto-versioning', async function (
     };
     const cli = createCli({
         renderChangelogMarkdown,
-        prependFile: prependFile as unknown as typeof _prependFile,
+        prependTextFile: prependTextFile as PrependTextFile,
         getLatestVersionTag,
         getMergedPullRequests,
         packageInfo
@@ -424,14 +424,14 @@ test('strips trailing empty lines from the generated changelog', async function 
     const renderChangelogMarkdown = stub().returns(
         'generated\nchangelog\nwith\n\na\nlot\n\nof\nempty\nlines\n\n\n\n\n'
     );
-    const prependFile = stub().resolves();
+    const prependTextFile = stub().resolves();
 
-    const cli = createCli({ renderChangelogMarkdown, prependFile: prependFile as unknown as typeof _prependFile });
+    const cli = createCli({ renderChangelogMarkdown, prependTextFile: prependTextFile as PrependTextFile });
     const options = cliRunOptionsFactory.build();
 
     await cli.run(options);
 
-    assert.deepStrictEqual(prependFile.firstCall.args, [
+    assert.deepStrictEqual(prependTextFile.firstCall.args, [
         '/foo/CHANGELOG.md',
         'generated\nchangelog\nwith\n\na\nlot\n\nof\nempty\nlines\n\n'
     ]);

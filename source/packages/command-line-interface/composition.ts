@@ -2,7 +2,6 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Octokit } from '@octokit/rest';
 import { execa } from 'execa';
-import prependFile from 'prepend-file';
 import loglevel from 'loglevel';
 import { createCliRunner, type CliRunnerDependencies } from '../../lib/cli.ts';
 import { ensureCleanLocalGitStateFactory } from '../../lib/ensure-clean-local-git-state.ts';
@@ -15,6 +14,7 @@ import {
     createMergedPullRequestReader
 } from '../../lib/pr-log-engine-cli-adapter.ts';
 import { createJsonFileReader } from '../../lib/read-json-file.ts';
+import { prependTextFile } from '../../lib/prepend-text-file.ts';
 import { createRemoteAliasReader } from '../../lib/remote-alias-reader.ts';
 import { createPullRequestLabelValidator } from '../../lib/validate-pull-request-labels.ts';
 import { createPrLogEngine, defaultPrLogConfig } from '../core/core.entry-point.ts';
@@ -85,7 +85,7 @@ const commandLineInterfaceProgram = createProgram({
     createCliRunner({ defaultBranch, packageInfo }) {
         const dependencies: CliRunnerDependencies = {
             defaultPrLogConfig,
-            prependFile,
+            prependTextFile,
             packageInfo,
             logger: loglevel,
             ensureCleanLocalGitState: ensureCleanLocalGitStateFactory(
