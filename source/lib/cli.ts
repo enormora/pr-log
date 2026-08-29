@@ -1,8 +1,8 @@
-import type _prependFile from 'prepend-file';
 import type { Logger } from 'loglevel';
 import type { CliRunOptions } from './cli-run-options.ts';
 import type { GetMergedPullRequests } from './get-merged-pull-requests.ts';
 import type { EnsureCleanLocalGitState } from './ensure-clean-local-git-state.ts';
+import type { PrependTextFile } from './prepend-text-file.ts';
 import { getGithubRepoFromPackageInfo } from './package-info.ts';
 import {
     createPrLogConfigFromPackageInfo,
@@ -28,7 +28,7 @@ export type CliRunnerDependencies = {
     readonly renderChangelogMarkdown: typeof renderChangelogMarkdown;
     readonly getCurrentDate: () => Readonly<Date>;
     readonly packageInfo: Readonly<Record<string, unknown>>;
-    readonly prependFile: typeof _prependFile;
+    readonly prependTextFile: PrependTextFile;
     readonly logger: Logger;
 };
 
@@ -52,7 +52,7 @@ type ChangelogData = {
     readonly mergedPullRequests: Awaited<ReturnType<GetMergedPullRequests>>;
 };
 
-type WriteChangelogContext = Pick<CliRunnerDependencies, 'logger' | 'prependFile'>;
+type WriteChangelogContext = Pick<CliRunnerDependencies, 'logger' | 'prependTextFile'>;
 
 type ChangelogRequest = {
     readonly githubRepo: string;
@@ -148,13 +148,13 @@ async function writeChangelog(
     changelog: string,
     options: CliRunOptions
 ): Promise<void> {
-    const { prependFile, logger } = context;
+    const { prependTextFile, logger } = context;
     const trimmedChangelog = changelog.trim();
 
     if (options.stdout) {
         logger.log(trimmedChangelog);
     } else {
-        await prependFile(options.changelogPath, `${trimmedChangelog}\n\n`);
+        await prependTextFile(options.changelogPath, `${trimmedChangelog}\n\n`);
     }
 }
 
