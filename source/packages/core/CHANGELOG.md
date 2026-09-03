@@ -1,3 +1,25 @@
+## 0.0.5 (September 3, 2026)
+
+### Features
+
+* Add `collapse: "same"` changelog collapse rules ([#718](https://github.com/enormora/pr-log/pull/718))
+* Add `versionGroup` collapse rules ([#717](https://github.com/enormora/pr-log/pull/717))
+* Detect single-parent (squash-merge-like) commits ([#656](https://github.com/enormora/pr-log/pull/656))
+
+### Dependency Upgrades
+
+* Update dependency `@packtory/cli` to `0.0.77` ([#681](https://github.com/enormora/pr-log/pull/681))
+* ⬆️ Update eslint ([#658](https://github.com/enormora/pr-log/pull/658))
+* Update dependency execa to v10.0.1 ([#684](https://github.com/enormora/pr-log/pull/684), [#660](https://github.com/enormora/pr-log/pull/660))
+
+### Code Refactoring
+
+* Revert Packtory declaration workarounds ([#682](https://github.com/enormora/pr-log/pull/682))
+
+### Build-Related
+
+* Align Node engines with CI ([#697](https://github.com/enormora/pr-log/pull/697))
+
 ## 0.0.4 (July 13, 2026)
 
 ### Features

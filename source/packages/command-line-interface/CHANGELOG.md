@@ -1,3 +1,25 @@
+## 6.5.0 (September 3, 2026)
+
+### Features
+
+* Add `collapse: "same"` changelog collapse rules ([#718](https://github.com/enormora/pr-log/pull/718))
+* Add `versionGroup` collapse rules ([#717](https://github.com/enormora/pr-log/pull/717))
+* Detect single-parent (squash-merge-like) commits ([#656](https://github.com/enormora/pr-log/pull/656))
+
+### Dependency Upgrades
+
+* Update dependency `@packtory/cli` to `0.0.77` ([#681](https://github.com/enormora/pr-log/pull/681))
+* Update @pr-log/core to 0.0.5
+* Update dependency execa to v10.0.1 ([#684](https://github.com/enormora/pr-log/pull/684), [#660](https://github.com/enormora/pr-log/pull/660))
+
+### Code Refactoring
+
+* Revert Packtory declaration workarounds ([#682](https://github.com/enormora/pr-log/pull/682))
+
+### Build-Related
+
+* Align Node engines with CI ([#697](https://github.com/enormora/pr-log/pull/697))
+
 ## 6.4.1 (July 13, 2026)
 
 ### Dependency Upgrades
