@@ -43,8 +43,8 @@ function registrySettings() {
 
 function publishedPackageFiles(readmePath) {
     return [
-        { sourceFilePath: licensePath, targetFilePath: 'LICENSE' },
-        { sourceFilePath: readmePath, targetFilePath: 'README.md' }
+        { inputFilePath: licensePath, targetFilePath: 'LICENSE' },
+        { inputFilePath: readmePath, targetFilePath: 'README.md' }
     ];
 }
 
