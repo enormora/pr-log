@@ -120,9 +120,9 @@ export async function buildConfig() {
     const versionedDependencyUpdatePattern =
         '^(?<prefix>⬆️ )?Update dependency (?<dependency>.+?) from (?<from>.+?) to (?<to>.+?)$';
     const singleVersionDependencyUpdatePattern =
-        '^(?<prefix>⬆️ )?Update (?:dependency )?`?(?<dependency>.+?)`? to `?(?<to>[^` ]+)`?(?<from>)$';
+        '^(?<prefix>⬆️ )?Update (?:dependency )?`?(?<dependency>.+?)`? to `?(?<to>[^` ]+)`?$';
     const groupedDependencyUpdatePattern =
-        '^(?<prefix>⬆️ )?(?<dependency>Lock file maintenance|Update (?:.+ dependencies|eslint))(?<from>)(?<to>)$';
+        '^(?<prefix>⬆️ )?(?<dependency>Lock file maintenance|Update (?:.+ dependencies|eslint))$';
 
     return {
         registrySettings: registrySettings(),
@@ -140,12 +140,13 @@ export async function buildConfig() {
                         label: 'upgrade',
                         pattern: singleVersionDependencyUpdatePattern,
                         replace: '$<prefix>Update dependency $<dependency> to $<to>',
-                        toGroup: 'from'
+                        versionGroup: 'to'
                     },
                     {
                         label: 'upgrade',
                         pattern: groupedDependencyUpdatePattern,
-                        replace: '$<prefix>$<dependency>'
+                        replace: '$<prefix>$<dependency>',
+                        collapse: 'same'
                     }
                 ]
             },
