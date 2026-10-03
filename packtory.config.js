@@ -104,6 +104,7 @@ function releasePullRequestSettings() {
                 'Node v22',
                 'Node v24',
                 'Node v26',
+                'Package checks',
                 'Release PR policy',
                 'Workflow security analysis'
             ]
@@ -170,6 +171,7 @@ export async function buildConfig() {
             noUnusedBundleDependencies: { enabled: true },
             noDevDependencyImports: { enabled: true },
             uniqueTargetPaths: { enabled: true },
+            noUnexposedExecutables: { enabled: true },
             noSideEffects: { enabled: false }
         },
         releasePullRequest: releasePullRequestSettings(),
