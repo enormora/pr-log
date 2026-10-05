@@ -45,11 +45,6 @@ jobs:
               run: npx just compile
             - name: Run tests
               run: npx just test
-            - name: Check packages
-              if: matrix.node-version == 24
-              env:
-                  GH_TOKEN: ${{ github.token }}
-              run: npx just publish-dry-run
             - name: Coveralls
               if: matrix.node-version == 24
               continue-on-error: true
@@ -59,6 +54,29 @@ jobs:
                   github-token: ${{ secrets.GITHUB_TOKEN }}
                   path-to-lcov: ./target/coverage/lcov.info
                   fail-on-error: false
+
+    package-checks:
+        needs: build
+        runs-on: ubuntu-latest
+        name: Package checks
+        permissions:
+            contents: read # required for actions/checkout to read the workflow source
+            pull-requests: read # required to read release PR files and metadata
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  fetch-depth: 0
+                  persist-credentials: false
+            - name: Use Node.js
+              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version: 26
+            - name: Install dependencies
+              run: npm clean-install --ignore-scripts
+            - name: Check packages
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: npx just publish-dry-run
 
     workflow-security:
         runs-on: ubuntu-latest
@@ -105,7 +123,7 @@ jobs:
             - name: Use Node.js
               uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
-                  node-version: 24
+                  node-version: 26
 
             - name: Install dependencies
               run: npm clean-install --ignore-scripts
@@ -117,7 +135,7 @@ jobs:
               run: npx just validate-release-pr
 
     publish-release:
-        needs: build
+        needs: [build, package-checks]
         name: Publish release
         if: >
             github.event_name == 'push' ||
@@ -138,7 +156,11 @@ jobs:
             always() &&
             (
                 github.event_name == 'push' ||
-                (github.event_name == 'workflow_dispatch' && inputs.release_pull_request_number == '')
+                (
+                    github.event_name == 'workflow_dispatch' &&
+                    github.ref_name == 'main' &&
+                    inputs.release_pull_request_number == ''
+                )
             ) &&
             needs.publish-release.result != 'failure' &&
             needs.publish-release.result != 'cancelled'
@@ -158,7 +180,7 @@ jobs:
             - name: Use Node.js
               uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
-                  node-version: 24
+                  node-version: 26
 
             - name: Install dependencies
               run: npm clean-install --ignore-scripts
