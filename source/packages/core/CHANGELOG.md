@@ -1,3 +1,9 @@
+## 0.0.6 (November 14, 2026)
+
+### Dependency Upgrades
+
+* ⬆️ Update dependency execa to v10.1.0 ([#766](https://github.com/enormora/pr-log/pull/766))
+
 ## 0.0.5 (September 14, 2026)
 
 ### Features

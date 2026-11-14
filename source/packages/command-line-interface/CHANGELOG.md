@@ -1,3 +1,10 @@
+## 6.5.1 (November 14, 2026)
+
+### Dependency Upgrades
+
+* Update @pr-log/core to 0.0.6
+* ⬆️ Update dependency execa to v10.1.0 ([#766](https://github.com/enormora/pr-log/pull/766))
+
 ## 6.5.0 (September 14, 2026)
 
 ### Features
