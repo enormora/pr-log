@@ -223,7 +223,7 @@ function parsePullRequestId(value: string): number {
 
 function extractPullRequestId(subject: string): number | undefined {
     const matches = /^Merge pull request #(?<id>\d+) from .*$/u.exec(subject);
-    const pullRequestIdentifier = matches?.groups?.['id'];
+    const pullRequestIdentifier = matches?.groups?.id;
 
     if (isUndefined(pullRequestIdentifier)) {
         if (subject.startsWith('Merge pull request ')) {
@@ -238,7 +238,7 @@ function extractPullRequestId(subject: string): number | undefined {
 
 function extractRevertedPullRequestId(subject: string): number | undefined {
     const matches = /^Revert "Merge pull request #(?<id>\d+) from .*"$/u.exec(subject);
-    const pullRequestIdentifier = matches?.groups?.['id'];
+    const pullRequestIdentifier = matches?.groups?.id;
 
     if (isUndefined(pullRequestIdentifier)) {
         if (subject.startsWith('Revert "Merge pull request ')) {
@@ -253,8 +253,8 @@ function extractRevertedPullRequestId(subject: string): number | undefined {
 
 function getPullRequestSubjectMatch(subject: string): PullRequestSubjectMatch | undefined {
     const groups = /^(?<title>.+) \(#(?<pullRequestIdentifier>\d+)\)$/u.exec(subject)?.groups;
-    const pullRequestIdentifier = groups?.['pullRequestIdentifier'];
-    const title = groups?.['title'];
+    const pullRequestIdentifier = groups?.pullRequestIdentifier;
+    const title = groups?.title;
 
     if (isUndefined(pullRequestIdentifier) || isUndefined(title)) {
         return undefined;
@@ -283,7 +283,7 @@ function extractPullRequestSubjectCommit(
 
 function extractRevertedCommitHash(commitBody: string | undefined): string | undefined {
     const matches = /^This reverts commit (?<hash>[0-9a-f]+)\./mu.exec(commitBody ?? '');
-    return matches?.groups?.['hash'];
+    return matches?.groups?.hash;
 }
 
 function collectActiveFirstParentCommitLogs(
