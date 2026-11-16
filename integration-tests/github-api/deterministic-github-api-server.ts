@@ -56,12 +56,12 @@ function writeJson(response: ServerResponse, statusCode: number, body: unknown, 
 function pullRequestFilesRoute(request: IncomingMessage, url: URL): PullRequestFilesRoute | undefined {
     const match = /^\/repos\/[^/]+\/[^/]+\/pulls\/(?<pullRequestId>\d+)\/files$/u.exec(url.pathname);
 
-    if (request.method !== 'GET' || match?.groups?.pullRequestId === undefined) {
+    if (request.method !== 'GET' || match?.groups?.['pullRequestId'] === undefined) {
         return undefined;
     }
 
     return {
-        pullRequestId: Number.parseInt(match.groups.pullRequestId, 10),
+        pullRequestId: Number.parseInt(match.groups['pullRequestId'], 10),
         page: Number.parseInt(url.searchParams.get('page') ?? '1', 10),
         path: url.pathname
     };

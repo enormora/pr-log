@@ -10,9 +10,9 @@ export function getGithubRepoFromPackageInfo(packageInfo: PackageInfo): string {
         throw new Error('Repository information missing in package.json');
     }
 
-    if (!isString(repository.url)) {
+    if (!isString(repository['url'])) {
         throw new TypeError('Repository url is not a string in package.json');
     }
 
-    return getGithubRepo(repository.url);
+    return getGithubRepo(repository['url']);
 }

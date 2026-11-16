@@ -21,9 +21,9 @@ function readStringValue(value: unknown): string {
 
 export function createPackageMetadata(packageJson: Readonly<Record<string, unknown>>): PackageMetadata {
     return {
-        name: readStringValue(packageJson.name),
-        description: readStringValue(packageJson.description),
-        version: readStringValue(packageJson.version)
+        name: readStringValue(packageJson['name']),
+        description: readStringValue(packageJson['description']),
+        version: readStringValue(packageJson['version'])
     };
 }
 
