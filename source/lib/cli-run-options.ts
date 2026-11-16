@@ -49,9 +49,9 @@ function getCommonRunOptions(options: CreateCliRunOptions): CommonRunOptions {
     const { commandOptions, changelogPath } = options;
 
     return {
-        sloppy: commandOptions.sloppy === true,
+        sloppy: commandOptions['sloppy'] === true,
         changelogPath,
-        stdout: commandOptions.stdout === true
+        stdout: commandOptions['stdout'] === true
     };
 }
 
@@ -116,9 +116,9 @@ function createReleasedRunOptions(
 export function createCliRunOptions(options: CreateCliRunOptions): Result<CliRunOptions, InvalidArgumentError> {
     const { versionNumber, commandOptions } = options;
     const commonRunOptions = getCommonRunOptions(options);
-    const autoVersion = commandOptions.autoVersion === true;
+    const autoVersion = commandOptions['autoVersion'] === true;
 
-    if (commandOptions.unreleased === true) {
+    if (commandOptions['unreleased'] === true) {
         return createUnreleasedRunOptions(commonRunOptions, versionNumber, autoVersion);
     }
 
