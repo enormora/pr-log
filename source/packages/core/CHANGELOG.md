@@ -1,3 +1,14 @@
+## 0.0.6 (November 17, 2026)
+
+### Dependency Upgrades
+
+* ⬆️ Update dependency execa to v10.1.0 ([#766](https://github.com/enormora/pr-log/pull/766))
+
+### Build-Related
+
+* Update `@enormora/tsconfig` to `0.0.3` ([#786](https://github.com/enormora/pr-log/pull/786))
+* Adopt `@enormora/tsconfig` ([#785](https://github.com/enormora/pr-log/pull/785))
+
 ## 0.0.5 (September 14, 2026)
 
 ### Features
