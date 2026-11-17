@@ -78,8 +78,8 @@ function getValidLabels(
 ): ReadonlyMap<string, string> {
     const prLogConfig = packageInfo['pr-log'];
 
-    if (isPlainObject(prLogConfig) && Array.isArray(prLogConfig['validLabels'])) {
-        return new Map(prLogConfig['validLabels']);
+    if (isPlainObject(prLogConfig) && Array.isArray(prLogConfig.validLabels)) {
+        return new Map(prLogConfig.validLabels);
     }
 
     return fallbackValidLabels;
@@ -111,7 +111,7 @@ function getRequiredStringField(rule: Readonly<Record<string, unknown>>, fieldNa
 }
 
 function createCollapseRuleBase(rule: Readonly<Record<string, unknown>>): CollapseRuleBase {
-    const customKeyGroup = rule['keyGroup'];
+    const customKeyGroup = rule.keyGroup;
 
     return {
         label: getRequiredStringField(rule, 'label'),
@@ -156,8 +156,8 @@ function createVersionChainCollapseRule(
     baseRule: CollapseRuleBase,
     rule: Readonly<Record<string, unknown>>
 ): VersionChainCollapseRule {
-    const customFromGroup = rule['fromGroup'];
-    const customToGroup = rule['toGroup'];
+    const customFromGroup = rule.fromGroup;
+    const customToGroup = rule.toGroup;
 
     return {
         ...baseRule,
@@ -168,8 +168,8 @@ function createVersionChainCollapseRule(
 
 function createCollapseRule(rule: Readonly<Record<string, unknown>>): CollapseRule {
     const baseRule = createCollapseRuleBase(rule);
-    const sameTitleRule = createSameTitleCollapseRule(baseRule, rule['collapse']);
-    const highestVersionRule = createHighestVersionCollapseRule(baseRule, rule['versionGroup']);
+    const sameTitleRule = createSameTitleCollapseRule(baseRule, rule.collapse);
+    const highestVersionRule = createHighestVersionCollapseRule(baseRule, rule.versionGroup);
 
     return sameTitleRule ?? highestVersionRule ?? createVersionChainCollapseRule(baseRule, rule);
 }
@@ -177,11 +177,11 @@ function createCollapseRule(rule: Readonly<Record<string, unknown>>): CollapseRu
 function getCollapseRules(packageInfo: PackageInfo): readonly CollapseRule[] {
     const prLogConfig = packageInfo['pr-log'];
 
-    if (!isPlainObject(prLogConfig) || !isArray(prLogConfig['collapseRules'])) {
+    if (!isPlainObject(prLogConfig) || !isArray(prLogConfig.collapseRules)) {
         return [];
     }
 
-    return prLogConfig['collapseRules'].map(function (rule) {
+    return prLogConfig.collapseRules.map(function (rule) {
         if (!isPlainObject(rule)) {
             throw new TypeError('pr-log.collapseRules[] entries must be objects');
         }

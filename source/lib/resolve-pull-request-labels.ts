@@ -77,7 +77,7 @@ function resolveTargetScopedLabel(options: TargetScopedLabelInput): string | und
     const targetScopedLabelRegExp = createTargetScopedLabelRegExp(targetName, targetScopedLabelPattern);
     const targetScopedLabels = labels.flatMap(function (label) {
         const match = targetScopedLabelRegExp.exec(label);
-        const targetLabel = match?.groups?.['label'];
+        const targetLabel = match?.groups?.label;
 
         if (targetLabel === undefined) {
             return [];

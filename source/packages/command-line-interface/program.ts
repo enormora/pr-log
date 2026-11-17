@@ -127,7 +127,7 @@ export function createProgram(dependencies: ProgramDependencies): Program {
         .option('--auto-version', 'derive the release version from merged pull request labels', false)
         .option('--unreleased', 'include section for unreleased changes', false)
         .action(async function (versionNumber: string | undefined, commandOptions: Readonly<Record<string, unknown>>) {
-            isTracingEnabled = commandOptions['trace'] === true;
+            isTracingEnabled = commandOptions.trace === true;
             await runChangelogCommand(dependencies, versionNumber, commandOptions);
         });
 
@@ -136,7 +136,7 @@ export function createProgram(dependencies: ProgramDependencies): Program {
         .description('validate labels assigned to a GitHub pull request')
         .argument('<pull-request-number>', 'GitHub pull request number', parsePullRequestId)
         .action(async function (pullRequestId: number) {
-            isTracingEnabled = program.opts()['trace'] === true;
+            isTracingEnabled = program.opts().trace === true;
             await runPullRequestLabelValidationCommand(dependencies, pullRequestId);
         });
 
